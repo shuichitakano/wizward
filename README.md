@@ -1,31 +1,33 @@
 # Wizward
 
-Wizward is the production C++ game built on the Pixel Twins system layer.
-
-The game logic is shared between the macOS and microcontroller targets.
-Pixel Twins is included as a Git submodule under `external/pixel-twins`.
+WizwardはPixel Twinsシステム上で動作する製品版C++ゲームです。ゲームロジックはmacOS版と
+マイコン版で共有し、Pixel Twinsは`external/pixel-twins`にGitサブモジュールとして組み込みます。
 
 ## Build
 
 ```sh
 python3 tools/build_assets.py
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DWIZWARD_BUILD_APP=ON
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-## アセット動作デモ
+## macOS版アプリ
 
-SDL3を使用して、タイトル画面、生成地形、ゲーム中スプライト、フォントを実データから表示できます。
+SDL3を使用し、Pixel Twinsと共通の描画・入力・音声コードを実行します。
 
 ```sh
-cmake -S . -B build-demo -DCMAKE_BUILD_TYPE=Release -DWIZWARD_BUILD_DEMO=ON
-cmake --build build-demo --parallel
-./build-demo/wizward_asset_demo
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DWIZWARD_BUILD_APP=ON
+cmake --build build --parallel
+./build/wizward
 ```
 
-タイトルは約2.5秒後、またはSpace/Startでゲーム画面へ切り替わります。ゲーム画面では左を
-WASD、右を矢印キーでスクロールできます。Space/Startでタイトルへ戻ります。
+タイトル、ゲーム、リザルトの3状態を持ち、Startボタンで順に遷移します。タイトルは約2.5秒後にも
+ゲームへ移ります。ゲーム中は2台のコントローラーの左スティックで左右の画面を独立して操作します。
+描画は60Hz固定更新で、1秒ごとにフレーム処理時間と音声状態を標準エラーへ表示します。
+
+`assets/audio/sfx.json`は効果音の編集用定義です。BGMとSFXはPixel Twinsの変換ツールで
+実行時パース不要のC++定数へ変換し、`src/audio/`に格納しています。
 
 採用バイナリはビルド時に読み取り専用C++配列へ変換され、BG、スプライト、パレットをFlashから
 直接参照します。マップはゲーム開始時にシードから生成し、100×100の8-bitタイルマップ

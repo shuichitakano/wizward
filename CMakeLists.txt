@@ -3,7 +3,8 @@ cmake_minimum_required(VERSION 3.20)
 project(wizward VERSION 0.1.0 LANGUAGES CXX)
 
 option(WIZWARD_BUILD_TESTS "Wizwardのテストをビルドする" ON)
-option(WIZWARD_BUILD_DEMO "SDLによるアセット動作デモをビルドする" OFF)
+option(WIZWARD_BUILD_APP "SDLによるmacOS版アプリをビルドする" OFF)
+option(WIZWARD_BUILD_DEMO "旧名。WIZWARD_BUILD_APPと同じ" OFF)
 set(WIZWARD_PIXEL_TWINS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/pixel-twins"
     CACHE PATH "Pixel Twinsソースディレクトリ")
 if(NOT EXISTS "${WIZWARD_PIXEL_TWINS_DIR}/CMakeLists.txt")
@@ -46,6 +47,9 @@ add_custom_command(
 )
 
 add_library(wizward_core
+    src/audio/audio_assets.cpp
+    src/audio/bgm_data.cpp
+    src/audio/sfx_data.cpp
     src/assets/game_assets.cpp
     src/assets/title_assets.cpp
     src/assets/wizward_font.cpp
@@ -64,20 +68,20 @@ target_compile_options(wizward_core PRIVATE -Wall -Wextra -Wpedantic -Wconversio
 target_link_libraries(wizward_core PUBLIC pixel_twins::pixel_twins)
 set_target_properties(wizward_core PROPERTIES CXX_EXTENSIONS OFF)
 
-if(WIZWARD_BUILD_DEMO)
+if(WIZWARD_BUILD_APP OR WIZWARD_BUILD_DEMO)
     add_subdirectory(
         "${WIZWARD_PIXEL_TWINS_DIR}/platform/sdl"
         "${CMAKE_BINARY_DIR}/pixel-twins-sdl"
     )
-    add_executable(wizward_asset_demo src/demo/main.cpp)
-    target_compile_features(wizward_asset_demo PRIVATE cxx_std_17)
-    target_compile_options(wizward_asset_demo PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
-    target_link_libraries(wizward_asset_demo
+    add_executable(wizward src/demo/main.cpp)
+    target_compile_features(wizward PRIVATE cxx_std_17)
+    target_compile_options(wizward PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+    target_link_libraries(wizward
         PRIVATE
             wizward::core
             pixel_twins::sdl
     )
-    set_target_properties(wizward_asset_demo PROPERTIES CXX_EXTENSIONS OFF)
+    set_target_properties(wizward PROPERTIES CXX_EXTENSIONS OFF)
 endif()
 
 if(WIZWARD_BUILD_TESTS)
