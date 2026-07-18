@@ -237,6 +237,17 @@ int main() {
     assert(gameplay.player(1).fireLevel == 1);
     assert(gameplay.player(1).linkedUpgradeTenths[fireIndex] == 2);
 
+    map.seals[0] = {50, 50};
+    map.seals[1] = {8, 8};
+    map.seals[2] = {92, 92};
+    gameplay.reset(map);
+    gameplay.tick(idle, map);
+    assert(gameplay.seal(0).active);
+    assert(!gameplay.seal(1).active);
+    assert(gameplay.activeSealCount() == 1);
+    assert(gameplay.sealNoticeTicks() == 132);
+    assert(gameplay.score(0) + gameplay.score(1) == 1000);
+
     wizward::world::WorldMap blockedMap;
     blockedMap.tiles.fill(wizward::world::kCollisionBit);
     gameplay.reset(blockedMap);

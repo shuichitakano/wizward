@@ -180,10 +180,11 @@ PIXEL_TWINS_SRAM void drawMiniMap(pixel_twins::RenderTarget target,
         }
     }
     pixel_twins::drawRectangle(target, kX, kY, kSize, kSize, 32);
-    for (const auto& seal : map.seals) {
+    for (std::size_t index = 0; index < map.seals.size(); ++index) {
+        const auto& seal = map.seals[index];
         const auto x = static_cast<std::int16_t>(kX + seal.x * kSize / world::kMapColumns);
         const auto y = static_cast<std::int16_t>(kY + seal.y * kSize / world::kMapRows);
-        pixel_twins::fillCircle(target, x, y, 1, 215);
+        pixel_twins::fillCircle(target, x, y, 1, gameplay.seal(index).active ? 255 : 220);
     }
     for (std::size_t index = 0; index < pixel_twins::kControllerCount; ++index) {
         const auto& player = gameplay.player(index);
@@ -192,6 +193,109 @@ PIXEL_TWINS_SRAM void drawMiniMap(pixel_twins::RenderTarget target,
         const auto y = static_cast<std::int16_t>(kY + player.y * kSize
             / static_cast<float>(world::kMapRows * kWorldTileSize));
         pixel_twins::fillCircle(target, x, y, index == viewer ? 2 : 1, index == 0 ? 19 : 20);
+    }
+}
+
+float smoothStep(float value) noexcept {
+    const auto t = std::clamp(value, 0.0F, 1.0F);
+    return t * t * (3.0F - 2.0F * t);
+}
+
+PIXEL_TWINS_SRAM void drawActiveSeals(pixel_twins::RenderTarget target,
+                     const world::WorldMap& map,
+                     const GameplayState& gameplay,
+                     const CameraState& camera) noexcept {
+    struct ParticleMotion {
+        float xFrequency, yFrequency, speed, xRadius, yRadius, offset, twinkle;
+    };
+    constexpr std::array<ParticleMotion, 5> kMotions{{
+        {3.0F, 2.0F, 1.38F, 14.0F, 7.0F, 0.1F, 9.0F},
+        {2.0F, 5.0F, 1.02F, 12.0F, 8.0F, 1.7F, 11.0F},
+        {4.0F, 3.0F, 0.84F, 15.0F, 6.0F, 3.1F, 13.0F},
+        {5.0F, 4.0F, 0.66F, 10.0F, 9.0F, 4.2F, 10.0F},
+        {3.0F, 5.0F, 0.55F, 13.0F, 8.0F, 5.4F, 12.0F},
+    }};
+    constexpr std::array<std::uint8_t, 3> kRisingColors{{25, 24, 26}};
+    constexpr std::array<std::uint8_t, 3> kTrailColors{{177, 25, 55}};
+    constexpr std::array<std::uint8_t, 4> kHeadColors{{26, 24, 148, 255}};
+    const auto elapsed = static_cast<float>(gameplay.elapsedTicks()) / 60.0F;
+    for (std::size_t sealIndex = 0; sealIndex < map.seals.size(); ++sealIndex) {
+        const auto& state = gameplay.seal(sealIndex);
+        if (!state.active) continue;
+        const auto x = static_cast<std::int16_t>(std::round(
+            static_cast<float>(map.seals[sealIndex].x * kWorldTileSize) + 8.0F - camera.x));
+        const auto y = static_cast<std::int16_t>(std::round(
+            static_cast<float>(map.seals[sealIndex].y * kWorldTileSize) + 1.0F - camera.y));
+        const auto age = static_cast<float>(gameplay.elapsedTicks() - state.activatedAtTicks) / 60.0F;
+        const auto formation = smoothStep(age / 0.52F);
+        if (age < 0.68F) {
+            const auto rise = smoothStep(age / 0.26F);
+            const auto fade = 1.0F - smoothStep((age - 0.28F) / 0.4F);
+            const auto height = static_cast<std::uint16_t>(std::max(2.0F, std::round(38.0F * rise * fade)));
+            pixel_twins::fillRectangle(target, static_cast<std::int16_t>(x - 1),
+                static_cast<std::int16_t>(y - static_cast<std::int16_t>(height)), 3,
+                static_cast<std::uint16_t>(height + 3U), 25);
+            pixel_twins::fillRectangle(target, x,
+                static_cast<std::int16_t>(y - static_cast<std::int16_t>(height) - 2), 1,
+                static_cast<std::uint16_t>(height + 4U), 26);
+            const auto burst = smoothStep((age - 0.08F) / 0.42F);
+            for (std::uint8_t ray = 0; ray < 8; ++ray) {
+                const auto angle = static_cast<float>(ray) * 3.1415927F / 4.0F + 3.1415927F / 8.0F;
+                const auto radius = 3.0F + burst * 18.0F;
+                pixel_twins::fillRectangle(target,
+                    static_cast<std::int16_t>(std::round(static_cast<float>(x) + std::cos(angle) * radius)),
+                    static_cast<std::int16_t>(std::round(static_cast<float>(y) + std::sin(angle) * radius * 0.5F)),
+                    2, 1, (ray & 1U) != 0U ? 24 : 148);
+            }
+        }
+        if (formation <= 0.0F) continue;
+        for (std::uint8_t beam = 0; beam < 3; ++beam) {
+            const auto progress = std::fmod(elapsed * (1.08F + static_cast<float>(beam) * 0.13F)
+                + static_cast<float>(sealIndex) * 0.23F + static_cast<float>(beam) * 0.31F, 1.0F);
+            const auto beamX = static_cast<std::int16_t>(std::round(static_cast<float>(x)
+                + std::sin(elapsed * 2.4F + static_cast<float>(sealIndex)
+                    + static_cast<float>(beam) * 2.1F) * (2.0F + static_cast<float>(beam) * 2.0F) * formation));
+            const auto beamY = static_cast<std::int16_t>(std::round(static_cast<float>(y)
+                - (4.0F + progress * 25.0F) * formation));
+            const auto height = static_cast<std::uint16_t>(std::max(2.0F,
+                std::round((7.0F - progress * 3.0F) * formation)));
+            pixel_twins::fillRectangle(target, beamX,
+                static_cast<std::int16_t>(beamY - static_cast<std::int16_t>(height)),
+                beam == 0 ? 2 : 1, height, kRisingColors[beam]);
+            if (beam == 2 && height >= 4) {
+                pixel_twins::fillRectangle(target, beamX,
+                    static_cast<std::int16_t>(beamY - static_cast<std::int16_t>(height)), 1, 2, 148);
+            }
+        }
+        for (std::size_t motionIndex = 0; motionIndex < kMotions.size(); ++motionIndex) {
+            const auto& motion = kMotions[motionIndex];
+            const auto phase = elapsed * motion.speed + motion.offset + static_cast<float>(sealIndex) * 0.41F;
+            for (std::int8_t trail = 3; trail >= 1; --trail) {
+                const auto trailPhase = phase - static_cast<float>(trail) * 0.055F;
+                const auto px = static_cast<std::int16_t>(std::round(static_cast<float>(x)
+                    + std::sin(trailPhase * motion.xFrequency) * motion.xRadius * formation));
+                const auto py = static_cast<std::int16_t>(std::round(static_cast<float>(y)
+                    + std::sin(trailPhase * motion.yFrequency) * motion.yRadius * formation));
+                pixel_twins::fillRectangle(target, px, py, 1, 1,
+                    kTrailColors[static_cast<std::size_t>(3 - trail)]);
+            }
+            const auto px = static_cast<std::int16_t>(std::round(static_cast<float>(x)
+                + std::sin(phase * motion.xFrequency) * motion.xRadius * formation));
+            const auto py = static_cast<std::int16_t>(std::round(static_cast<float>(y)
+                + std::sin(phase * motion.yFrequency) * motion.yRadius * formation));
+            const auto twinkle = static_cast<std::uint8_t>(
+                static_cast<std::uint32_t>(elapsed * motion.twinkle
+                    + static_cast<float>(motionIndex) * 1.7F + static_cast<float>(sealIndex)) % 7U);
+            pixel_twins::fillRectangle(target, static_cast<std::int16_t>(px - 1),
+                static_cast<std::int16_t>(py - 1), 2, 2,
+                kHeadColors[(motionIndex + twinkle) % kHeadColors.size()]);
+            if (twinkle <= 1U) {
+                pixel_twins::fillRectangle(target, static_cast<std::int16_t>(px - 2), py, 1, 1, 255);
+                pixel_twins::fillRectangle(target, static_cast<std::int16_t>(px + 2), py, 1, 1, 255);
+                pixel_twins::fillRectangle(target, px, static_cast<std::int16_t>(py - 2), 1, 1, 255);
+                pixel_twins::fillRectangle(target, px, static_cast<std::int16_t>(py + 2), 1, 1, 255);
+            }
+        }
     }
 }
 
@@ -288,6 +392,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        std::size_t viewer) noexcept {
     map.draw(target, assets.background(), static_cast<std::int32_t>(camera.x),
              static_cast<std::int32_t>(camera.y));
+    drawActiveSeals(target, map, gameplay, camera);
     spriteBuckets.reset();
     for (const auto& bullet : gameplay.bullets()) {
         if (!bullet.active) continue;
@@ -590,6 +695,11 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     char scoreBuffer[12]{};
     drawRightAlignedText(target, formatUnsigned(gameplay.score(viewer), scoreBuffer), 155, 5);
     drawTimer(target, gameplay.elapsedTicks());
+    if (gameplay.sealNoticeTicks() > 0) {
+        char sealText[] = "SEAL 0/3";
+        sealText[5] = static_cast<char>('0' + gameplay.activeSealCount());
+        drawCenteredText(target, sealText, 80, 38);
+    }
     drawWeaponLevels(target, assets, viewedPlayer);
     drawPerkChoices(target, assets, viewedPlayer, viewer);
     drawMiniMap(target, map, gameplay, viewer);
@@ -614,6 +724,7 @@ UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
     scene_ = scene;
     sceneFrame_ = 0;
     if (scene_ == Scene::Gameplay) {
+        (void)worldMap_.resetSeals(gameAssets_.background());
         gameplay_.reset(worldMap_);
         resultOutcome_ = GameplayOutcome::Running;
     }
@@ -644,6 +755,11 @@ UpdateResult Game::tick(const pixel_twins::Controllers& controllers) noexcept {
     }
     if (scene_ == Scene::Gameplay) {
         gameplay_.tick(controllers, worldMap_);
+        for (std::uint8_t index = 0; index < worldMap_.seals.size(); ++index) {
+            if (gameplay_.seal(index).active) {
+                (void)worldMap_.activateSeal(index, gameAssets_.background());
+            }
+        }
         if (gameplay_.outcome() != GameplayOutcome::Running) {
             resultOutcome_ = gameplay_.outcome();
             auto result = changeScene(Scene::Result, false);

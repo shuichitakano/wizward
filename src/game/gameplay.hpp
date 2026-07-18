@@ -130,6 +130,11 @@ struct CameraState {
     float y = 0.0F;
 };
 
+struct SealState {
+    bool active = false;
+    std::uint32_t activatedAtTicks = 0;
+};
+
 struct EnemyState {
     float x = 0.0F;
     float y = 0.0F;
@@ -247,6 +252,11 @@ public:
     [[nodiscard]] std::uint32_t score(std::size_t playerIndex) const noexcept {
         return scores_[playerIndex];
     }
+    [[nodiscard]] const SealState& seal(std::size_t index) const noexcept {
+        return seals_[index];
+    }
+    [[nodiscard]] std::uint8_t activeSealCount() const noexcept { return activeSealCount_; }
+    [[nodiscard]] std::uint16_t sealNoticeTicks() const noexcept { return sealNoticeTicks_; }
 
 private:
     std::array<PlayerState, pixel_twins::kControllerCount> players_{};
@@ -262,6 +272,9 @@ private:
     std::uint16_t swarmCooldownTicks_ = 0;
     std::uint32_t elapsedTicks_ = 0;
     std::array<std::uint32_t, pixel_twins::kControllerCount> scores_{};
+    std::array<SealState, 3> seals_{};
+    std::uint16_t sealNoticeTicks_ = 0;
+    std::uint8_t activeSealCount_ = 0;
     GameplayOutcome outcome_ = GameplayOutcome::Running;
 };
 

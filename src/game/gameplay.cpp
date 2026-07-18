@@ -921,6 +921,37 @@ void processLinkShares(std::array<PlayerState, pixel_twins::kControllerCount>& p
     }
 }
 
+void updateSealStones(
+    const std::array<PlayerState, pixel_twins::kControllerCount>& players,
+    const world::WorldMap& map,
+    std::array<SealState, 3>& seals,
+    std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
+    std::uint32_t elapsedTicks,
+    std::uint8_t& activeCount,
+    std::uint16_t& noticeTicks) noexcept {
+    constexpr float kActivationRange = 42.0F;
+    constexpr std::uint32_t kSealScore = 1000;
+    for (std::size_t sealIndex = 0; sealIndex < seals.size(); ++sealIndex) {
+        auto& seal = seals[sealIndex];
+        if (seal.active) continue;
+        const auto sealX = static_cast<float>(map.seals[sealIndex].x * kWorldTileSize)
+            + static_cast<float>(kWorldTileSize) * 0.5F;
+        const auto sealY = static_cast<float>(map.seals[sealIndex].y * kWorldTileSize)
+            + static_cast<float>(kWorldTileSize) * 0.5F;
+        for (std::size_t playerIndex = 0; playerIndex < players.size(); ++playerIndex) {
+            const auto& player = players[playerIndex];
+            if (squaredDistance(player.x, player.y, sealX, sealY)
+                >= kActivationRange * kActivationRange) continue;
+            seal.active = true;
+            seal.activatedAtTicks = elapsedTicks;
+            scores[playerIndex] += kSealScore;
+            activeCount = static_cast<std::uint8_t>(activeCount + 1U);
+            noticeTicks = 132;
+            break;
+        }
+    }
+}
+
 void updatePerkChoice(PlayerState& player, const pixel_twins::ControllerState& controller,
                       std::uint32_t& randomState) noexcept {
     if (player.perkFlashTicks > 0) --player.perkFlashTicks;
@@ -1083,6 +1114,9 @@ void GameplayState::reset(const world::WorldMap&) noexcept {
     swarmCooldownTicks_ = 28U * 60U;
     elapsedTicks_ = 0;
     scores_.fill(0);
+    seals_.fill({});
+    sealNoticeTicks_ = 0;
+    activeSealCount_ = 0;
     outcome_ = GameplayOutcome::Running;
     for (std::size_t index = 0; index < cameras_.size(); ++index) {
         updateCamera(cameras_[index], players_[index]);
@@ -1126,6 +1160,8 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         updateCamera(cameras_[index], players_[index]);
     }
     processLinkShares(players_);
+    if (sealNoticeTicks_ > 0) --sealNoticeTicks_;
+    updateSealStones(players_, map, seals_, scores_, elapsedTicks_, activeSealCount_, sealNoticeTicks_);
     if (spawnCooldownTicks_ > 0) --spawnCooldownTicks_;
     if (swarmCooldownTicks_ > 0) --swarmCooldownTicks_;
     if (swarmCooldownTicks_ == 0 && enemyCount() < kMaximumEnemies - 8U) {

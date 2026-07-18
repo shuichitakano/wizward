@@ -57,6 +57,8 @@ struct WorldMap {
     [[nodiscard]] bool activateSeal(
         std::uint8_t sealIndex,
         const pixel_twins::BackgroundAssetPackView& assets) noexcept;
+    [[nodiscard]] bool resetSeals(
+        const pixel_twins::BackgroundAssetPackView& assets) noexcept;
 };
 
 static_assert(sizeof(WorldMap) <= 10016, "常駐マップは10KB程度に収める");

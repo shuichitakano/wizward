@@ -285,6 +285,15 @@ bool WorldMap::activateSeal(
                      assets);
 }
 
+bool WorldMap::resetSeals(const pixel_twins::BackgroundAssetPackView& assets) noexcept {
+    bool result = true;
+    for (const auto& seal : seals) {
+        result = putObject(*this, seal.x, seal.y, BakedObjectId::SealInactivePlaza,
+                           true, assets) && result;
+    }
+    return result;
+}
+
 bool MapGenerator::generate(
     std::uint32_t seed,
     const pixel_twins::BackgroundAssetPackView& assets,
