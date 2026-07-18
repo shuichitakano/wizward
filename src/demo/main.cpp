@@ -77,9 +77,10 @@ int main(int argc, char** argv) {
             std::chrono::steady_clock::duration>(kSimulationStep * 4);
         accumulatedTime += std::min(currentTime - previousTime, maximumFrameTime);
         previousTime = currentTime;
-        controllerInput.update(controllers);
-        if (!applyUpdate(game.processInput(controllers), audioSystem, audioPlayer)) return 1;
         while (accumulatedTime >= kSimulationStep) {
+            // Generate button edges immediately before the simulation consumes them.
+            controllerInput.update(controllers);
+            if (!applyUpdate(game.processInput(controllers), audioSystem, audioPlayer)) return 1;
             if (!applyUpdate(game.tick(controllers), audioSystem, audioPlayer)) return 1;
             accumulatedTime -= kSimulationStep;
         }
