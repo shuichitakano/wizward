@@ -73,6 +73,7 @@ enum class GameplayOutcome : std::uint8_t {
     Running,
     Down,
     TimeUp,
+    Clear,
 };
 
 struct FamiliarState {
@@ -265,6 +266,11 @@ public:
     [[nodiscard]] bool bossSpawned() const noexcept { return bossSpawned_; }
     [[nodiscard]] std::uint16_t bossIntroTicks() const noexcept { return bossIntroTicks_; }
     [[nodiscard]] const EnemyState* boss() const noexcept;
+    [[nodiscard]] bool clearSequenceActive() const noexcept { return clearSequenceTicks_ > 0; }
+    [[nodiscard]] std::uint16_t clearSequenceTicks() const noexcept { return clearSequenceTicks_; }
+    [[nodiscard]] float clearX() const noexcept { return clearX_; }
+    [[nodiscard]] float clearY() const noexcept { return clearY_; }
+    [[nodiscard]] Facing clearFacing() const noexcept { return clearFacing_; }
 
 private:
     std::array<PlayerState, pixel_twins::kControllerCount> players_{};
@@ -286,6 +292,10 @@ private:
     std::uint16_t bossSpawnPendingTicks_ = 0;
     std::uint16_t bossIntroTicks_ = 0;
     bool bossSpawned_ = false;
+    std::uint16_t clearSequenceTicks_ = 0;
+    float clearX_ = 0.0F;
+    float clearY_ = 0.0F;
+    Facing clearFacing_ = Facing::South;
     GameplayOutcome outcome_ = GameplayOutcome::Running;
 };
 

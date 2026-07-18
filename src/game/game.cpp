@@ -349,6 +349,113 @@ PIXEL_TWINS_SRAM void drawBossIntroOverlay(pixel_twins::RenderTarget target,
     }
 }
 
+PIXEL_TWINS_SRAM void drawClearSequence(pixel_twins::RenderTarget target,
+                       const assets::GameAssets& assets,
+                       const GameplayState& gameplay,
+                       const CameraState& camera,
+                       std::uint32_t frame) noexcept {
+    if (!gameplay.clearSequenceActive()) return;
+    const auto ticks = gameplay.clearSequenceTicks();
+    const auto centerX = gameplay.clearX() - camera.x;
+    const auto centerY = gameplay.clearY() - 10.0F - camera.y;
+    const auto hash = [](std::uint32_t value) noexcept {
+        value ^= value >> 16U;
+        value *= 0x7feb352dU;
+        value ^= value >> 15U;
+        value *= 0x846ca68bU;
+        return value ^ (value >> 16U);
+    };
+    const auto unit = [&hash](std::uint32_t value) noexcept {
+        return static_cast<float>(hash(value) & 0xffffU) / 65535.0F;
+    };
+    if (ticks < 141U) {
+        const auto shake = ((ticks * 46U / 60U) & 1U) == 0U ? (ticks > 87U ? -3 : -2)
+                                                               : (ticks > 87U ? 3 : 2);
+        pixel_twins::Sprite sprite{};
+        if (assets.makeLoopingSprite(assets::SpriteAssetId::SealedStoneGuardianBossWalk48x483fSheet,
+                                     frame / 8U, fourDirectionRow(gameplay.clearFacing()),
+                                     static_cast<std::int16_t>(
+                                         static_cast<std::int32_t>(std::round(gameplay.clearX() - camera.x - 24.0F))
+                                         + shake),
+                                     static_cast<std::int16_t>(std::round(gameplay.clearY() - camera.y - 42.0F)),
+                                     sprite)) {
+            pixel_twins::drawSprite(target, sprite);
+        }
+        const auto visibleRays = static_cast<std::uint8_t>(36U * ticks / 141U);
+        for (std::uint8_t index = 0; index < visibleRays; ++index) {
+            const auto start = 9.0F + unit(index * 17U + 1U) * 93.0F;
+            if (static_cast<float>(ticks) < start) continue;
+            if (((ticks + static_cast<std::uint16_t>(start)) / 3U) % 3U == 0U) continue;
+            const auto angle = unit(index * 17U + 2U) * 6.2831853F;
+            const auto inner = 8.0F + unit(index * 17U + 3U) * 20.0F;
+            const auto targetOuter = 96.0F + unit(index * 17U + 4U) * 172.0F;
+            const auto grow = smoothStep((static_cast<float>(ticks) - start) / 51.0F);
+            const auto outer = inner + (targetOuter - inner) * grow;
+            const auto color = unit(index * 17U + 5U) < 0.62F ? 13 : 148;
+            pixel_twins::drawLine(target,
+                static_cast<std::int16_t>(std::round(centerX + std::cos(angle) * outer)),
+                static_cast<std::int16_t>(std::round(centerY + std::sin(angle) * outer)),
+                static_cast<std::int16_t>(std::round(centerX + std::cos(angle) * inner)),
+                static_cast<std::int16_t>(std::round(centerY + std::sin(angle) * inner)),
+                static_cast<std::uint8_t>(color));
+        }
+        if (ticks >= 107U) {
+            for (std::uint8_t ring = 0; ring < 5; ++ring) {
+                const auto start = static_cast<std::uint16_t>(103U + ring * 5U);
+                if (ticks <= start || ticks >= start + 25U) continue;
+                const auto progress = smoothStep(static_cast<float>(ticks - start) / 25.0F);
+                const auto radius = (150.0F + static_cast<float>(ring) * 22.0F) * (1.0F - progress)
+                    + 8.0F * progress;
+                pixel_twins::drawCircle(target,
+                    static_cast<std::int16_t>(std::round(centerX)),
+                    static_cast<std::int16_t>(std::round(centerY)),
+                    static_cast<std::uint16_t>(std::round(radius)),
+                    (ring & 1U) != 0U ? 12 : 13);
+            }
+        }
+        return;
+    }
+    const auto age = static_cast<float>(ticks - 141U) / 60.0F;
+    constexpr std::array<std::uint8_t, 4> kEnergyColors{{12, 13, 241, 148}};
+    for (std::uint16_t index = 0; index < 112; ++index) {
+        const auto lifetime = 1.15F + unit(index * 29U + 7U) * 1.05F;
+        if (age > lifetime) continue;
+        const auto angle = static_cast<float>(index) / 112.0F * 6.2831853F
+            + unit(index * 29U + 8U) * 0.16F;
+        const auto speed = 78.0F + unit(index * 29U + 9U) * 184.0F;
+        const auto x = centerX + std::cos(angle) * speed * age;
+        const auto y = centerY + std::sin(angle) * speed * age;
+        const auto size = static_cast<std::uint16_t>(unit(index * 29U + 10U) < 0.28F ? 5U : 3U);
+        pixel_twins::fillRectangle(target, static_cast<std::int16_t>(std::round(x)),
+            static_cast<std::int16_t>(std::round(y)), size, size,
+            kEnergyColors[index % kEnergyColors.size()]);
+    }
+    constexpr std::array<std::uint8_t, 4> kRockColors{{152, 33, 125, 130}};
+    for (std::uint16_t index = 0; index < 72; ++index) {
+        const auto lifetime = 1.45F + unit(index * 31U + 11U) * 1.1F;
+        if (age > lifetime) continue;
+        const auto angle = static_cast<float>(index) / 72.0F * 6.2831853F
+            + (unit(index * 31U + 12U) - 0.5F) * 0.24F;
+        const auto speed = 92.0F + unit(index * 31U + 13U) * 196.0F;
+        const auto gravity = 148.0F + unit(index * 31U + 14U) * 96.0F;
+        const auto x = centerX + (unit(index * 31U + 15U) - 0.5F) * 18.0F
+            + std::cos(angle) * speed * age;
+        const auto y = centerY + (unit(index * 31U + 16U) - 0.5F) * 10.0F
+            + (std::sin(angle) * speed * 0.62F - 58.0F - unit(index * 31U + 17U) * 112.0F) * age
+            + gravity * age * age * 0.5F;
+        const auto size = static_cast<std::uint16_t>(4U + hash(index * 31U + 18U) % 5U);
+        pixel_twins::fillRectangle(target, static_cast<std::int16_t>(std::round(x)),
+            static_cast<std::int16_t>(std::round(y)), size, size, (index % 3U) == 0U ? 118 : 124);
+        pixel_twins::fillRectangle(target, static_cast<std::int16_t>(std::round(x + 1.0F)),
+            static_cast<std::int16_t>(std::round(y)), std::max<std::uint16_t>(1, size - 2U),
+            std::max<std::uint16_t>(1, size - 2U), kRockColors[index % kRockColors.size()]);
+    }
+    if (ticks < 155U) {
+        pixel_twins::fillRectangle(target, 0, 0, 160, 120,
+            ((ticks - 141U) / 3U) % 2U == 0U ? 255 : 148);
+    }
+}
+
 PIXEL_TWINS_SRAM void drawOffscreenPartnerArrow(pixel_twins::RenderTarget target,
                                const GameplayState& gameplay,
                                const CameraState& camera,
@@ -702,6 +809,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     }
     spriteBuckets.draw(target);
     drawBossIntroOverlay(target, gameplay, camera);
+    drawClearSequence(target, assets, gameplay, camera, frame);
     for (std::size_t playerIndex = 0; playerIndex < pixel_twins::kControllerCount; ++playerIndex) {
         const auto& player = gameplay.player(playerIndex);
         if (player.bombEffectTicks == 0) continue;
@@ -811,7 +919,7 @@ UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
         : gameAssets_.applyPalette(framebuffer_);
     AudioEvent audio = AudioEvent::StopBgm;
     if (scene_ == Scene::Gameplay) audio = AudioEvent::PlayField;
-    if (scene_ == Scene::Result && resultOutcome_ == GameplayOutcome::Running) {
+    if (scene_ == Scene::Result && resultOutcome_ == GameplayOutcome::Clear) {
         audio = AudioEvent::PlayVictory;
     }
     return {audio, playStartSfx, paletteApplied};
@@ -869,7 +977,9 @@ void Game::render() noexcept {
         const auto text = resultOutcome_ == GameplayOutcome::Down
             ? std::string_view{"GAME OVER"}
             : (resultOutcome_ == GameplayOutcome::TimeUp
-                ? std::string_view{"TIME UP"} : std::string_view{"RESULT"});
+                ? std::string_view{"TIME UP"}
+                : (resultOutcome_ == GameplayOutcome::Clear
+                    ? std::string_view{"CONGRATULATIONS!"} : std::string_view{"RESULT"}));
         drawCenteredText(left, text, 80, 48);
         drawCenteredText(right, text, 80, 48);
     }

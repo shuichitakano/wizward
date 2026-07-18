@@ -125,6 +125,35 @@ void updateBossIntroCameras(
     }
 }
 
+void updateClearCameras(
+    std::array<CameraState, pixel_twins::kControllerCount>& cameras,
+    const std::array<PlayerState, pixel_twins::kControllerCount>& players,
+    float clearX, float clearY, std::uint16_t elapsedTicks) noexcept {
+    const auto smooth = [](float value) noexcept {
+        const auto t = std::clamp(value, 0.0F, 1.0F);
+        return t * t * (3.0F - 2.0F * t);
+    };
+    const auto toBoss = smooth(static_cast<float>(elapsedTicks) / 11.0F);
+    const auto back = smooth((static_cast<float>(elapsedTicks) - 246.0F) / 51.0F);
+    for (std::size_t index = 0; index < cameras.size(); ++index) {
+        const auto playerX = players[index].x;
+        const auto playerY = players[index].y - kCameraVerticalOffset;
+        auto focusX = playerX + (clearX - playerX) * toBoss;
+        auto focusY = playerY + (clearY - 10.0F - playerY) * toBoss;
+        focusX += (playerX - focusX) * back;
+        focusY += (playerY - focusY) * back;
+        if (elapsedTicks >= 141U && elapsedTicks < 184U) {
+            const auto strength = 1.0F - static_cast<float>(elapsedTicks - 141U) / 43.0F;
+            focusX += (elapsedTicks & 1U) != 0U ? -std::ceil(5.0F * strength)
+                                                : std::ceil(5.0F * strength);
+            focusY += (elapsedTicks & 2U) != 0U ? std::ceil(4.0F * strength)
+                                                : -std::ceil(4.0F * strength);
+        }
+        cameras[index].x = std::clamp(focusX - 80.0F, 0.0F, kMapPixelWidth - 160.0F);
+        cameras[index].y = std::clamp(focusY - 60.0F, 0.0F, kMapPixelHeight - 120.0F);
+    }
+}
+
 void movePlayer(PlayerState& player,
                 const pixel_twins::ControllerState& controller,
                 const world::WorldMap& map) noexcept {
@@ -1219,6 +1248,10 @@ void GameplayState::reset(const world::WorldMap&) noexcept {
     bossSpawnPendingTicks_ = 0;
     bossIntroTicks_ = 0;
     bossSpawned_ = false;
+    clearSequenceTicks_ = 0;
+    clearX_ = 0.0F;
+    clearY_ = 0.0F;
+    clearFacing_ = Facing::South;
     outcome_ = GameplayOutcome::Running;
     for (std::size_t index = 0; index < cameras_.size(); ++index) {
         updateCamera(cameras_[index], players_[index]);
@@ -1228,6 +1261,18 @@ void GameplayState::reset(const world::WorldMap&) noexcept {
 void GameplayState::tick(const pixel_twins::Controllers& controllers,
                          const world::WorldMap& map) noexcept {
     if (outcome_ != GameplayOutcome::Running) return;
+    if (clearSequenceTicks_ > 0) {
+        ++clearSequenceTicks_;
+        if (clearSequenceTicks_ == 246U) {
+            for (auto& player : players_) {
+                player.facing = Facing::South;
+                player.moving = false;
+            }
+        }
+        updateClearCameras(cameras_, players_, clearX_, clearY_, clearSequenceTicks_);
+        if (clearSequenceTicks_ >= 309U) outcome_ = GameplayOutcome::Clear;
+        return;
+    }
     if (bossIntroTicks_ > 0) {
         --bossIntroTicks_;
         if (const auto* introBoss = boss()) {
@@ -1358,6 +1403,29 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
     outcome_ = updateRevives(players_);
     for (auto& enemy : enemies_) {
         if (!enemy.active && enemy.deathTicks > 0) --enemy.deathTicks;
+    }
+    if (bossSpawned_ && boss() == nullptr && clearSequenceTicks_ == 0) {
+        const auto defeated = std::find_if(enemies_.begin(), enemies_.end(), [](const EnemyState& enemy) {
+            return enemy.kind == EnemyKind::Boss;
+        });
+        clearX_ = defeated != enemies_.end() ? defeated->x : kMapPixelWidth * 0.5F;
+        clearY_ = defeated != enemies_.end() ? defeated->y : kMapPixelHeight * 0.5F;
+        clearFacing_ = defeated != enemies_.end() ? defeated->facing : Facing::South;
+        enemies_.fill({});
+        bullets_.fill({});
+        xpGems_.fill({});
+        windSlashes_.fill({});
+        thunderStrikes_.fill({});
+        enemyBullets_.fill({});
+        for (auto& player : players_) {
+            if (player.hp <= 0) {
+                player.hp = static_cast<std::int16_t>(std::max<std::int32_t>(2,
+                    (static_cast<std::int32_t>(player.maxHp) * 35 + 99) / 100));
+                player.invulnerabilityTicks = 120;
+            }
+        }
+        outcome_ = GameplayOutcome::Running;
+        clearSequenceTicks_ = 1;
     }
 }
 
