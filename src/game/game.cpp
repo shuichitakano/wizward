@@ -222,8 +222,8 @@ PIXEL_TWINS_SRAM void drawOffscreenPartnerArrow(pixel_twins::RenderTarget target
         viewer == 0 ? 20 : 19);
 }
 
-template<std::size_t Capacity>
-PIXEL_TWINS_SRAM void queueAsset(pixel_twins::SpriteBuckets<Capacity, 0>& buckets,
+template<std::size_t Capacity, std::size_t ExCapacity>
+PIXEL_TWINS_SRAM void queueAsset(pixel_twins::SpriteBuckets<Capacity, ExCapacity>& buckets,
                 const assets::GameAssets& assets,
                 assets::SpriteAssetId id,
                 std::uint32_t frame,
@@ -238,6 +238,28 @@ PIXEL_TWINS_SRAM void queueAsset(pixel_twins::SpriteBuckets<Capacity, 0>& bucket
         static_cast<std::int32_t>(screenFootY + kSortMargin), 0,
         static_cast<std::int32_t>(pixel_twins::kBucketCount - 1U)));
     (void)buckets.addSprite(bucket, sprite);
+}
+
+template<std::size_t Capacity, std::size_t ExCapacity>
+PIXEL_TWINS_SRAM void queueScaledAsset(
+                pixel_twins::SpriteBuckets<Capacity, ExCapacity>& buckets,
+                const assets::GameAssets& assets,
+                assets::SpriteAssetId id,
+                std::uint32_t frame,
+                std::uint8_t directionRow,
+                std::int16_t x,
+                std::int16_t y,
+                std::uint8_t width,
+                std::uint8_t height,
+                float screenFootY) noexcept {
+    pixel_twins::Sprite source{};
+    if (!assets.makeLoopingSprite(id, frame, directionRow, x, y, source)) return;
+    pixel_twins::SpriteEx sprite{x, y, width, height, source.sw, source.sh, source.p};
+    constexpr float kSortMargin = 60.0F;
+    const auto bucket = static_cast<std::uint16_t>(std::clamp(
+        static_cast<std::int32_t>(screenFootY + kSortMargin), 0,
+        static_cast<std::int32_t>(pixel_twins::kBucketCount - 1U)));
+    (void)buckets.addSpriteEx(bucket, sprite);
 }
 
 PIXEL_TWINS_SRAM void drawTitle(pixel_twins::Framebuffer& framebuffer,
@@ -255,13 +277,13 @@ PIXEL_TWINS_SRAM void drawTitle(pixel_twins::Framebuffer& framebuffer,
     }
 }
 
-template<std::size_t Capacity>
+template<std::size_t Capacity, std::size_t ExCapacity>
 PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        const world::WorldMap& map,
                        const assets::GameAssets& assets,
                        const CameraState& camera,
                        const GameplayState& gameplay,
-                       pixel_twins::SpriteBuckets<Capacity, 0>& spriteBuckets,
+                       pixel_twins::SpriteBuckets<Capacity, ExCapacity>& spriteBuckets,
                        std::uint32_t frame,
                        std::size_t viewer) noexcept {
     map.draw(target, assets.background(), static_cast<std::int32_t>(camera.x),
@@ -293,36 +315,100 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                    static_cast<std::int16_t>(gem.y - camera.y - 4.0F), gem.y - camera.y);
     }
     for (const auto& enemy : gameplay.enemies()) {
-        if (!enemy.active || enemy.spawnDelayTicks > 0) continue;
+        if ((!enemy.active && enemy.deathTicks == 0) || enemy.spawnDelayTicks > 0) continue;
+        const auto dying = !enemy.active && enemy.deathTicks > 0;
         auto asset = assets::SpriteAssetId::SlimeEnemyWalk16x164fSmallerSheet;
         float anchorX = 8.0F;
         float anchorY = 12.0F;
+        std::uint8_t spriteWidth = 16;
+        std::uint8_t spriteHeight = 16;
         switch (enemy.kind) {
-        case EnemyKind::Imp: break;
+        case EnemyKind::Imp:
+            if (dying) asset = assets::SpriteAssetId::SlimeEnemyDeath16x163fSmallerSheet;
+            break;
         case EnemyKind::Bat:
-            asset = assets::SpriteAssetId::BatEnemyLinelessWalk18x184fSheet;
-            anchorX = 9.0F; anchorY = 10.0F; break;
+            asset = dying ? assets::SpriteAssetId::BatEnemyLinelessDeath18x183fSheet
+                          : assets::SpriteAssetId::BatEnemyLinelessWalk18x184fSheet;
+            anchorX = 9.0F; anchorY = 10.0F; spriteWidth = 18; spriteHeight = 18; break;
         case EnemyKind::Skeleton:
-            asset = assets::SpriteAssetId::SkeletonEnemyWalk24x244fSheet;
-            anchorX = 12.0F; anchorY = 20.0F; break;
+            asset = dying ? assets::SpriteAssetId::SkeletonEnemyDeath24x243fSheet
+                          : assets::SpriteAssetId::SkeletonEnemyWalk24x244fSheet;
+            anchorX = 12.0F; anchorY = 20.0F; spriteWidth = 24; spriteHeight = 24; break;
         case EnemyKind::Golem:
-            asset = assets::SpriteAssetId::GolemEnemyLinelessWalk24x244fSheet;
-            anchorX = 12.0F; anchorY = 20.0F; break;
+            asset = dying ? assets::SpriteAssetId::GolemEnemyLinelessDeath24x243fSheet
+                          : assets::SpriteAssetId::GolemEnemyLinelessWalk24x244fSheet;
+            anchorX = 12.0F; anchorY = 20.0F; spriteWidth = 24; spriteHeight = 24; break;
         case EnemyKind::Archer:
-            asset = enemy.attackAnimationTicks > 0
+            asset = dying ? assets::SpriteAssetId::GoblinArcherEnemyLinelessDeath16x163fSheet
+                : enemy.attackAnimationTicks > 0
                 ? assets::SpriteAssetId::GoblinArcherEnemyLinelessShoot16x164fSheet
                 : assets::SpriteAssetId::GoblinArcherEnemyLinelessWalk16x164fSheet;
             anchorX = 8.0F; anchorY = 13.0F; break;
         case EnemyKind::Wisp:
-            asset = assets::SpriteAssetId::WispEnemyLinelessWalk18x184fSheet;
-            anchorX = 9.0F; anchorY = 10.0F; break;
+            asset = dying ? assets::SpriteAssetId::WispEnemyLinelessDeath18x183fSheet
+                          : assets::SpriteAssetId::WispEnemyLinelessWalk18x184fSheet;
+            anchorX = 9.0F; anchorY = 10.0F; spriteWidth = 18; spriteHeight = 18; break;
         case EnemyKind::Mage:
-            asset = assets::SpriteAssetId::MonsterMageEnemyLinelessWalk18x184fSheet;
-            anchorX = 9.0F; anchorY = 15.0F; break;
+            asset = dying ? assets::SpriteAssetId::MonsterMageEnemyLinelessDeath18x183fSheet
+                          : assets::SpriteAssetId::MonsterMageEnemyLinelessWalk18x184fSheet;
+            anchorX = 9.0F; anchorY = 15.0F; spriteWidth = 18; spriteHeight = 18; break;
         }
-        const auto animationFrame = enemy.attackAnimationTicks > 0
+        const auto animationFrame = dying
+            ? static_cast<std::uint32_t>(std::min<std::uint16_t>(2U,
+                static_cast<std::uint16_t>((16U - enemy.deathTicks) * 3U / 16U)))
+            : enemy.attackAnimationTicks > 0
             ? static_cast<std::uint32_t>((20U - enemy.attackAnimationTicks) / 5U)
             : frame / 8U;
+        if (enemy.active && enemy.bornTicks > 0) {
+            const auto progress = std::clamp(1.0F - static_cast<float>(enemy.bornTicks) / 23.0F,
+                                             0.0F, 1.0F);
+            const auto footX = static_cast<std::int16_t>(std::round(enemy.x - camera.x));
+            const auto footY = static_cast<std::int16_t>(std::round(enemy.y - camera.y));
+            const auto shadowWidth = static_cast<std::uint16_t>(std::max(2.0F, std::round(2.0F + progress * 8.0F)));
+            pixel_twins::fillRectangle(target,
+                static_cast<std::int16_t>(footX - static_cast<std::int16_t>(shadowWidth / 2U)),
+                footY, shadowWidth, 2, 1);
+            const auto smooth = [](float value) noexcept {
+                const auto t = std::clamp(value, 0.0F, 1.0F);
+                return t * t * (3.0F - 2.0F * t);
+            };
+            if (progress < 0.18F) {
+                const auto lineHeight = static_cast<std::int16_t>(std::round(
+                    8.0F + static_cast<float>(spriteHeight) * smooth(progress / 0.18F)));
+                pixel_twins::fillRectangle(target, static_cast<std::int16_t>(footX - 1),
+                                            static_cast<std::int16_t>(footY - lineHeight), 3,
+                                            static_cast<std::uint16_t>(lineHeight), 17);
+                pixel_twins::fillRectangle(target, footX,
+                                            static_cast<std::int16_t>(footY - lineHeight - 2), 1,
+                                            static_cast<std::uint16_t>(lineHeight + 3), 18);
+                continue;
+            }
+            float scaleX = 1.0F;
+            float scaleY = 1.0F;
+            if (progress < 0.54F) {
+                const auto p = smooth((progress - 0.18F) / 0.36F);
+                scaleX = 0.08F + (0.72F - 0.08F) * p;
+                scaleY = 1.5F + (1.12F - 1.5F) * p;
+            } else if (progress < 0.76F) {
+                const auto p = smooth((progress - 0.54F) / 0.22F);
+                scaleX = 0.72F + (1.28F - 0.72F) * p;
+                scaleY = 1.12F + (0.78F - 1.12F) * p;
+            } else {
+                const auto p = smooth((progress - 0.76F) / 0.24F);
+                scaleX = 1.28F + (1.0F - 1.28F) * p;
+                scaleY = 0.78F + (1.0F - 0.78F) * p;
+            }
+            const auto width = static_cast<std::uint8_t>(std::max(1.0F,
+                std::round(static_cast<float>(spriteWidth) * scaleX)));
+            const auto height = static_cast<std::uint8_t>(std::max(1.0F,
+                std::round(static_cast<float>(spriteHeight) * scaleY)));
+            queueScaledAsset(spriteBuckets, assets, asset, animationFrame,
+                fourDirectionRow(enemy.facing),
+                static_cast<std::int16_t>(std::round(enemy.x - camera.x - anchorX * scaleX)),
+                static_cast<std::int16_t>(std::round(enemy.y - camera.y - anchorY * scaleY)),
+                width, height, enemy.y - camera.y);
+            continue;
+        }
         queueAsset(spriteBuckets, assets, asset, animationFrame,
                    static_cast<std::int16_t>(enemy.x - camera.x - anchorX),
                    static_cast<std::int16_t>(enemy.y - camera.y - anchorY), enemy.y - camera.y,

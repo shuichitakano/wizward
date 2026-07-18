@@ -235,8 +235,10 @@ void killEnemy(EnemyState& enemy,
     const auto gem = std::find_if(xpGems.begin(), xpGems.end(),
         [](const XpGemState& candidate) { return !candidate.active; });
     if (gem != xpGems.end()) *gem = {enemy.x, enemy.y, enemy.xpValue, true};
-    if (owner < scores.size()) scores[owner] += 10U;
+    constexpr std::array<std::uint16_t, 7> kScores{{10, 15, 45, 100, 30, 25, 60}};
+    if (owner < scores.size()) scores[owner] += kScores[static_cast<std::size_t>(enemy.kind)];
     enemy.active = false;
+    enemy.deathTicks = 16;
 }
 
 EnemyState makeEnemyState(EnemyKind kind, float x, float y,
@@ -462,6 +464,7 @@ void spawnThunder(PlayerState& player, std::uint8_t owner,
 
 void damageOrbs(PlayerState& player, std::uint8_t owner,
                 std::array<EnemyState, kMaximumEnemies>& enemies,
+                std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                 std::array<XpGemState, kMaximumXpGems>& xpGems,
                 std::array<std::uint32_t, pixel_twins::kControllerCount>& scores) noexcept {
     const auto stats = attackStats(player.orbLevel, 1, 4, 22.0F, 2, 4.0F);
@@ -469,6 +472,11 @@ void damageOrbs(PlayerState& player, std::uint8_t owner,
         const auto angle = player.orbAngle + static_cast<float>(orbIndex) * kTau / stats.count;
         const auto x = player.x + std::cos(angle) * stats.speed;
         const auto y = player.y + std::sin(angle) * stats.speed;
+        for (auto& bullet : enemyBullets) {
+            if (!bullet.active || bullet.type != EnemyBulletType::Arrow) continue;
+            const auto range = 6.0F + bullet.radius;
+            if (squaredDistance(x, y, bullet.x, bullet.y) <= range * range) bullet.active = false;
+        }
         for (auto& enemy : enemies) {
             if (!enemy.active) continue;
             const auto range = enemy.radius + 4.0F;
@@ -481,6 +489,7 @@ void damageOrbs(PlayerState& player, std::uint8_t owner,
 
 void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
                    std::array<EnemyState, kMaximumEnemies>& enemies,
+                   std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                    std::array<XpGemState, kMaximumXpGems>& xpGems,
                    std::array<std::uint32_t, pixel_twins::kControllerCount>& scores) noexcept {
     for (auto& bullet : bullets) {
@@ -500,6 +509,13 @@ void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets
         }
         bullet.x += bullet.velocityX;
         bullet.y += bullet.velocityY;
+        for (auto& enemyBullet : enemyBullets) {
+            if (!enemyBullet.active || enemyBullet.type != EnemyBulletType::Arrow) continue;
+            const auto range = bullet.radius + 3.0F + enemyBullet.radius;
+            if (squaredDistance(bullet.x, bullet.y, enemyBullet.x, enemyBullet.y) <= range * range) {
+                enemyBullet.active = false;
+            }
+        }
         if (bullet.remainingTicks > 0) --bullet.remainingTicks;
         if (bullet.remainingTicks == 0 || bullet.x < 0.0F || bullet.y < 0.0F
             || bullet.x >= kMapPixelWidth || bullet.y >= kMapPixelHeight) {
@@ -525,6 +541,7 @@ void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets
 void updateWindSlashes(std::array<WindSlashState, kMaximumWindSlashes>& slashes,
                        std::array<PlayerState, pixel_twins::kControllerCount>& players,
                        std::array<EnemyState, kMaximumEnemies>& enemies,
+                       std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                        std::array<XpGemState, kMaximumXpGems>& xpGems,
                        std::array<std::uint32_t, pixel_twins::kControllerCount>& scores) noexcept {
     for (auto& slash : slashes) {
@@ -536,6 +553,13 @@ void updateWindSlashes(std::array<WindSlashState, kMaximumWindSlashes>& slashes,
             continue;
         }
         const auto& owner = players[slash.owner];
+        for (auto& bullet : enemyBullets) {
+            if (!bullet.active || bullet.type != EnemyBulletType::Arrow) continue;
+            const auto range = slash.outerRadius + bullet.radius;
+            if (squaredDistance(owner.x, owner.y, bullet.x, bullet.y) <= range * range) {
+                bullet.active = false;
+            }
+        }
         for (std::size_t enemyIndex = 0; enemyIndex < enemies.size(); ++enemyIndex) {
             if (slash.hitCooldownTicks[enemyIndex] > 0) --slash.hitCooldownTicks[enemyIndex];
             auto& enemy = enemies[enemyIndex];
@@ -768,7 +792,7 @@ bool spawnEnemyNear(std::array<EnemyState, kMaximumEnemies>& enemies,
                     EnemyKind kind, std::uint32_t elapsedTicks,
                     std::uint32_t& randomState, std::uint16_t delayTicks = 0) noexcept {
     const auto slot = std::find_if(enemies.begin(), enemies.end(),
-        [](const EnemyState& enemy) { return !enemy.active; });
+        [](const EnemyState& enemy) { return !enemy.active && enemy.deathTicks == 0; });
     if (slot == enemies.end()) return false;
     for (std::uint8_t attempt = 0; attempt < 40; ++attempt) {
         const auto angle = randomUnit(randomState) * kTau;
@@ -810,7 +834,7 @@ void spawnSwarm(std::array<EnemyState, kMaximumEnemies>& enemies,
                                   20.0F, kMapPixelHeight - 20.0F);
         if (!circlePositionIsWalkable(map, x, y, 8.0F)) continue;
         const auto slot = std::find_if(enemies.begin(), enemies.end(),
-            [](const EnemyState& enemy) { return !enemy.active; });
+            [](const EnemyState& enemy) { return !enemy.active && enemy.deathTicks == 0; });
         if (slot == enemies.end()) return;
         *slot = makeEnemyState(kind, x, y, elapsedTicks, randomState, true);
         slot->spawnDelayTicks = static_cast<std::uint16_t>(index * 2U);
@@ -927,15 +951,18 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
             if (fired) player.iceCooldownTicks = cooldownTicks(1.25F, 0.05F, player.iceLevel, 0.55F);
         }
         if (player.hp > 0 && player.orbLevel > 0 && player.orbCooldownTicks == 0) {
-            damageOrbs(player, static_cast<std::uint8_t>(index), enemies_, xpGems_, scores_);
+            damageOrbs(player, static_cast<std::uint8_t>(index), enemies_, enemyBullets_, xpGems_, scores_);
             player.orbCooldownTicks = 10;
         }
     }
-    updateBullets(bullets_, enemies_, xpGems_, scores_);
-    updateWindSlashes(windSlashes_, players_, enemies_, xpGems_, scores_);
+    updateBullets(bullets_, enemies_, enemyBullets_, xpGems_, scores_);
+    updateWindSlashes(windSlashes_, players_, enemies_, enemyBullets_, xpGems_, scores_);
     updateThunderStrikes(thunderStrikes_);
     updateEnemyBullets(enemyBullets_, players_);
     updateXpGems(xpGems_, players_, randomState_);
+    for (auto& enemy : enemies_) {
+        if (!enemy.active && enemy.deathTicks > 0) --enemy.deathTicks;
+    }
 }
 
 void GameplayState::grantXp(std::size_t playerIndex, std::uint16_t amount) noexcept {
@@ -944,7 +971,7 @@ void GameplayState::grantXp(std::size_t playerIndex, std::uint16_t amount) noexc
 
 bool GameplayState::addEnemy(float x, float y, EnemyKind kind) noexcept {
     const auto slot = std::find_if(enemies_.begin(), enemies_.end(), [](const EnemyState& enemy) {
-        return !enemy.active;
+        return !enemy.active && enemy.deathTicks == 0;
     });
     if (slot == enemies_.end()) return false;
     *slot = makeEnemyState(kind, x, y, elapsedTicks_, randomState_, false);

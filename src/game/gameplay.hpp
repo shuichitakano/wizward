@@ -118,6 +118,7 @@ struct EnemyState {
     std::uint16_t attackCooldownTicks = 0;
     std::uint16_t attackAnimationTicks = 0;
     std::uint16_t dashTicks = 0;
+    std::uint16_t deathTicks = 0;
     std::uint8_t xpValue = 2;
     EnemyKind kind = EnemyKind::Imp;
     Facing facing = Facing::South;
