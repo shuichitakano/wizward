@@ -18,6 +18,7 @@ inline constexpr std::size_t kMaximumXpGems = 128;
 inline constexpr std::size_t kMaximumWindSlashes = 8;
 inline constexpr std::size_t kMaximumThunderStrikes = 16;
 inline constexpr std::size_t kMaximumEnemyBullets = 128;
+inline constexpr std::size_t kMaximumFamiliarsPerPlayer = 3;
 
 enum class Facing : std::uint8_t {
     South,
@@ -48,6 +49,7 @@ enum class PlayerAttack : std::uint8_t {
     Light,
     Fire,
     Ice,
+    Familiar,
 };
 
 enum class EnemyKind : std::uint8_t {
@@ -71,6 +73,13 @@ enum class GameplayOutcome : std::uint8_t {
     TimeUp,
 };
 
+struct FamiliarState {
+    float x = 0.0F;
+    float y = 0.0F;
+    Facing facing = Facing::South;
+    bool active = false;
+};
+
 struct PlayerState {
     float x = 0.0F;
     float y = 0.0F;
@@ -85,6 +94,7 @@ struct PlayerState {
     std::uint16_t thunderCooldownTicks = 0;
     std::uint16_t iceCooldownTicks = 0;
     std::uint16_t orbCooldownTicks = 0;
+    std::uint16_t familiarCooldownTicks = 0;
     std::uint16_t xp = 0;
     std::uint8_t level = 1;
     std::uint8_t pendingPerkChoices = 0;
@@ -103,6 +113,11 @@ struct PlayerState {
     std::uint8_t perkFlashTicks = 0;
     float orbAngle = 0.0F;
     float hpRegenAccumulator = 0.0F;
+    std::array<FamiliarState, kMaximumFamiliarsPerPlayer> familiars{};
+    bool bombPending = false;
+    std::uint16_t bombEffectTicks = 0;
+    float bombEffectX = 0.0F;
+    float bombEffectY = 0.0F;
 };
 
 struct CameraState {

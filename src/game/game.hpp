@@ -57,7 +57,9 @@ private:
         kMaximumEnemies + kMaximumPlayerBullets + kMaximumXpGems
             + kMaximumEnemyBullets
             + kMaximumWindSlashes * 3U + kMaximumThunderStrikes * 3U
-            + pixel_twins::kControllerCount * 4U, kMaximumEnemies> spriteBuckets_;
+            + pixel_twins::kControllerCount * 10U
+            + pixel_twins::kControllerCount * (4U + kMaximumFamiliarsPerPlayer),
+        kMaximumEnemies> spriteBuckets_;
     Scene scene_ = Scene::Title;
     std::uint32_t frame_ = 0;
     std::uint32_t sceneFrame_ = 0;

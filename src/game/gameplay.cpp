@@ -228,6 +228,28 @@ bool spawnBullet(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
     return true;
 }
 
+bool spawnBulletAt(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
+                   float x, float y, std::uint8_t owner, PlayerAttack type,
+                   float directionX, float directionY, std::int16_t damage,
+                   float speed, std::uint16_t lifetimeTicks, float radius) noexcept {
+    const auto slot = std::find_if(bullets.begin(), bullets.end(),
+        [](const PlayerBulletState& bullet) { return !bullet.active; });
+    if (slot == bullets.end()) return false;
+    slot->x = x;
+    slot->y = y;
+    slot->velocityX = directionX * speed;
+    slot->velocityY = directionY * speed;
+    slot->speed = speed;
+    slot->remainingTicks = lifetimeTicks;
+    slot->ageTicks = 0;
+    slot->damage = damage;
+    slot->owner = owner;
+    slot->type = type;
+    slot->radius = radius;
+    slot->active = true;
+    return true;
+}
+
 void killEnemy(EnemyState& enemy,
                std::uint8_t owner,
                std::array<XpGemState, kMaximumXpGems>& xpGems,
@@ -487,6 +509,116 @@ void damageOrbs(PlayerState& player, std::uint8_t owner,
     }
 }
 
+void updateFamiliars(PlayerState& player, std::uint8_t owner,
+                     std::array<EnemyState, kMaximumEnemies>& enemies,
+                     std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets) noexcept {
+    if (player.familiarLevel == 0) {
+        for (auto& familiar : player.familiars) familiar.active = false;
+        return;
+    }
+    const auto stats = attackStats(player.familiarLevel, 1, 5, 135.0F / 60.0F,
+                                   3, 18.0F / 60.0F);
+    const auto count = std::min<std::uint8_t>(stats.count, kMaximumFamiliarsPerPlayer);
+    const auto faceAngle = facingAngle(player.facing);
+    const auto facingX = std::cos(faceAngle);
+    const auto facingY = std::sin(faceAngle);
+    const auto backX = -facingX;
+    const auto backY = -facingY;
+    const auto sideX = -facingY;
+    const auto sideY = facingX;
+    for (std::uint8_t index = 0; index < kMaximumFamiliarsPerPlayer; ++index) {
+        auto& familiar = player.familiars[index];
+        familiar.active = index < count;
+        if (!familiar.active) continue;
+        if (familiar.x == 0.0F && familiar.y == 0.0F) {
+            familiar.x = player.x;
+            familiar.y = player.y;
+        }
+        float sideOffset = 0.0F;
+        float backOffset = 20.0F;
+        if (count == 2) {
+            sideOffset = index == 0 ? -22.0F : 22.0F;
+            backOffset = 6.0F;
+        } else if (count >= 3) {
+            sideOffset = (static_cast<float>(index) - static_cast<float>(count - 1U) * 0.5F) * 18.0F;
+            backOffset = index == 1 ? 22.0F : 8.0F;
+        }
+        const auto homeX = player.x + backX * backOffset + sideX * sideOffset;
+        const auto homeY = player.y + backY * backOffset + sideY * sideOffset;
+        auto targetX = homeX;
+        auto targetY = homeY;
+        const auto seekRange = 95.0F + static_cast<float>(player.familiarLevel / 3U) * 25.0F;
+        if (auto* target = nearestEnemy(enemies, homeX, homeY, seekRange)) {
+            auto dx = target->x - homeX;
+            auto dy = target->y - homeY;
+            normalize(dx, dy);
+            targetX += dx * 22.0F;
+            targetY += dy * 22.0F;
+        }
+        auto dx = targetX - familiar.x;
+        auto dy = targetY - familiar.y;
+        const auto distance = std::sqrt(dx * dx + dy * dy);
+        if (distance > 0.0F) {
+            normalize(dx, dy);
+            const auto step = std::min(54.0F / 60.0F, distance);
+            familiar.x += dx * step;
+            familiar.y += dy * step;
+            familiar.facing = facingFor(dx, dy);
+        }
+    }
+    if (player.familiarCooldownTicks > 0) return;
+    bool fired = false;
+    const auto fireRange = 135.0F + static_cast<float>(player.familiarLevel / 3U) * 25.0F;
+    for (auto& familiar : player.familiars) {
+        if (!familiar.active) continue;
+        auto* target = nearestEnemy(enemies, familiar.x, familiar.y, fireRange);
+        if (target == nullptr) continue;
+        auto dx = target->x - familiar.x;
+        auto dy = target->y - familiar.y;
+        normalize(dx, dy);
+        familiar.facing = facingFor(dx, dy);
+        fired = spawnBulletAt(bullets, familiar.x, familiar.y, owner, PlayerAttack::Familiar,
+                              dx, dy, stats.damage, stats.speed, 63, 2.0F) || fired;
+    }
+    if (fired) {
+        player.familiarCooldownTicks = cooldownTicks(0.7F, 0.035F,
+                                                      player.familiarLevel, 0.26F);
+    }
+}
+
+void processBombs(std::array<PlayerState, pixel_twins::kControllerCount>& players,
+                  std::array<EnemyState, kMaximumEnemies>& enemies,
+                  std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
+                  std::array<XpGemState, kMaximumXpGems>& xpGems,
+                  std::array<std::uint32_t, pixel_twins::kControllerCount>& scores) noexcept {
+    constexpr float kRadius = 96.0F;
+    for (std::size_t playerIndex = 0; playerIndex < players.size(); ++playerIndex) {
+        auto& player = players[playerIndex];
+        if (player.bombEffectTicks > 0) --player.bombEffectTicks;
+        if (!player.bombPending) continue;
+        player.bombPending = false;
+        player.bombEffectTicks = 34;
+        player.bombEffectX = player.x;
+        player.bombEffectY = player.y;
+        for (auto& enemy : enemies) {
+            if (!enemy.active || enemy.bornTicks > 0) continue;
+            const auto range = kRadius + enemy.radius;
+            if (squaredDistance(player.x, player.y, enemy.x, enemy.y) > range * range) continue;
+            enemy.hp = static_cast<std::int16_t>(enemy.hp - 32);
+            if (enemy.hp <= 0) {
+                killEnemy(enemy, static_cast<std::uint8_t>(playerIndex), xpGems, scores);
+            }
+        }
+        for (auto& bullet : enemyBullets) {
+            if (!bullet.active || bullet.type != EnemyBulletType::Arrow) continue;
+            const auto range = kRadius + bullet.radius;
+            if (squaredDistance(player.x, player.y, bullet.x, bullet.y) <= range * range) {
+                bullet.active = false;
+            }
+        }
+    }
+}
+
 void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
                    std::array<EnemyState, kMaximumEnemies>& enemies,
                    std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
@@ -647,17 +779,18 @@ std::uint8_t perkLevel(const PlayerState& player, Perk perk) noexcept {
 }
 
 void rollPerks(PlayerState& player, std::uint32_t& randomState) noexcept {
-    // FAMILIAR and BOMB join this pool with their gameplay implementations.
-    constexpr std::array<Perk, 9> kPool{{
+    constexpr std::array<Perk, 11> kPool{{
         Perk::Light, Perk::Fire, Perk::Wind, Perk::Thunder, Perk::Ice,
-        Perk::Orb, Perk::Speed, Perk::MaxHp, Perk::Heal,
+        Perk::Orb, Perk::Familiar, Perk::Speed, Perk::MaxHp, Perk::Heal, Perk::Bomb,
     }};
-    constexpr std::array<std::uint8_t, 9> kWeights{{5, 5, 4, 4, 4, 4, 3, 3, 4}};
+    constexpr std::array<std::uint8_t, 11> kWeights{{5, 5, 4, 4, 4, 4, 4, 3, 3, 4, 3}};
     std::array<bool, kPool.size()> chosen{};
     for (std::size_t slot = 0; slot < player.perkChoices.size(); ++slot) {
         unsigned total = 0;
         for (std::size_t index = 0; index < kPool.size(); ++index) {
-            const auto capped = kPool[index] != Perk::Heal && perkLevel(player, kPool[index]) >= 5;
+            const auto maximum = kPool[index] == Perk::Speed || kPool[index] == Perk::MaxHp ? 4U : 5U;
+            const auto instant = kPool[index] == Perk::Heal || kPool[index] == Perk::Bomb;
+            const auto capped = !instant && perkLevel(player, kPool[index]) >= maximum;
             if (!chosen[index] && !capped) total += kWeights[index];
         }
         if (total == 0) {
@@ -667,7 +800,9 @@ void rollPerks(PlayerState& player, std::uint32_t& randomState) noexcept {
         randomState = randomState * 1664525U + 1013904223U;
         auto pick = static_cast<unsigned>((randomState >> 16U) % total);
         for (std::size_t index = 0; index < kPool.size(); ++index) {
-            const auto capped = kPool[index] != Perk::Heal && perkLevel(player, kPool[index]) >= 5;
+            const auto maximum = kPool[index] == Perk::Speed || kPool[index] == Perk::MaxHp ? 4U : 5U;
+            const auto instant = kPool[index] == Perk::Heal || kPool[index] == Perk::Bomb;
+            const auto capped = !instant && perkLevel(player, kPool[index]) >= maximum;
             if (chosen[index] || capped) continue;
             if (pick < kWeights[index]) {
                 player.perkChoices[slot] = kPool[index];
@@ -729,6 +864,7 @@ void applyPerk(PlayerState& player, Perk perk) noexcept {
         player.hp = static_cast<std::int16_t>(std::min<std::int32_t>(player.maxHp, player.hp + 26));
         break;
     case Perk::Bomb:
+        player.bombPending = true;
         break;
     }
 }
@@ -922,6 +1058,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         if (players_[index].thunderCooldownTicks > 0) --players_[index].thunderCooldownTicks;
         if (players_[index].iceCooldownTicks > 0) --players_[index].iceCooldownTicks;
         if (players_[index].orbCooldownTicks > 0) --players_[index].orbCooldownTicks;
+        if (players_[index].familiarCooldownTicks > 0) --players_[index].familiarCooldownTicks;
         if (players_[index].hp > 0) {
             players_[index].orbAngle -= (8.1F + static_cast<float>(players_[index].orbLevel) * 0.72F) / 60.0F;
             if (players_[index].hp < players_[index].maxHp) {
@@ -958,6 +1095,9 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
     moveEnemies(enemies_, players_, enemyBullets_, map, randomState_);
     for (std::size_t index = 0; index < players_.size(); ++index) {
         auto& player = players_[index];
+        if (player.hp > 0) {
+            updateFamiliars(player, static_cast<std::uint8_t>(index), enemies_, bullets_);
+        }
         if (player.hp > 0 && player.lightCooldownTicks == 0
             && fireLight(player, static_cast<std::uint8_t>(index), enemies_, bullets_)) {
             player.lightCooldownTicks = cooldownTicks(0.52F, 0.035F, player.lightLevel, 0.18F);
@@ -995,6 +1135,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
             player.orbCooldownTicks = 10;
         }
     }
+    processBombs(players_, enemies_, enemyBullets_, xpGems_, scores_);
     updateBullets(bullets_, enemies_, enemyBullets_, xpGems_, scores_);
     updateWindSlashes(windSlashes_, players_, enemies_, enemyBullets_, xpGems_, scores_);
     updateThunderStrikes(thunderStrikes_);

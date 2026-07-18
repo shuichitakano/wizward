@@ -302,6 +302,9 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
             asset = assets::SpriteAssetId::IceShard128dir12x128fSheet;
             halfSize = 6;
             directionRow = directionRow8(bullet.velocityX, bullet.velocityY);
+        } else if (bullet.type == PlayerAttack::Familiar) {
+            asset = assets::SpriteAssetId::FamiliarProjectile66x61fSheet;
+            halfSize = 3;
         }
         queueAsset(spriteBuckets, assets, asset, frame / 6U,
                    static_cast<std::int16_t>(bullet.x - camera.x - halfSize),
@@ -479,6 +482,18 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     }
     for (std::size_t playerIndex = 0; playerIndex < pixel_twins::kControllerCount; ++playerIndex) {
         const auto& player = gameplay.player(playerIndex);
+        if (player.hp <= 0) continue;
+        for (const auto& familiar : player.familiars) {
+            if (!familiar.active) continue;
+            queueAsset(spriteBuckets, assets, assets::SpriteAssetId::FamiliarPink1616x1620fSheet,
+                       frame / 7U,
+                       static_cast<std::int16_t>(familiar.x - camera.x - 8.0F),
+                       static_cast<std::int16_t>(familiar.y - camera.y - 11.0F),
+                       familiar.y - camera.y, fourDirectionRow(familiar.facing));
+        }
+    }
+    for (std::size_t playerIndex = 0; playerIndex < pixel_twins::kControllerCount; ++playerIndex) {
+        const auto& player = gameplay.player(playerIndex);
         if (player.orbLevel == 0) continue;
         const auto points = static_cast<unsigned>(player.orbLevel - 1U);
         const auto count = static_cast<std::uint8_t>(1U + (points + 2U) / 3U);
@@ -515,6 +530,46 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                    player.y - camera.y, directionRow);
     }
     spriteBuckets.draw(target);
+    for (std::size_t playerIndex = 0; playerIndex < pixel_twins::kControllerCount; ++playerIndex) {
+        const auto& player = gameplay.player(playerIndex);
+        if (player.bombEffectTicks == 0) continue;
+        const auto age = static_cast<std::uint16_t>(34U - player.bombEffectTicks);
+        const auto centerX = static_cast<std::int16_t>(std::round(player.bombEffectX - camera.x));
+        const auto centerY = static_cast<std::int16_t>(std::round(player.bombEffectY - camera.y));
+        pixel_twins::Sprite sprite{};
+        if (age >= 4U && age < 29U) {
+            const auto waveFrame = static_cast<std::uint32_t>(std::min<std::uint16_t>(
+                5U, static_cast<std::uint16_t>((age - 4U) * 6U / 25U)));
+            if (assets.makeLoopingSprite(assets::SpriteAssetId::BombGroundWave64x326fSheet,
+                                         waveFrame, 0,
+                                         static_cast<std::int16_t>(centerX - 32),
+                                         static_cast<std::int16_t>(centerY - 16), sprite)) {
+                pixel_twins::drawSprite(target, sprite);
+            }
+        }
+        if (age >= 2U && age < 30U) {
+            const auto coreFrame = static_cast<std::uint32_t>(std::min<std::uint16_t>(
+                6U, static_cast<std::uint16_t>((age - 2U) * 7U / 28U)));
+            if (assets.makeLoopingSprite(assets::SpriteAssetId::BombCore48x487fSheet,
+                                         coreFrame, 0,
+                                         static_cast<std::int16_t>(centerX - 24),
+                                         static_cast<std::int16_t>(centerY - 36), sprite)) {
+                pixel_twins::drawSprite(target, sprite);
+            }
+        }
+        for (std::uint8_t row = 0; row < 8; ++row) {
+            const auto start = static_cast<std::uint16_t>((row % 2U) == 0U ? 0U : 3U);
+            if (age < start || age >= start + 13U) continue;
+            const auto rayFrame = static_cast<std::uint32_t>(std::min<std::uint16_t>(
+                3U, static_cast<std::uint16_t>((age - start) * 4U / 13U)));
+            if (assets.makeLoopingSprite(assets::SpriteAssetId::BombRay16x164f8dirSheet,
+                                         rayFrame, row,
+                                         static_cast<std::int16_t>(centerX - 8),
+                                         static_cast<std::int16_t>(centerY - 20), sprite)) {
+                pixel_twins::drawSprite(target, sprite);
+            }
+        }
+    }
     for (const auto& strike : gameplay.thunderStrikes()) {
         if (!strike.active) continue;
         pixel_twins::drawCircle(target,

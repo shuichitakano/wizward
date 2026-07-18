@@ -161,7 +161,7 @@ int main() {
     const auto chooseLeft = controllersWith(0, 0,
         pixel_twins::buttonMask(pixel_twins::ControllerButton::choiceLeft));
     gameplay.tick(chooseLeft, map);
-    if (selectedLeft != wizward::game::Perk::Heal) {
+    if (selectedLeft != wizward::game::Perk::Heal && selectedLeft != wizward::game::Perk::Bomb) {
         assert(perkLevel(gameplay.player(0), selectedLeft) == selectedLeftLevel + 1);
     }
     assert(!gameplay.player(0).choosingPerk);
@@ -172,7 +172,7 @@ int main() {
     const auto chooseUp = controllersWith(0, 0,
         pixel_twins::buttonMask(pixel_twins::ControllerButton::choiceUp));
     gameplay.tick(chooseUp, map);
-    if (selectedUp != wizward::game::Perk::Heal) {
+    if (selectedUp != wizward::game::Perk::Heal && selectedUp != wizward::game::Perk::Bomb) {
         assert(perkLevel(gameplay.player(0), selectedUp) == selectedUpLevel + 1);
     }
 
@@ -194,6 +194,40 @@ int main() {
     assert(std::any_of(gameplay.thunderStrikes().begin(), gameplay.thunderStrikes().end(),
         [](const auto& strike) { return strike.active; }));
     assert(gameplay.player(0).orbCooldownTicks > 0);
+
+    gameplay.reset(map);
+    grantPerk(gameplay, map, wizward::game::Perk::Familiar);
+    const auto familiarPlayer = gameplay.player(0);
+    assert(gameplay.addEnemy(familiarPlayer.x + 100.0F, familiarPlayer.y));
+    gameplay.tick(idle, map);
+    assert(gameplay.player(0).familiars[0].active);
+    assert(std::any_of(gameplay.bullets().begin(), gameplay.bullets().end(),
+        [](const auto& bullet) {
+            return bullet.active && bullet.type == wizward::game::PlayerAttack::Familiar;
+        }));
+
+    gameplay.reset(map);
+    bool bombSelected = false;
+    for (int attempt = 0; attempt < 24 && !bombSelected; ++attempt) {
+        gameplay.grantXp(0, wizward::game::xpNeededForLevel(gameplay.player(0).level));
+        const auto& choices = gameplay.player(0).perkChoices;
+        for (std::size_t index = 0; index < choices.size(); ++index) {
+            if (choices[index] != wizward::game::Perk::Bomb) continue;
+            const auto bombPlayer = gameplay.player(0);
+            assert(gameplay.addEnemy(bombPlayer.x + 50.0F, bombPlayer.y,
+                                     wizward::game::EnemyKind::Golem));
+            gameplay.tick(controllersWith(0, 0, choiceButton(index)), map);
+            bombSelected = true;
+            break;
+        }
+        if (!bombSelected) gameplay.tick(controllersWith(0, 0, choiceButton(0)), map);
+    }
+    assert(bombSelected);
+    assert(gameplay.player(0).bombEffectTicks > 0);
+    assert(std::any_of(gameplay.enemies().begin(), gameplay.enemies().end(),
+        [](const auto& enemy) {
+            return enemy.kind == wizward::game::EnemyKind::Golem && enemy.hp <= 54;
+        }));
 
     wizward::world::WorldMap blockedMap;
     blockedMap.tiles.fill(wizward::world::kCollisionBit);
