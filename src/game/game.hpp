@@ -2,11 +2,13 @@
 
 #include "assets/game_assets.hpp"
 #include "assets/title_assets.hpp"
+#include "game/gameplay.hpp"
 #include "world/world_map.hpp"
 
 #include "pixel_twins/controller.hpp"
 #include "pixel_twins/framebuffer.hpp"
 #include "pixel_twins/platform.hpp"
+#include "pixel_twins/sprite.hpp"
 
 #include <cstdint>
 
@@ -33,11 +35,6 @@ struct UpdateResult {
 
 class Game {
 public:
-    struct Camera {
-        float x;
-        float y;
-    };
-
     [[nodiscard]] bool initialize(Scene initialScene = Scene::Title) noexcept;
     [[nodiscard]] UpdateResult processInput(const pixel_twins::Controllers& controllers) noexcept;
     [[nodiscard]] UpdateResult tick(const pixel_twins::Controllers& controllers) noexcept;
@@ -55,8 +52,11 @@ private:
     world::TerrainWorkspace terrainWorkspace_;
     world::WorldMap worldMap_;
     pixel_twins::Framebuffer framebuffer_;
-    Camera leftCamera_{320.0F, 340.0F};
-    Camera rightCamera_{};
+    GameplayState gameplay_;
+    pixel_twins::SpriteBuckets<
+        kMaximumEnemies + kMaximumPlayerBullets + kMaximumXpGems
+            + kMaximumWindSlashes * 3U + kMaximumThunderStrikes * 3U
+            + pixel_twins::kControllerCount * 4U, 0> spriteBuckets_;
     Scene scene_ = Scene::Title;
     std::uint32_t frame_ = 0;
     std::uint32_t sceneFrame_ = 0;
