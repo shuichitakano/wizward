@@ -271,6 +271,9 @@ public:
     [[nodiscard]] float clearX() const noexcept { return clearX_; }
     [[nodiscard]] float clearY() const noexcept { return clearY_; }
     [[nodiscard]] Facing clearFacing() const noexcept { return clearFacing_; }
+    [[nodiscard]] bool playerIsManual(std::size_t index) const noexcept {
+        return manualPlayers_[index];
+    }
 
 private:
     std::array<PlayerState, pixel_twins::kControllerCount> players_{};
@@ -286,6 +289,7 @@ private:
     std::uint16_t swarmCooldownTicks_ = 0;
     std::uint32_t elapsedTicks_ = 0;
     std::array<std::uint32_t, pixel_twins::kControllerCount> scores_{};
+    std::array<bool, pixel_twins::kControllerCount> manualPlayers_{{true, false}};
     std::array<SealState, 3> seals_{};
     std::uint16_t sealNoticeTicks_ = 0;
     std::uint8_t activeSealCount_ = 0;

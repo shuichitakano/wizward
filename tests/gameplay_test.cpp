@@ -19,6 +19,14 @@ pixel_twins::Controllers controllersWith(std::int16_t x, std::int16_t y, std::ui
     return controllers;
 }
 
+pixel_twins::Controllers player2ControllersWith(std::int16_t x, std::int16_t y) {
+    pixel_twins::Controllers controllers;
+    std::array<pixel_twins::ControllerSample, pixel_twins::kControllerCount> samples{};
+    samples[1] = {x, y, 0, true, true};
+    controllers.update(samples);
+    return controllers;
+}
+
 std::uint16_t choiceButton(std::size_t packIndex) {
     using pixel_twins::ControllerButton;
     constexpr std::array<ControllerButton, 4> kButtons{{
@@ -78,12 +86,15 @@ int main() {
     gameplay.reset(map);
 
     const auto initial = gameplay.player(0);
+    const auto initialPartner = gameplay.player(1);
     const auto moveRight = controllersWith(32767, 0);
     gameplay.tick(moveRight, map);
     assert(gameplay.player(0).x > initial.x);
     assert(gameplay.player(0).y == initial.y);
     assert(gameplay.player(0).facing == wizward::game::Facing::East);
     assert(gameplay.player(0).moving);
+    assert(!gameplay.playerIsManual(1));
+    assert(gameplay.player(1).x != initialPartner.x || gameplay.player(1).y != initialPartner.y);
     assert(std::abs((gameplay.camera(0).x + 80.0F) - gameplay.player(0).x) < 0.01F);
     assert(std::abs((gameplay.camera(0).y + 60.0F) - (gameplay.player(0).y - 16.0F)) < 0.01F);
 
@@ -91,6 +102,9 @@ int main() {
     gameplay.tick(stopped, map);
     assert(!gameplay.player(0).moving);
     assert(gameplay.player(0).facing == wizward::game::Facing::East);
+
+    gameplay.tick(player2ControllersWith(32767, 0), map);
+    assert(gameplay.playerIsManual(1));
 
     gameplay.reset(map);
     const auto beforeCollision = gameplay.player(0);
@@ -114,9 +128,8 @@ int main() {
     const auto idle = controllersWith(0, 0);
     gameplay.tick(idle, map);
     assert(gameplay.bulletCount() > 0);
-    for (int frame = 0; frame < 60; ++frame) gameplay.tick(idle, map);
-    assert(gameplay.enemies()[0].hp < 10 || !gameplay.enemies()[0].active);
-    assert(gameplay.player(0).xp + gameplay.player(1).xp > 0);
+    for (int frame = 0; frame < 120; ++frame) gameplay.tick(idle, map);
+    assert(gameplay.score(0) + gameplay.score(1) > 0);
 
     gameplay.reset(map);
     const auto contactPlayer = gameplay.player(0);

@@ -223,9 +223,11 @@ PIXEL_TWINS_SRAM void drawActiveSeals(pixel_twins::RenderTarget target,
         const auto& state = gameplay.seal(sealIndex);
         if (!state.active) continue;
         const auto x = static_cast<std::int16_t>(std::round(
-            static_cast<float>(map.seals[sealIndex].x * kWorldTileSize) + 8.0F - camera.x));
+            static_cast<float>(map.seals[sealIndex].x * kWorldTileSize)
+                + static_cast<float>(kWorldTileSize) * 0.5F - camera.x));
         const auto y = static_cast<std::int16_t>(std::round(
-            static_cast<float>(map.seals[sealIndex].y * kWorldTileSize) + 1.0F - camera.y));
+            static_cast<float>(map.seals[sealIndex].y * kWorldTileSize)
+                + static_cast<float>(kWorldTileSize) * 0.5F - 7.0F - camera.y));
         const auto age = static_cast<float>(gameplay.elapsedTicks() - state.activatedAtTicks) / 60.0F;
         const auto formation = smoothStep(age / 0.52F);
         if (age < 0.68F) {
@@ -885,6 +887,8 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
         char sealText[] = "SEAL 0/3";
         sealText[5] = static_cast<char>('0' + gameplay.activeSealCount());
         drawCenteredText(target, sealText, 80, 38);
+    } else if (!gameplay.playerIsManual(viewer) && (gameplay.elapsedTicks() / 30U) % 2U == 0U) {
+        drawCenteredText(target, "PUSH BUTTON TO JOIN", 80, 39);
     }
     drawWeaponLevels(target, assets, viewedPlayer);
     drawPerkChoices(target, assets, viewedPlayer, viewer);

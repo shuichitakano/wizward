@@ -154,6 +154,12 @@ void updateClearCameras(
     }
 }
 
+float playerSpeedPerTick(const PlayerState& player) noexcept {
+    const auto speedLevels = static_cast<float>(player.speedLevel)
+        + static_cast<float>(player.linkedUpgradeTenths[static_cast<std::size_t>(Perk::Speed)]) * 0.1F;
+    return kPlayerSpeedPerTick + speedLevels * kSpeedPerLevelPerTick;
+}
+
 void movePlayer(PlayerState& player,
                 const pixel_twins::ControllerState& controller,
                 const world::WorldMap& map) noexcept {
@@ -166,9 +172,7 @@ void movePlayer(PlayerState& player,
     inputX /= length;
     inputY /= length;
     player.facing = facingFor(inputX, inputY);
-    const auto speedLevels = static_cast<float>(player.speedLevel)
-        + static_cast<float>(player.linkedUpgradeTenths[static_cast<std::size_t>(Perk::Speed)]) * 0.1F;
-    const auto speed = kPlayerSpeedPerTick + speedLevels * kSpeedPerLevelPerTick;
+    const auto speed = playerSpeedPerTick(player);
     const auto nextX = player.x + inputX * speed;
     if (playerPositionIsWalkable(map, nextX, player.y)) player.x = nextX;
     const auto nextY = player.y + inputY * speed;
@@ -186,6 +190,80 @@ void normalize(float& x, float& y) noexcept {
     if (length <= 0.0F) return;
     x /= length;
     y /= length;
+}
+
+float moveAiPlayerSmart(PlayerState& player, float targetX, float targetY,
+                        const world::WorldMap& map, float stepScale) noexcept {
+    auto directionX = targetX - player.x;
+    auto directionY = targetY - player.y;
+    normalize(directionX, directionY);
+    const auto sideX = -directionY;
+    const auto sideY = directionX;
+    std::array<std::array<float, 2>, 7> directions{{
+        {{directionX, directionY}},
+        {{directionX + sideX * 0.7F, directionY + sideY * 0.7F}},
+        {{directionX - sideX * 0.7F, directionY - sideY * 0.7F}},
+        {{directionX + sideX * 1.35F, directionY + sideY * 1.35F}},
+        {{directionX - sideX * 1.35F, directionY - sideY * 1.35F}},
+        {{sideX, sideY}}, {{-sideX, -sideY}},
+    }};
+    const auto beforeX = player.x;
+    const auto beforeY = player.y;
+    auto bestX = beforeX;
+    auto bestY = beforeY;
+    auto bestMoved = 0.0F;
+    auto bestScore = std::sqrt(squaredDistance(beforeX, beforeY, targetX, targetY));
+    const auto step = playerSpeedPerTick(player) * stepScale;
+    for (auto& direction : directions) {
+        normalize(direction[0], direction[1]);
+        auto probeX = beforeX + direction[0] * step;
+        auto probeY = beforeY;
+        if (!playerPositionIsWalkable(map, probeX, probeY)) probeX = beforeX;
+        probeY = beforeY + direction[1] * step;
+        if (!playerPositionIsWalkable(map, probeX, probeY)) probeY = beforeY;
+        const auto moved = std::sqrt(squaredDistance(beforeX, beforeY, probeX, probeY));
+        if (moved < 0.05F) continue;
+        const auto score = std::sqrt(squaredDistance(probeX, probeY, targetX, targetY)) - moved * 0.08F;
+        if (score >= bestScore) continue;
+        bestX = probeX;
+        bestY = probeY;
+        bestMoved = moved;
+        bestScore = score;
+    }
+    player.x = bestX;
+    player.y = bestY;
+    player.moving = bestMoved > 0.05F;
+    if (player.moving) player.facing = facingFor(bestX - beforeX, bestY - beforeY);
+    return bestMoved;
+}
+
+void followAiPartner(PlayerState& player, const PlayerState& leader,
+                     const world::WorldMap& map) noexcept {
+    const auto rescuing = leader.hp <= 0;
+    const auto targetX = rescuing ? leader.x : leader.x - 38.0F;
+    const auto targetY = rescuing ? leader.y : leader.y + 24.0F;
+    const auto distance = std::sqrt(squaredDistance(player.x, player.y, targetX, targetY));
+    const auto stopDistance = rescuing ? kPlayerRadius * 2.0F + 6.0F : 8.0F;
+    if (distance <= stopDistance) {
+        player.moving = false;
+        return;
+    }
+    const auto moved = moveAiPlayerSmart(player, targetX, targetY, map,
+                                          std::min(1.4F, distance / 40.0F));
+    if (moved >= 0.2F || squaredDistance(player.x, player.y, leader.x, leader.y) <= 190.0F * 190.0F) return;
+    constexpr std::array<std::array<float, 2>, 8> kCatchUpOffsets{{
+        {{-36.0F, 24.0F}}, {{36.0F, 24.0F}}, {{-48.0F, 0.0F}}, {{48.0F, 0.0F}},
+        {{0.0F, 42.0F}}, {{0.0F, -42.0F}}, {{-64.0F, 32.0F}}, {{64.0F, 32.0F}},
+    }};
+    for (const auto& offset : kCatchUpOffsets) {
+        const auto x = std::clamp(leader.x + offset[0], kPlayerRadius, kMapPixelWidth - kPlayerRadius);
+        const auto y = std::clamp(leader.y + offset[1], kPlayerRadius, kMapPixelHeight - kPlayerRadius);
+        if (!playerPositionIsWalkable(map, x, y)) continue;
+        player.x = x;
+        player.y = y;
+        player.moving = false;
+        return;
+    }
 }
 
 EnemyState* nearestEnemy(std::array<EnemyState, kMaximumEnemies>& enemies,
@@ -987,6 +1065,52 @@ void applyPerk(PlayerState& player, Perk perk) noexcept {
     player.sharePerk = perk;
 }
 
+void updateAutoPerkChoice(PlayerState& player,
+                          const std::array<EnemyState, kMaximumEnemies>& enemies,
+                          std::uint32_t& randomState) noexcept {
+    if (!player.choosingPerk) return;
+    constexpr std::array<float, 11> kWeights{{5.0F, 5.0F, 4.0F, 4.0F, 4.0F, 4.0F,
+                                               4.0F, 3.0F, 3.0F, 4.0F, 3.0F}};
+    std::uint8_t nearbyEnemies = 0;
+    for (const auto& enemy : enemies) {
+        if (!enemy.active || enemy.bornTicks > 0) continue;
+        if (squaredDistance(player.x, player.y, enemy.x, enemy.y) < 92.0F * 92.0F) ++nearbyEnemies;
+    }
+    std::array<float, 4> scores{};
+    float total = 0.0F;
+    for (std::size_t index = 0; index < player.perkChoices.size(); ++index) {
+        const auto perk = player.perkChoices[index];
+        const auto level = perkLevel(player, perk);
+        const auto maximum = perk == Perk::Speed || perk == Perk::MaxHp ? 4U : 5U;
+        const auto instant = perk == Perk::Heal || perk == Perk::Bomb;
+        if (!instant && level >= maximum) continue;
+        auto score = kWeights[static_cast<std::size_t>(perk)];
+        if (perk == Perk::Heal) score = player.hp * 100 <= player.maxHp * 48 ? 9.0F : 0.8F;
+        else if (perk == Perk::MaxHp) score = player.hp * 10 <= player.maxHp * 7 ? 7.0F : 3.0F;
+        else if (perk == Perk::Bomb) score = nearbyEnemies >= 5 ? 8.0F : 1.2F;
+        else score += static_cast<float>(std::max(0, 4 - static_cast<int>(level))) * 0.75F;
+        scores[index] = score;
+        total += score;
+    }
+    auto pick = randomUnit(randomState) * total;
+    std::size_t selected = 0;
+    for (std::size_t index = 0; index < scores.size(); ++index) {
+        pick -= scores[index];
+        if (pick <= 0.0F) {
+            selected = index;
+            break;
+        }
+    }
+    constexpr std::array<std::uint8_t, 4> kSlotsByPackIndex{{1, 0, 2, 3}};
+    player.perkFlash = player.perkChoices[selected];
+    player.perkFlashSlot = kSlotsByPackIndex[selected];
+    player.perkFlashTicks = 25;
+    applyPerk(player, player.perkChoices[selected]);
+    if (player.pendingPerkChoices > 0) --player.pendingPerkChoices;
+    player.choosingPerk = false;
+    beginPerkChoice(player, randomState);
+}
+
 void applyLinkedUpgrade(PlayerState& player, Perk perk) noexcept {
     const auto index = static_cast<std::size_t>(perk);
     if (index >= player.linkedUpgradeTenths.size()) return;
@@ -1242,6 +1366,7 @@ void GameplayState::reset(const world::WorldMap&) noexcept {
     swarmCooldownTicks_ = 28U * 60U;
     elapsedTicks_ = 0;
     scores_.fill(0);
+    manualPlayers_ = {{true, false}};
     seals_.fill({});
     sealNoticeTicks_ = 0;
     activeSealCount_ = 0;
@@ -1287,9 +1412,19 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         return;
     }
     for (std::size_t index = 0; index < players_.size(); ++index) {
+        if (!manualPlayers_[index] && (std::abs(controllers[index].x) >= kAxisDeadzone
+            || std::abs(controllers[index].y) >= kAxisDeadzone
+            || controllers[index].held != 0 || controllers[index].pressed != 0)) {
+            manualPlayers_[index] = true;
+        }
         if (players_[index].hp > 0) {
-            updatePerkChoice(players_[index], controllers[index], randomState_);
-            movePlayer(players_[index], controllers[index], map);
+            if (manualPlayers_[index]) {
+                updatePerkChoice(players_[index], controllers[index], randomState_);
+                movePlayer(players_[index], controllers[index], map);
+            } else {
+                updateAutoPerkChoice(players_[index], enemies_, randomState_);
+                followAiPartner(players_[index], players_[1U - index], map);
+            }
         }
         else players_[index].moving = false;
         if (players_[index].invulnerabilityTicks > 0) --players_[index].invulnerabilityTicks;
