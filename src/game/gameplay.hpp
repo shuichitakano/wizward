@@ -12,6 +12,7 @@ namespace wizward::game {
 
 inline constexpr std::int32_t kWorldTileSize = 32;
 inline constexpr float kPlayerRadius = 5.0F;
+inline constexpr float kPlayerCollisionRadius = 8.0F;
 inline constexpr std::size_t kMaximumEnemies = 90;
 inline constexpr std::size_t kMaximumPlayerBullets = 128;
 inline constexpr std::size_t kMaximumXpGems = 128;

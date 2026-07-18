@@ -47,6 +47,30 @@ int main() {
 
     const auto seal = first.seals[0];
     const auto inactive = first.tile(seal.x, seal.y);
+    const auto sealLeft = static_cast<float>(seal.x * wizward::world::kMapTileSize);
+    const auto sealTop = static_cast<float>(seal.y * wizward::world::kMapTileSize);
+    assert(!first.circleIsWalkable(sealLeft + 16.0F, sealTop + 16.0F, 8.0F));
+    assert(first.circleIsWalkable(sealLeft + 1.0F, sealTop + 1.0F, 2.0F));
+
+    bool foundInterpolatedCoast = false;
+    for (std::uint16_t y = 0; y < wizward::world::kMapRows && !foundInterpolatedCoast; ++y) {
+        for (std::uint16_t x = 0; x < wizward::world::kMapColumns; ++x) {
+            const auto left = static_cast<float>(x * wizward::world::kMapTileSize);
+            const auto top = static_cast<float>(y * wizward::world::kMapTileSize);
+            const std::array<bool, 4> samples{{
+                first.terrainPointIsWalkable(left + 4.0F, top + 4.0F),
+                first.terrainPointIsWalkable(left + 28.0F, top + 4.0F),
+                first.terrainPointIsWalkable(left + 28.0F, top + 28.0F),
+                first.terrainPointIsWalkable(left + 4.0F, top + 28.0F),
+            }};
+            foundInterpolatedCoast = std::any_of(samples.begin(), samples.end(),
+                                                 [](bool value) { return value; })
+                && std::any_of(samples.begin(), samples.end(),
+                               [](bool value) { return !value; });
+            if (foundInterpolatedCoast) break;
+        }
+    }
+    assert(foundInterpolatedCoast);
     assert(first.activateSeal(0, assets.background()));
     assert(first.tile(seal.x, seal.y) != inactive);
     assert(first.collides(seal.x, seal.y));

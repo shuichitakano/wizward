@@ -17,6 +17,7 @@ inline constexpr std::uint16_t kMapColumns = 100;
 inline constexpr std::uint16_t kMapRows = 100;
 inline constexpr std::uint8_t kTileIndexMask = 0x7f;
 inline constexpr std::uint8_t kCollisionBit = 0x80;
+inline constexpr std::uint16_t kMapTileSize = 32;
 inline constexpr std::size_t kMapTileCount =
     static_cast<std::size_t>(kMapColumns) * kMapRows;
 
@@ -43,11 +44,14 @@ struct SealCell {
 
 struct WorldMap {
     std::array<std::uint8_t, kMapTileCount> tiles{};
+    std::array<std::uint8_t, 128> patternCollisionShapes{};
     std::array<SealCell, 3> seals{};
     std::uint32_t seed = 0;
 
     [[nodiscard]] std::uint8_t tile(std::uint16_t x, std::uint16_t y) const noexcept;
     [[nodiscard]] bool collides(std::uint16_t x, std::uint16_t y) const noexcept;
+    [[nodiscard]] bool terrainPointIsWalkable(float x, float y) const noexcept;
+    [[nodiscard]] bool circleIsWalkable(float x, float y, float radius) const noexcept;
     [[nodiscard]] pixel_twins::Background background(
         const pixel_twins::BackgroundAssetPackView& assets) const noexcept;
     void draw(pixel_twins::RenderTarget target,
@@ -61,7 +65,7 @@ struct WorldMap {
         const pixel_twins::BackgroundAssetPackView& assets) noexcept;
 };
 
-static_assert(sizeof(WorldMap) <= 10016, "常駐マップは10KB程度に収める");
+static_assert(sizeof(WorldMap) <= 10144, "常駐マップは10KB程度に収める");
 
 class MapGenerator {
 public:

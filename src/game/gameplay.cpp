@@ -64,11 +64,6 @@ float facingAngle(Facing facing) noexcept {
     return kAngles[static_cast<std::size_t>(facing)];
 }
 
-std::uint16_t tileCoordinate(float value) noexcept {
-    if (value <= 0.0F) return 0;
-    return static_cast<std::uint16_t>(value / static_cast<float>(kWorldTileSize));
-}
-
 float randomUnit(std::uint32_t& state) noexcept {
     state = state * 1664525U + 1013904223U;
     return static_cast<float>(state & 0xffffU) / 65535.0F;
@@ -256,8 +251,10 @@ void followAiPartner(PlayerState& player, const PlayerState& leader,
         {{0.0F, 42.0F}}, {{0.0F, -42.0F}}, {{-64.0F, 32.0F}}, {{64.0F, 32.0F}},
     }};
     for (const auto& offset : kCatchUpOffsets) {
-        const auto x = std::clamp(leader.x + offset[0], kPlayerRadius, kMapPixelWidth - kPlayerRadius);
-        const auto y = std::clamp(leader.y + offset[1], kPlayerRadius, kMapPixelHeight - kPlayerRadius);
+        const auto x = std::clamp(leader.x + offset[0], kPlayerCollisionRadius,
+                                  kMapPixelWidth - kPlayerCollisionRadius);
+        const auto y = std::clamp(leader.y + offset[1], kPlayerCollisionRadius,
+                                  kMapPixelHeight - kPlayerCollisionRadius);
         if (!playerPositionIsWalkable(map, x, y)) continue;
         player.x = x;
         player.y = y;
@@ -285,17 +282,7 @@ bool circlePositionIsWalkable(const world::WorldMap& map, float x, float y, floa
     if (x < radius || y < radius || x >= kMapPixelWidth - radius || y >= kMapPixelHeight - radius) {
         return false;
     }
-    constexpr float kDiagonal = 0.70710678F;
-    constexpr std::array<std::array<float, 2>, 8> kDirections{{
-        {{-1.0F, 0.0F}}, {{1.0F, 0.0F}}, {{0.0F, -1.0F}}, {{0.0F, 1.0F}},
-        {{-kDiagonal, -kDiagonal}}, {{kDiagonal, -kDiagonal}},
-        {{kDiagonal, kDiagonal}}, {{-kDiagonal, kDiagonal}},
-    }};
-    for (const auto& direction : kDirections) {
-        if (map.collides(tileCoordinate(x + direction[0] * radius),
-                         tileCoordinate(y + direction[1] * radius))) return false;
-    }
-    return true;
+    return map.circleIsWalkable(x, y, radius);
 }
 
 void moveActor(EnemyState& enemy, float dx, float dy, const world::WorldMap& map) noexcept {
@@ -1335,20 +1322,12 @@ void spawnSwarm(std::array<EnemyState, kMaximumEnemies>& enemies,
 } // namespace
 
 bool playerPositionIsWalkable(const world::WorldMap& map, float x, float y) noexcept {
-    if (x < kPlayerRadius || y < kPlayerRadius
-        || x >= kMapPixelWidth - kPlayerRadius || y >= kMapPixelHeight - kPlayerRadius) {
+    if (x < kPlayerCollisionRadius || y < kPlayerCollisionRadius
+        || x >= kMapPixelWidth - kPlayerCollisionRadius
+        || y >= kMapPixelHeight - kPlayerCollisionRadius) {
         return false;
     }
-    constexpr std::array<std::array<float, 2>, 8> kSamples{{
-        {{-kPlayerRadius, 0.0F}}, {{kPlayerRadius, 0.0F}},
-        {{0.0F, -kPlayerRadius}}, {{0.0F, kPlayerRadius}},
-        {{-3.54F, -3.54F}}, {{3.54F, -3.54F}},
-        {{3.54F, 3.54F}}, {{-3.54F, 3.54F}},
-    }};
-    for (const auto& sample : kSamples) {
-        if (map.collides(tileCoordinate(x + sample[0]), tileCoordinate(y + sample[1]))) return false;
-    }
-    return true;
+    return map.circleIsWalkable(x, y, kPlayerCollisionRadius);
 }
 
 void GameplayState::reset(const world::WorldMap&) noexcept {

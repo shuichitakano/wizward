@@ -5,9 +5,15 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cmath>
 
 namespace wizward::world {
 namespace {
+
+constexpr std::uint8_t kCollisionShapeNone = 0;
+constexpr std::uint8_t kCollisionShapeWater = 1;
+constexpr std::uint8_t kCollisionShapeDecoration = 2;
+constexpr std::uint8_t kCollisionShapeCoastBase = 0x10;
 
 using assets::BakedObjectId;
 using assets::BoundaryId;
@@ -49,46 +55,83 @@ TerrainId terrainAt(const TerrainWorkspace& terrain, std::int32_t x, std::int32_
     return terrain.get(clampX(x), clampY(y));
 }
 
-void paintCircle(TerrainWorkspace& terrain,
-                 std::int32_t centerX,
-                 std::int32_t centerY,
-                 std::int32_t radius,
-                 TerrainId valueToPaint,
-                 bool preserveWater = true) noexcept {
-    const auto minY = std::max<std::int32_t>(0, centerY - radius);
-    const auto maxY = std::min<std::int32_t>(kMapRows - 1, centerY + radius);
-    const auto minX = std::max<std::int32_t>(0, centerX - radius);
-    const auto maxX = std::min<std::int32_t>(kMapColumns - 1, centerX + radius);
-    const auto radiusSquared = radius * radius;
-    for (auto y = minY; y <= maxY; ++y) {
-        for (auto x = minX; x <= maxX; ++x) {
-            const auto dx = x - centerX;
-            const auto dy = y - centerY;
-            if (dx * dx + dy * dy > radiusSquared) {
-                continue;
-            }
-            if (preserveWater && terrain.get(static_cast<std::uint16_t>(x), static_cast<std::uint16_t>(y))
-                    == TerrainId::Water) {
-                continue;
-            }
-            terrain.set(static_cast<std::uint16_t>(x), static_cast<std::uint16_t>(y), valueToPaint);
+struct MapPoint { float x; float y; };
+struct IslandNode { MapPoint point; float radius; std::uint16_t salt; };
+struct IslandSegment { MapPoint from; MapPoint to; float radius; std::uint16_t salt; };
+
+float seededUnit(std::uint32_t salt, std::uint32_t seed) noexcept {
+    return static_cast<float>(tileHash(static_cast<std::int32_t>(salt),
+                                       static_cast<std::int32_t>(seed & 0xffffU), 991U, seed))
+        / static_cast<float>(0xffffffffU) * 2.0F - 1.0F;
+}
+
+float seededRange(std::uint32_t salt, float minimum, float maximum,
+                  std::uint32_t seed) noexcept {
+    return minimum + (seededUnit(salt, seed) * 0.5F + 0.5F) * (maximum - minimum);
+}
+
+float edgeNoise(std::int32_t x, std::int32_t y, std::uint32_t salt,
+                std::uint32_t seed) noexcept {
+    const auto a = static_cast<float>(tileHash(x, y, salt, seed))
+        / static_cast<float>(0xffffffffU) * 2.0F - 1.0F;
+    const auto b = static_cast<float>(tileHash(x + 17, y - 9, salt + 101U, seed))
+        / static_cast<float>(0xffffffffU) * 2.0F - 1.0F;
+    return a * 0.65F + b * 0.35F;
+}
+
+MapPoint rotatePoint(MapPoint point, float angle, float radiusScale) noexcept {
+    constexpr MapPoint kCenter{50.0F, 50.0F};
+    const auto dx = (point.x - kCenter.x) * radiusScale;
+    const auto dy = (point.y - kCenter.y) * radiusScale;
+    const auto cosine = std::cos(angle);
+    const auto sine = std::sin(angle);
+    return {kCenter.x + dx * cosine - dy * sine,
+            kCenter.y + dx * sine + dy * cosine};
+}
+
+MapPoint jitterPoint(MapPoint point, float amount, std::uint32_t salt,
+                     std::uint32_t seed) noexcept {
+    return {std::clamp(point.x + seededUnit(salt, seed) * amount, 5.0F, 95.0F),
+            std::clamp(point.y + seededUnit(salt + 1009U, seed) * amount, 5.0F, 95.0F)};
+}
+
+float distanceToSegment(MapPoint point, MapPoint from, MapPoint to) noexcept {
+    const auto dx = to.x - from.x;
+    const auto dy = to.y - from.y;
+    const auto lengthSquared = dx * dx + dy * dy;
+    if (lengthSquared <= 0.0F) return std::hypot(point.x - from.x, point.y - from.y);
+    const auto t = std::clamp(((point.x - from.x) * dx + (point.y - from.y) * dy)
+                                  / lengthSquared,
+                              0.0F, 1.0F);
+    return std::hypot(point.x - (from.x + dx * t), point.y - (from.y + dy * t));
+}
+
+void paintSegment(TerrainWorkspace& terrain, MapPoint from, MapPoint to,
+                  float radius, TerrainId paint, bool preservePlaza = false) noexcept {
+    for (std::uint16_t y = 0; y < kMapRows; ++y) {
+        for (std::uint16_t x = 0; x < kMapColumns; ++x) {
+            const auto current = terrain.get(x, y);
+            if (current == TerrainId::Water || (preservePlaza && current == TerrainId::Plaza)) continue;
+            if ((paint == TerrainId::Grass && value(current) >= value(TerrainId::Dirt))
+                || (paint == TerrainId::Dirt && value(current) >= value(TerrainId::Road))
+                || (paint == TerrainId::Road && value(current) >= value(TerrainId::Plaza))) continue;
+            const MapPoint point{static_cast<float>(x) + 0.5F, static_cast<float>(y) + 0.5F};
+            if (distanceToSegment(point, from, to) <= radius) terrain.set(x, y, paint);
         }
     }
 }
 
-void paintPath(TerrainWorkspace& terrain,
-               std::int32_t x1,
-               std::int32_t y1,
-               std::int32_t x2,
-               std::int32_t y2) noexcept {
-    const auto dx = x2 - x1;
-    const auto dy = y2 - y1;
-    const auto steps = std::max(std::abs(dx), std::abs(dy));
-    for (std::int32_t step = 0; step <= steps; ++step) {
-        const auto x = x1 + (steps == 0 ? 0 : dx * step / steps);
-        const auto y = y1 + (steps == 0 ? 0 : dy * step / steps);
-        paintCircle(terrain, x, y, 3, TerrainId::Dirt);
-        paintCircle(terrain, x, y, 1, TerrainId::Road);
+void paintEllipse(TerrainWorkspace& terrain, MapPoint center, float radiusX,
+                  float radiusY, TerrainId paint, std::uint32_t seed) noexcept {
+    for (std::uint16_t y = 0; y < kMapRows; ++y) {
+        for (std::uint16_t x = 0; x < kMapColumns; ++x) {
+            if (terrain.get(x, y) == TerrainId::Water) continue;
+            const auto nx = (static_cast<float>(x) + 0.5F - center.x) / radiusX;
+            const auto ny = (static_cast<float>(y) + 0.5F - center.y) / radiusY;
+            if (std::hypot(nx, ny) + edgeNoise(x, y, 8801U, seed) * 0.10F <= 1.0F) {
+                terrain.set(x, y, paint);
+            }
+        }
     }
 }
 
@@ -259,6 +302,58 @@ bool WorldMap::collides(std::uint16_t x, std::uint16_t y) const noexcept {
     return (tile(x, y) & kCollisionBit) != 0;
 }
 
+bool WorldMap::terrainPointIsWalkable(float x, float y) const noexcept {
+    if (x < 0.0F || y < 0.0F
+        || x >= static_cast<float>(kMapColumns * kMapTileSize)
+        || y >= static_cast<float>(kMapRows * kMapTileSize)) return false;
+    const auto tx = static_cast<std::uint16_t>(x / static_cast<float>(kMapTileSize));
+    const auto ty = static_cast<std::uint16_t>(y / static_cast<float>(kMapTileSize));
+    const auto tileValue = tile(tx, ty);
+    const auto shape = patternCollisionShapes[tileValue & kTileIndexMask];
+    if (shape == kCollisionShapeNone && (tileValue & kCollisionBit) != 0U) return false;
+    if (shape == kCollisionShapeWater) return false;
+    if ((shape & 0xf0U) != kCollisionShapeCoastBase) return true;
+    const auto mask = static_cast<std::uint8_t>(shape & 0x0fU);
+    const auto u = (x - static_cast<float>(tx * kMapTileSize)) / static_cast<float>(kMapTileSize);
+    const auto v = (y - static_cast<float>(ty * kMapTileSize)) / static_cast<float>(kMapTileSize);
+    const auto topLeft = (mask & 1U) != 0U ? 1.0F : 0.0F;
+    const auto topRight = (mask & 2U) != 0U ? 1.0F : 0.0F;
+    const auto bottomRight = (mask & 4U) != 0U ? 1.0F : 0.0F;
+    const auto bottomLeft = (mask & 8U) != 0U ? 1.0F : 0.0F;
+    const auto land = topLeft * (1.0F - u) * (1.0F - v) + topRight * u * (1.0F - v)
+        + bottomRight * u * v + bottomLeft * (1.0F - u) * v;
+    return land >= 0.5F;
+}
+
+bool WorldMap::circleIsWalkable(float x, float y, float radius) const noexcept {
+    if (!terrainPointIsWalkable(x, y)) return false;
+    const auto minX = static_cast<std::int32_t>(std::floor((x - radius) / kMapTileSize));
+    const auto maxX = static_cast<std::int32_t>(std::floor((x + radius) / kMapTileSize));
+    const auto minY = static_cast<std::int32_t>(std::floor((y - radius) / kMapTileSize));
+    const auto maxY = static_cast<std::int32_t>(std::floor((y + radius) / kMapTileSize));
+    for (auto ty = minY; ty <= maxY; ++ty) {
+        for (auto tx = minX; tx <= maxX; ++tx) {
+            if (tx < 0 || ty < 0 || tx >= kMapColumns || ty >= kMapRows) return false;
+            const auto tileValue = tile(static_cast<std::uint16_t>(tx), static_cast<std::uint16_t>(ty));
+            const auto shape = patternCollisionShapes[tileValue & kTileIndexMask];
+            const auto legacyFullTile = shape == kCollisionShapeNone
+                && (tileValue & kCollisionBit) != 0U;
+            if (shape != kCollisionShapeDecoration && !legacyFullTile) continue;
+            const auto inset = legacyFullTile ? 0.0F : 10.0F;
+            const auto left = static_cast<float>(tx * kMapTileSize) + inset;
+            const auto top = static_cast<float>(ty * kMapTileSize) + inset;
+            const auto right = static_cast<float>((tx + 1) * kMapTileSize) - inset;
+            const auto bottom = static_cast<float>((ty + 1) * kMapTileSize) - inset;
+            const auto nearestX = std::clamp(x, left, right);
+            const auto nearestY = std::clamp(y, top, bottom);
+            const auto dx = x - nearestX;
+            const auto dy = y - nearestY;
+            if (dx * dx + dy * dy < radius * radius) return false;
+        }
+    }
+    return true;
+}
+
 pixel_twins::Background WorldMap::background(
     const pixel_twins::BackgroundAssetPackView& assets) const noexcept {
     return assets.makeBackground(kMapColumns, kMapRows, tiles.data(), kTileIndexMask);
@@ -307,16 +402,113 @@ bool MapGenerator::generate(
     }
     workspace.fill(TerrainId::Water);
     result.seed = seed;
-    const auto centerX = 50;
-    const auto centerY = 50;
+    result.patternCollisionShapes.fill(kCollisionShapeNone);
+    for (std::uint8_t variant = 0; variant < 4; ++variant) {
+        std::uint8_t pattern = 0;
+        if (!assets.terrainPattern(value(TerrainId::Water), variant, pattern)) return false;
+        result.patternCollisionShapes[pattern] = kCollisionShapeWater;
+    }
+    for (std::uint8_t mask = 1; mask < 15; ++mask) {
+        std::uint8_t pattern = 0;
+        if (!assets.boundaryPattern(value(BoundaryId::WaterToSand), mask, pattern)) return false;
+        result.patternCollisionShapes[pattern] = static_cast<std::uint8_t>(kCollisionShapeCoastBase | mask);
+    }
+    constexpr std::array<BakedObjectId, 5> kCollisionObjects{{
+        BakedObjectId::RockGrass, BakedObjectId::ShrubGrass, BakedObjectId::PlazaPedestal,
+        BakedObjectId::SealInactivePlaza, BakedObjectId::SealActivePlaza,
+    }};
+    for (const auto object : kCollisionObjects) {
+        std::uint8_t pattern = 0;
+        if (!assets.objectPattern(value(object), pattern)) return false;
+        result.patternCollisionShapes[pattern] = kCollisionShapeDecoration;
+    }
+
+    constexpr MapPoint kCenter{50.0F, 50.0F};
+    constexpr std::array<MapPoint, 3> kBaseSeals{{
+        {16.875F, 22.5F}, {82.5F, 25.3125F}, {49.375F, 82.5F},
+    }};
+    constexpr std::array<std::array<MapPoint, 4>, 3> kBaseRoutes{{
+        {{{40.9375F, 43.125F}, {33.4375F, 38.125F}, {27.8125F, 32.5F}, {21.875F, 31.25F}}},
+        {{{56.875F, 40.625F}, {63.4375F, 43.125F}, {70.3125F, 35.0F}, {76.5625F, 33.4375F}}},
+        {{{47.5F, 56.25F}, {40.625F, 61.25F}, {44.375F, 69.6875F}, {52.1875F, 74.0625F}}},
+    }};
+    std::array<std::array<MapPoint, 5>, 3> routes{};
+    const auto phase = seededRange(7001U, 0.0F, 6.2831853F, seed);
+    for (std::uint8_t stone = 0; stone < result.seals.size(); ++stone) {
+        auto point = rotatePoint(kBaseSeals[stone], phase,
+                                 1.0F + seededUnit(stone * 97U + 3001U, seed) * 0.09F);
+        point = jitterPoint(point, 4.75F, stone * 97U, seed);
+        result.seals[stone] = {
+            static_cast<std::uint8_t>(std::floor(point.x)),
+            static_cast<std::uint8_t>(std::floor(point.y)),
+        };
+        for (std::uint8_t index = 0; index < 4; ++index) {
+            auto route = rotatePoint(kBaseRoutes[stone][index], phase,
+                1.0F + seededUnit(stone * 97U + index * 19U + 5003U, seed) * 0.08F);
+            routes[stone][index] = jitterPoint(route, 4.0F, stone * 97U + index * 19U + 7U, seed);
+        }
+        routes[stone][4] = {static_cast<float>(result.seals[stone].x) + 0.5F,
+                            static_cast<float>(result.seals[stone].y) + 0.5F};
+    }
+
+    std::array<IslandNode, 8> nodes{{
+        {kCenter, 15.625F, 101},
+        {routes[0][4], 12.8125F, 137}, {routes[1][4], 13.75F, 173},
+        {routes[2][4], 13.4375F, 211}, {}, {}, {}, {},
+    }};
+    const auto supportPhase = seededRange(8101U, 0.0F, 6.2831853F, seed);
+    for (std::uint8_t index = 0; index < 4; ++index) {
+        const auto angle = supportPhase + static_cast<float>(index) * 1.5707963F
+            + seededUnit(8200U + index * 31U, seed) * 0.48F;
+        const auto distance = seededRange(8300U + index * 37U, 16.25F, 27.5F, seed);
+        nodes[index + 4] = {
+            {std::clamp(kCenter.x + std::cos(angle) * distance, 5.0F, 95.0F),
+             std::clamp(kCenter.y + std::sin(angle) * distance, 5.0F, 95.0F)},
+            seededRange(8400U + index * 41U, 9.0625F, 15.0F, seed),
+            static_cast<std::uint16_t>(251U + index * 43U),
+        };
+    }
+    std::array<IslandSegment, 15> segments{};
+    std::uint8_t segmentCount = 0;
+    for (const auto& route : routes) {
+        auto from = kCenter;
+        for (const auto to : route) {
+            segments[segmentCount] = {from, to, 10.75F,
+                static_cast<std::uint16_t>(401U + segmentCount * 29U)};
+            ++segmentCount;
+            from = to;
+        }
+    }
     for (std::uint16_t y = 0; y < kMapRows; ++y) {
         for (std::uint16_t x = 0; x < kMapColumns; ++x) {
-            const auto dx = static_cast<std::int32_t>(x) - centerX;
-            const auto dy = static_cast<std::int32_t>(y) - centerY;
-            const auto edgeNoise = static_cast<std::int32_t>(tileHash(x / 2, y / 2, 101, seed) % 11U) - 5;
-            const auto score = dx * dx * 100 / (43 * 43) + dy * dy * 100 / (40 * 40);
-            if (score <= 100 + edgeNoise) {
+            const MapPoint point{static_cast<float>(x) + 0.5F, static_cast<float>(y) + 0.5F};
+            auto strength = -1000.0F;
+            for (const auto& node : nodes) {
+                const auto noise = edgeNoise(x, y, node.salt, seed) * 0.14F
+                    + edgeNoise(x / 3, y / 3, node.salt + 503U, seed) * 0.08F;
+                strength = std::max(strength,
+                    1.0F - std::hypot(point.x - node.point.x, point.y - node.point.y) / node.radius + noise);
+            }
+            for (const auto& segment : segments) {
+                const auto noise = edgeNoise(x, y, segment.salt, seed) * 0.12F
+                    + edgeNoise(x / 2, y / 2, segment.salt + 607U, seed) * 0.08F;
+                strength = std::max(strength,
+                    1.0F - distanceToSegment(point, segment.from, segment.to) / segment.radius + noise);
+            }
+            if (strength > 0.0F) workspace.set(x, y, TerrainId::Grass);
+        }
+    }
+    for (std::uint16_t y = 0; y < kMapRows; ++y) {
+        for (std::uint16_t x = 0; x < kMapColumns; ++x) {
+            const MapPoint point{static_cast<float>(x) + 0.5F, static_cast<float>(y) + 0.5F};
+            if (std::hypot(point.x - kCenter.x, point.y - kCenter.y) <= 8.125F) {
                 workspace.set(x, y, TerrainId::Grass);
+            }
+            for (const auto seal : result.seals) {
+                if (std::hypot(point.x - (static_cast<float>(seal.x) + 0.5F),
+                               point.y - (static_cast<float>(seal.y) + 0.5F)) <= 5.625F) {
+                    workspace.set(x, y, TerrainId::Grass);
+                }
             }
         }
     }
@@ -341,23 +533,32 @@ bool MapGenerator::generate(
         }
     }
 
-    constexpr std::array<SealCell, 3> kBaseSeals{{
-        SealCell{24, 28}, SealCell{76, 30}, SealCell{50, 77},
-    }};
-    for (std::uint8_t index = 0; index < result.seals.size(); ++index) {
-        const auto jitterX = static_cast<std::int32_t>(tileHash(index, 0, 701, seed) % 9U) - 4;
-        const auto jitterY = static_cast<std::int32_t>(tileHash(index, 0, 1701, seed) % 9U) - 4;
-        result.seals[index] = SealCell{
-            static_cast<std::uint8_t>(static_cast<std::int32_t>(kBaseSeals[index].x) + jitterX),
-            static_cast<std::uint8_t>(static_cast<std::int32_t>(kBaseSeals[index].y) + jitterY),
-        };
-        paintPath(workspace, centerX, centerY, result.seals[index].x, result.seals[index].y);
-        paintCircle(workspace, result.seals[index].x, result.seals[index].y, 4, TerrainId::Dirt);
-        paintCircle(workspace, result.seals[index].x, result.seals[index].y, 3, TerrainId::Plaza);
+    for (const auto& route : routes) {
+        auto from = kCenter;
+        for (const auto to : route) {
+            paintSegment(workspace, from, to, 4.625F, TerrainId::Grass);
+            paintSegment(workspace, from, to, 2.75F, TerrainId::Dirt);
+            paintSegment(workspace, from, to, 1.25F, TerrainId::Road);
+            from = to;
+        }
     }
-    paintCircle(workspace, centerX, centerY, 7, TerrainId::Dirt);
-    paintCircle(workspace, centerX, centerY, 5, TerrainId::Road);
-    paintCircle(workspace, centerX, centerY, 4, TerrainId::Plaza);
+    paintEllipse(workspace, kCenter, 7.25F, 7.25F, TerrainId::Dirt, seed);
+    paintEllipse(workspace, kCenter, 6.125F, 6.125F, TerrainId::Road, seed);
+    paintEllipse(workspace, kCenter, 4.875F, 4.875F, TerrainId::Plaza, seed);
+    for (const auto seal : result.seals) {
+        paintEllipse(workspace,
+                     {static_cast<float>(seal.x) + 0.5F, static_cast<float>(seal.y) + 0.5F},
+                     4.5F, 3.625F, TerrainId::Plaza, seed);
+    }
+    for (const auto& route : routes) {
+        auto from = kCenter;
+        for (const auto to : route) {
+            paintSegment(workspace, from, to, 4.25F, TerrainId::Grass, true);
+            paintSegment(workspace, from, to, 2.375F, TerrainId::Dirt, true);
+            paintSegment(workspace, from, to, 1.125F, TerrainId::Road, true);
+            from = to;
+        }
+    }
 
     for (std::uint16_t y = 0; y < kMapRows; ++y) {
         for (std::uint16_t x = 0; x < kMapColumns; ++x) {
@@ -376,13 +577,14 @@ bool MapGenerator::generate(
             return false;
         }
     }
-    constexpr std::array<std::array<std::int8_t, 2>, 4> kPedestals{{
-        {{-3, -3}}, {{3, -3}}, {{-3, 3}}, {{3, 3}},
+    constexpr std::array<std::array<std::int8_t, 2>, 8> kPedestals{{
+        {{0, -3}}, {{2, -2}}, {{3, 0}}, {{2, 2}},
+        {{0, 3}}, {{-2, 2}}, {{-3, 0}}, {{-2, -2}},
     }};
     for (const auto offset : kPedestals) {
         if (!putObject(result,
-                       static_cast<std::uint16_t>(centerX + offset[0]),
-                       static_cast<std::uint16_t>(centerY + offset[1]),
+                       static_cast<std::uint16_t>(50 + offset[0]),
+                       static_cast<std::uint16_t>(50 + offset[1]),
                        BakedObjectId::PlazaPedestal,
                        true,
                        assets)) {
@@ -390,7 +592,7 @@ bool MapGenerator::generate(
         }
     }
     std::array<std::uint16_t, 6> placed{};
-    constexpr std::array<std::uint16_t, 6> kLimits{{24, 18, 64, 28, 28, 28}};
+    constexpr std::array<std::uint16_t, 6> kLimits{{48, 42, 156, 66, 66, 66}};
     constexpr std::array<BakedObjectId, 6> kObjects{{
         BakedObjectId::RockGrass,
         BakedObjectId::ShrubGrass,

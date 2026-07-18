@@ -113,7 +113,7 @@ int main() {
     map.tiles[tileIndex(blockedX, blockedY)] = wizward::world::kCollisionBit;
     for (int frame = 0; frame < 20; ++frame) gameplay.tick(moveRight, map);
     assert(gameplay.player(0).x <= static_cast<float>(blockedX * wizward::game::kWorldTileSize)
-                                      - wizward::game::kPlayerRadius);
+                                      - wizward::game::kPlayerCollisionRadius);
 
     assert(!wizward::game::playerPositionIsWalkable(map, 2.0F, 2.0F));
 
