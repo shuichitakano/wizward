@@ -223,7 +223,7 @@ struct XpGemState {
 
 class GameplayState {
 public:
-    void reset(const world::WorldMap& map) noexcept;
+    void reset(const world::WorldMap& map, std::size_t startingPlayer = 0) noexcept;
     void tick(const pixel_twins::Controllers& controllers, const world::WorldMap& map) noexcept;
     [[nodiscard]] bool addEnemy(float x, float y, EnemyKind kind = EnemyKind::Imp) noexcept;
     void grantXp(std::size_t playerIndex, std::uint16_t amount) noexcept;

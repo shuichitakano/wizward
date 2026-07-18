@@ -17,8 +17,6 @@
 namespace wizward::game {
 namespace {
 
-constexpr std::uint32_t kTitleFrames = 150;
-
 std::uint8_t fourDirectionRow(Facing facing) noexcept {
     switch (facing) {
     case Facing::South:
@@ -535,8 +533,8 @@ PIXEL_TWINS_SRAM void drawTitle(pixel_twins::Framebuffer& framebuffer,
     pixel_twins::Sprite logo{};
     if (title.makeLogo(28, 18, logo)) pixel_twins::drawSprite(right, logo);
     if ((frame / 30U) % 2U == 0U) {
-        pixel_twins::drawText(left, assets::kWizwardFont, 40, 98, "PRESS START", 255);
-        pixel_twins::drawText(right, assets::kWizwardFont, 40, 98, "PRESS START", 255);
+        drawCenteredText(left, "PUSH ANY BUTTON", 80, 98);
+        drawCenteredText(right, "PUSH ANY BUTTON", 80, 98);
     }
 }
 
@@ -904,8 +902,9 @@ bool Game::initialize(Scene initialScene) noexcept {
         || !mapGenerator.generate(0x57495aU, gameAssets_.background(), terrainWorkspace_, worldMap_)) {
         return false;
     }
-    gameplay_.reset(worldMap_);
+    gameplay_.reset(worldMap_, startingPlayer_);
     scene_ = initialScene;
+    paused_ = false;
     return scene_ == Scene::Title ? titleAssets_.applyPalette(framebuffer_)
                                   : gameAssets_.applyPalette(framebuffer_);
 }
@@ -913,9 +912,10 @@ bool Game::initialize(Scene initialScene) noexcept {
 UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
     scene_ = scene;
     sceneFrame_ = 0;
+    paused_ = false;
     if (scene_ == Scene::Gameplay) {
         (void)worldMap_.resetSeals(gameAssets_.background());
-        gameplay_.reset(worldMap_);
+        gameplay_.reset(worldMap_, startingPlayer_);
         resultOutcome_ = GameplayOutcome::Running;
     }
     const bool paletteApplied = scene_ == Scene::Title
@@ -930,20 +930,32 @@ UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
 }
 
 UpdateResult Game::processInput(const pixel_twins::Controllers& controllers) noexcept {
-    if (!controllers[0].isPressed(pixel_twins::ControllerButton::start)) return {};
-    const auto next = scene_ == Scene::Title ? Scene::Gameplay
-        : (scene_ == Scene::Gameplay ? Scene::Result : Scene::Title);
-    return changeScene(next, true);
+    if (scene_ == Scene::Title) {
+        for (std::uint8_t index = 0; index < pixel_twins::kControllerCount; ++index) {
+            if (controllers[index].pressed == 0) continue;
+            startingPlayer_ = index;
+            return changeScene(Scene::Gameplay, true);
+        }
+        return {};
+    }
+    if (scene_ == Scene::Result) {
+        for (std::size_t index = 0; index < pixel_twins::kControllerCount; ++index) {
+            if (controllers[index].pressed != 0) return changeScene(Scene::Title, false);
+        }
+        return {};
+    }
+    if (gameplay_.bossIntroTicks() > 0) return {};
+    for (std::size_t index = 0; index < pixel_twins::kControllerCount; ++index) {
+        if (!gameplay_.playerIsManual(index)
+            || !controllers[index].isPressed(pixel_twins::ControllerButton::start)) continue;
+        paused_ = !paused_;
+        break;
+    }
+    return {};
 }
 
 UpdateResult Game::tick(const pixel_twins::Controllers& controllers) noexcept {
-    if (scene_ == Scene::Title && sceneFrame_ == kTitleFrames) {
-        auto result = changeScene(Scene::Gameplay, false);
-        ++frame_;
-        ++sceneFrame_;
-        return result;
-    }
-    if (scene_ == Scene::Gameplay) {
+    if (scene_ == Scene::Gameplay && !paused_) {
         gameplay_.tick(controllers, worldMap_);
         for (std::uint8_t index = 0; index < worldMap_.seals.size(); ++index) {
             if (gameplay_.seal(index).active) {
@@ -973,6 +985,10 @@ void Game::render() noexcept {
                           spriteBuckets_, frame_, 0);
         drawGameplayPanel(right, worldMap_, gameAssets_, gameplay_.camera(1), gameplay_,
                           spriteBuckets_, frame_, 1);
+        if (paused_) {
+            drawCenteredText(left, "PAUSED", 80, 84);
+            drawCenteredText(right, "PAUSED", 80, 84);
+        }
     } else {
         const auto left = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Left);
         const auto right = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Right);

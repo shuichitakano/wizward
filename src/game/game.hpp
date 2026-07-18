@@ -43,6 +43,8 @@ public:
     [[nodiscard]] pixel_twins::Framebuffer& framebuffer() noexcept { return framebuffer_; }
     [[nodiscard]] const pixel_twins::Framebuffer& framebuffer() const noexcept { return framebuffer_; }
     [[nodiscard]] Scene scene() const noexcept { return scene_; }
+    [[nodiscard]] bool paused() const noexcept { return paused_; }
+    [[nodiscard]] const GameplayState& gameplay() const noexcept { return gameplay_; }
 
 private:
     [[nodiscard]] UpdateResult changeScene(Scene scene, bool playStartSfx) noexcept;
@@ -63,6 +65,8 @@ private:
     Scene scene_ = Scene::Title;
     std::uint32_t frame_ = 0;
     std::uint32_t sceneFrame_ = 0;
+    std::uint8_t startingPlayer_ = 0;
+    bool paused_ = false;
     GameplayOutcome resultOutcome_ = GameplayOutcome::Running;
 };
 

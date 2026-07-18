@@ -1330,7 +1330,7 @@ bool playerPositionIsWalkable(const world::WorldMap& map, float x, float y) noex
     return map.circleIsWalkable(x, y, kPlayerCollisionRadius);
 }
 
-void GameplayState::reset(const world::WorldMap&) noexcept {
+void GameplayState::reset(const world::WorldMap&, std::size_t startingPlayer) noexcept {
     constexpr float kCenter = 50.5F * static_cast<float>(kWorldTileSize);
     players_[0] = {kCenter - 28.0F, kCenter, Facing::East};
     players_[1] = {kCenter + 28.0F, kCenter, Facing::West};
@@ -1345,7 +1345,8 @@ void GameplayState::reset(const world::WorldMap&) noexcept {
     swarmCooldownTicks_ = 28U * 60U;
     elapsedTicks_ = 0;
     scores_.fill(0);
-    manualPlayers_ = {{true, false}};
+    manualPlayers_ = {{false, false}};
+    manualPlayers_[std::min(startingPlayer, manualPlayers_.size() - 1U)] = true;
     seals_.fill({});
     sealNoticeTicks_ = 0;
     activeSealCount_ = 0;
