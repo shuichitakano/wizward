@@ -23,6 +23,25 @@ int main() {
     assert(std::any_of(first.tiles.begin(), first.tiles.end(), [](std::uint8_t tile) {
         return (tile & wizward::world::kCollisionBit) != 0;
     }));
+    constexpr std::array<std::uint16_t, 6> kDecorationCounts{{48, 42, 156, 66, 66, 66}};
+    constexpr std::array<wizward::assets::BakedObjectId, 6> kDecorations{{
+        wizward::assets::BakedObjectId::RockGrass,
+        wizward::assets::BakedObjectId::ShrubGrass,
+        wizward::assets::BakedObjectId::GrassClumpGrass,
+        wizward::assets::BakedObjectId::FlowerWhiteGrass,
+        wizward::assets::BakedObjectId::FlowerBlueGrass,
+        wizward::assets::BakedObjectId::FlowerYellowGrass,
+    }};
+    for (std::size_t index = 0; index < kDecorations.size(); ++index) {
+        std::uint8_t pattern = 0;
+        assert(assets.background().objectPattern(
+            static_cast<std::uint8_t>(kDecorations[index]), pattern));
+        const auto actualCount = std::count_if(first.tiles.begin(), first.tiles.end(), [pattern](std::uint8_t tile) {
+            return (tile & wizward::world::kTileIndexMask) == pattern;
+        });
+        assert(actualCount > 0);
+        assert(actualCount <= kDecorationCounts[index]);
+    }
     const auto background = first.background(assets.background());
     assert(background.width == wizward::world::kMapColumns);
     assert(background.height == wizward::world::kMapRows);
