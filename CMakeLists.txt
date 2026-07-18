@@ -53,6 +53,7 @@ add_library(wizward_core
     src/assets/game_assets.cpp
     src/assets/title_assets.cpp
     src/assets/wizward_font.cpp
+    src/game/game.cpp
     src/world/world_map.cpp
     "${WIZWARD_GENERATED_DIR}/embedded_assets.cpp"
 )

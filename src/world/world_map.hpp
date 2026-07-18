@@ -4,6 +4,7 @@
 
 #include "pixel_twins/background.hpp"
 #include "pixel_twins/background_asset.hpp"
+#include "pixel_twins/platform.hpp"
 #include "pixel_twins/render_target.hpp"
 
 #include <array>
@@ -52,7 +53,7 @@ struct WorldMap {
     void draw(pixel_twins::RenderTarget target,
               const pixel_twins::BackgroundAssetPackView& assets,
               std::int32_t sourceX,
-              std::int32_t sourceY) const noexcept;
+              std::int32_t sourceY) const noexcept PIXEL_TWINS_SRAM;
     [[nodiscard]] bool activateSeal(
         std::uint8_t sealIndex,
         const pixel_twins::BackgroundAssetPackView& assets) noexcept;

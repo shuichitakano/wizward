@@ -39,6 +39,9 @@ cmake --build build --parallel
 Flash/RAM配置、ランタイムマップ生成、BG描画、アニメーション参照については、
 [ランタイムアセットとマップ生成](docs/runtime_assets.md)を参照してください。
 
+Pico SDKによるRP2350ビルドとmacOS版との共通ゲーム境界は
+[RP2350移植設計](docs/rp2350_port.md)を参照してください。
+
 ## Clone
 
 ```sh
