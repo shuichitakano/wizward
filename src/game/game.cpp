@@ -293,12 +293,58 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                    static_cast<std::int16_t>(gem.y - camera.y - 4.0F), gem.y - camera.y);
     }
     for (const auto& enemy : gameplay.enemies()) {
-        if (!enemy.active) continue;
-        queueAsset(spriteBuckets, assets, assets::SpriteAssetId::SlimeEnemyWalk16x164fSmallerSheet,
-                   frame / 8U,
-                   static_cast<std::int16_t>(enemy.x - camera.x - 8.0F),
-                   static_cast<std::int16_t>(enemy.y - camera.y - 12.0F), enemy.y - camera.y,
+        if (!enemy.active || enemy.spawnDelayTicks > 0) continue;
+        auto asset = assets::SpriteAssetId::SlimeEnemyWalk16x164fSmallerSheet;
+        float anchorX = 8.0F;
+        float anchorY = 12.0F;
+        switch (enemy.kind) {
+        case EnemyKind::Imp: break;
+        case EnemyKind::Bat:
+            asset = assets::SpriteAssetId::BatEnemyLinelessWalk18x184fSheet;
+            anchorX = 9.0F; anchorY = 10.0F; break;
+        case EnemyKind::Skeleton:
+            asset = assets::SpriteAssetId::SkeletonEnemyWalk24x244fSheet;
+            anchorX = 12.0F; anchorY = 20.0F; break;
+        case EnemyKind::Golem:
+            asset = assets::SpriteAssetId::GolemEnemyLinelessWalk24x244fSheet;
+            anchorX = 12.0F; anchorY = 20.0F; break;
+        case EnemyKind::Archer:
+            asset = enemy.attackAnimationTicks > 0
+                ? assets::SpriteAssetId::GoblinArcherEnemyLinelessShoot16x164fSheet
+                : assets::SpriteAssetId::GoblinArcherEnemyLinelessWalk16x164fSheet;
+            anchorX = 8.0F; anchorY = 13.0F; break;
+        case EnemyKind::Wisp:
+            asset = assets::SpriteAssetId::WispEnemyLinelessWalk18x184fSheet;
+            anchorX = 9.0F; anchorY = 10.0F; break;
+        case EnemyKind::Mage:
+            asset = assets::SpriteAssetId::MonsterMageEnemyLinelessWalk18x184fSheet;
+            anchorX = 9.0F; anchorY = 15.0F; break;
+        }
+        const auto animationFrame = enemy.attackAnimationTicks > 0
+            ? static_cast<std::uint32_t>((20U - enemy.attackAnimationTicks) / 5U)
+            : frame / 8U;
+        queueAsset(spriteBuckets, assets, asset, animationFrame,
+                   static_cast<std::int16_t>(enemy.x - camera.x - anchorX),
+                   static_cast<std::int16_t>(enemy.y - camera.y - anchorY), enemy.y - camera.y,
                    fourDirectionRow(enemy.facing));
+    }
+    for (const auto& bullet : gameplay.enemyBullets()) {
+        if (!bullet.active) continue;
+        if (bullet.type == EnemyBulletType::Arrow) {
+            auto angle = std::atan2(bullet.velocityY, bullet.velocityX);
+            if (angle < 0.0F) angle += 6.2831853F;
+            const auto directionFrame = static_cast<std::uint32_t>(
+                static_cast<unsigned>(std::round(angle / (6.2831853F / 16.0F))) % 16U);
+            queueAsset(spriteBuckets, assets, assets::SpriteAssetId::ArcherArrow12x416dir12x1216fSheet,
+                       directionFrame,
+                       static_cast<std::int16_t>(bullet.x - camera.x - 6.0F),
+                       static_cast<std::int16_t>(bullet.y - camera.y - 6.0F), bullet.y - camera.y);
+        } else {
+            queueAsset(spriteBuckets, assets, assets::SpriteAssetId::EnemyMagicOrb88x83fSheet,
+                       frame / 7U,
+                       static_cast<std::int16_t>(bullet.x - camera.x - 4.0F),
+                       static_cast<std::int16_t>(bullet.y - camera.y - 4.0F), bullet.y - camera.y);
+        }
     }
     for (const auto& slash : gameplay.windSlashes()) {
         if (!slash.active || slash.owner >= pixel_twins::kControllerCount) continue;

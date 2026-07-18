@@ -55,6 +55,7 @@ private:
     GameplayState gameplay_;
     pixel_twins::SpriteBuckets<
         kMaximumEnemies + kMaximumPlayerBullets + kMaximumXpGems
+            + kMaximumEnemyBullets
             + kMaximumWindSlashes * 3U + kMaximumThunderStrikes * 3U
             + pixel_twins::kControllerCount * 4U, 0> spriteBuckets_;
     Scene scene_ = Scene::Title;

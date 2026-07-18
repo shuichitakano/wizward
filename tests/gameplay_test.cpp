@@ -105,6 +105,10 @@ int main() {
 
     map = {};
     gameplay.reset(map);
+    gameplay.tick(controllersWith(0, 0), map);
+    assert(gameplay.enemyCount() >= 2);
+
+    gameplay.reset(map);
     const auto combatPlayer = gameplay.player(0);
     assert(gameplay.addEnemy(combatPlayer.x + 100.0F, combatPlayer.y));
     const auto idle = controllersWith(0, 0);
@@ -122,6 +126,16 @@ int main() {
     gameplay.tick(idle, map);
     assert(gameplay.player(0).hp == 27);
     assert(gameplay.player(0).invulnerabilityTicks > 0);
+
+    gameplay.reset(map);
+    const auto rangedTarget = gameplay.player(0);
+    assert(gameplay.addEnemy(rangedTarget.x + 160.0F, rangedTarget.y,
+                             wizward::game::EnemyKind::Mage));
+    assert(gameplay.enemies()[0].hp == 20);
+    assert(gameplay.enemies()[0].xpValue == 6);
+    for (int frame = 0; frame < 120; ++frame) gameplay.tick(idle, map);
+    assert(std::any_of(gameplay.enemyBullets().begin(), gameplay.enemyBullets().end(),
+        [](const auto& bullet) { return bullet.active && bullet.type == wizward::game::EnemyBulletType::Magic; }));
 
     assert(wizward::game::xpNeededForLevel(1) == 15);
     assert(wizward::game::xpNeededForLevel(2) == 21);

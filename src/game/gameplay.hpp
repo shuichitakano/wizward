@@ -17,6 +17,7 @@ inline constexpr std::size_t kMaximumPlayerBullets = 128;
 inline constexpr std::size_t kMaximumXpGems = 128;
 inline constexpr std::size_t kMaximumWindSlashes = 8;
 inline constexpr std::size_t kMaximumThunderStrikes = 16;
+inline constexpr std::size_t kMaximumEnemyBullets = 128;
 
 enum class Facing : std::uint8_t {
     South,
@@ -47,6 +48,21 @@ enum class PlayerAttack : std::uint8_t {
     Light,
     Fire,
     Ice,
+};
+
+enum class EnemyKind : std::uint8_t {
+    Imp,
+    Bat,
+    Skeleton,
+    Golem,
+    Archer,
+    Wisp,
+    Mage,
+};
+
+enum class EnemyBulletType : std::uint8_t {
+    Arrow,
+    Magic,
 };
 
 struct PlayerState {
@@ -91,9 +107,33 @@ struct EnemyState {
     float x = 0.0F;
     float y = 0.0F;
     float radius = 5.0F;
+    float speedPerTick = 0.0F;
+    float phase = 0.0F;
+    float dashVelocityX = 0.0F;
+    float dashVelocityY = 0.0F;
     std::int16_t hp = 0;
     std::uint16_t slowTicks = 0;
+    std::uint16_t bornTicks = 0;
+    std::uint16_t spawnDelayTicks = 0;
+    std::uint16_t attackCooldownTicks = 0;
+    std::uint16_t attackAnimationTicks = 0;
+    std::uint16_t dashTicks = 0;
+    std::uint8_t xpValue = 2;
+    EnemyKind kind = EnemyKind::Imp;
     Facing facing = Facing::South;
+    bool active = false;
+};
+
+struct EnemyBulletState {
+    float x = 0.0F;
+    float y = 0.0F;
+    float velocityX = 0.0F;
+    float velocityY = 0.0F;
+    float radius = 0.0F;
+    std::uint16_t remainingTicks = 0;
+    std::uint16_t ageTicks = 0;
+    std::uint8_t damage = 0;
+    EnemyBulletType type = EnemyBulletType::Arrow;
     bool active = false;
 };
 
@@ -145,7 +185,7 @@ class GameplayState {
 public:
     void reset(const world::WorldMap& map) noexcept;
     void tick(const pixel_twins::Controllers& controllers, const world::WorldMap& map) noexcept;
-    [[nodiscard]] bool addEnemy(float x, float y) noexcept;
+    [[nodiscard]] bool addEnemy(float x, float y, EnemyKind kind = EnemyKind::Imp) noexcept;
     void grantXp(std::size_t playerIndex, std::uint16_t amount) noexcept;
 
     [[nodiscard]] const PlayerState& player(std::size_t index) const noexcept {
@@ -169,6 +209,9 @@ public:
     [[nodiscard]] const std::array<ThunderStrikeState, kMaximumThunderStrikes>& thunderStrikes() const noexcept {
         return thunderStrikes_;
     }
+    [[nodiscard]] const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets() const noexcept {
+        return enemyBullets_;
+    }
     [[nodiscard]] std::size_t enemyCount() const noexcept;
     [[nodiscard]] std::size_t bulletCount() const noexcept;
     [[nodiscard]] std::uint32_t elapsedTicks() const noexcept { return elapsedTicks_; }
@@ -184,8 +227,10 @@ private:
     std::array<XpGemState, kMaximumXpGems> xpGems_{};
     std::array<WindSlashState, kMaximumWindSlashes> windSlashes_{};
     std::array<ThunderStrikeState, kMaximumThunderStrikes> thunderStrikes_{};
+    std::array<EnemyBulletState, kMaximumEnemyBullets> enemyBullets_{};
     std::uint32_t randomState_ = 1;
     std::uint16_t spawnCooldownTicks_ = 0;
+    std::uint16_t swarmCooldownTicks_ = 0;
     std::uint32_t elapsedTicks_ = 0;
     std::array<std::uint32_t, pixel_twins::kControllerCount> scores_{};
 };
