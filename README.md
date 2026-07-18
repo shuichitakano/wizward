@@ -14,6 +14,19 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
+## アセット動作デモ
+
+SDL3を使用して、タイトル画面、生成地形、ゲーム中スプライト、フォントを実データから表示できます。
+
+```sh
+cmake -S . -B build-demo -DCMAKE_BUILD_TYPE=Release -DWIZWARD_BUILD_DEMO=ON
+cmake --build build-demo --parallel
+./build-demo/wizward_asset_demo
+```
+
+タイトルは約2.5秒後、またはSpace/Startでゲーム画面へ切り替わります。ゲーム画面では左を
+WASD、右を矢印キーでスクロールできます。Space/Startでタイトルへ戻ります。
+
 採用バイナリはビルド時に読み取り専用C++配列へ変換され、BG、スプライト、パレットをFlashから
 直接参照します。マップはゲーム開始時にシードから生成し、100×100の8-bitタイルマップ
 10,000バイトと、生成時だけ使用する4-bit地形ワーク5,000バイトを使用します。
@@ -35,3 +48,8 @@ For an existing checkout:
 ```sh
 git submodule update --init --recursive
 ```
+
+## ライセンス
+
+ソースコードは[MIT License](LICENSE)で公開します。画像、音楽、フォントなどのアセットには、
+それぞれの出典や利用条件が適用される場合があり、MIT Licenseの対象とは限りません。
