@@ -12,6 +12,7 @@
 #include "pixel_twins/sprite.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <string_view>
@@ -21,6 +22,7 @@ namespace {
 constexpr std::int32_t kMapPixelWidth = wizward::world::kMapColumns * 8;
 constexpr std::int32_t kMapPixelHeight = wizward::world::kMapRows * 8;
 constexpr std::uint32_t kTitleFrames = 150;
+constexpr auto kSimulationStep = std::chrono::microseconds(16667);
 
 struct Camera {
     std::int32_t x;
@@ -201,22 +203,38 @@ int main(int argc, char** argv) {
     pixel_twins::sdl::ControllerInput controllerInput;
     pixel_twins::Controllers controllers;
     std::uint32_t frame = 0;
+    auto previousTime = std::chrono::steady_clock::now();
+    auto accumulatedTime = std::chrono::steady_clock::duration::zero();
     while (presenter.processEvents(&controllerInput)) {
+        const auto currentTime = std::chrono::steady_clock::now();
+        const auto maximumFrameTime = std::chrono::duration_cast<
+            std::chrono::steady_clock::duration>(kSimulationStep * 4);
+        accumulatedTime += std::min(currentTime - previousTime, maximumFrameTime);
+        previousTime = currentTime;
         controllerInput.update(controllers);
-        if (controllers[0].isPressed(pixel_twins::ControllerButton::start)
-            || (scene == Scene::Title && frame == kTitleFrames)) {
+        if (controllers[0].isPressed(pixel_twins::ControllerButton::start)) {
             scene = scene == Scene::Title ? Scene::Gameplay : Scene::Title;
             const auto paletteApplied = scene == Scene::Title
                 ? titleAssets.applyPalette(framebuffer)
                 : gameAssets.applyPalette(framebuffer);
             if (!paletteApplied) return 1;
         }
+        while (accumulatedTime >= kSimulationStep) {
+            if (scene == Scene::Title && frame == kTitleFrames) {
+                scene = Scene::Gameplay;
+                if (!gameAssets.applyPalette(framebuffer)) return 1;
+            }
+            if (scene == Scene::Gameplay) {
+                moveCamera(leftCamera, controllers[0]);
+                moveCamera(rightCamera, controllers[1]);
+            }
+            ++frame;
+            accumulatedTime -= kSimulationStep;
+        }
 
         if (scene == Scene::Title) {
             drawTitle(framebuffer, titleAssets, frame);
         } else {
-            moveCamera(leftCamera, controllers[0]);
-            moveCamera(rightCamera, controllers[1]);
             drawGameplay(framebuffer, worldMap, gameAssets, leftCamera, rightCamera, frame);
         }
         framebuffer.flip();
