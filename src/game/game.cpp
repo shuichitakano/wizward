@@ -299,6 +299,56 @@ PIXEL_TWINS_SRAM void drawActiveSeals(pixel_twins::RenderTarget target,
     }
 }
 
+PIXEL_TWINS_SRAM void drawBossIntroShadow(pixel_twins::RenderTarget target,
+                         const GameplayState& gameplay,
+                         const CameraState& camera) noexcept {
+    if (gameplay.bossIntroTicks() == 0 || gameplay.boss() == nullptr) return;
+    const auto elapsedTicks = static_cast<std::uint16_t>(183U - gameplay.bossIntroTicks());
+    if (elapsedTicks < 35U) return;
+    const auto* boss = gameplay.boss();
+    const auto growth = smoothStep((static_cast<float>(elapsedTicks) / 60.0F - 0.58F) / 0.67F);
+    const auto x = static_cast<std::int16_t>(std::round(boss->x - camera.x));
+    const auto y = static_cast<std::int16_t>(std::round(boss->y - camera.y + 1.0F));
+    pixel_twins::fillEllipse(target, x, y,
+        static_cast<std::uint16_t>(std::round(4.0F + growth * 15.0F)),
+        static_cast<std::uint16_t>(std::round(2.0F + growth * 3.0F)),
+        elapsedTicks >= 75U ? 118 : 130);
+}
+
+PIXEL_TWINS_SRAM void drawBossIntroOverlay(pixel_twins::RenderTarget target,
+                          const GameplayState& gameplay,
+                          const CameraState& camera) noexcept {
+    if (gameplay.bossIntroTicks() == 0 || gameplay.boss() == nullptr) return;
+    const auto elapsedTicks = static_cast<std::uint16_t>(183U - gameplay.bossIntroTicks());
+    if (elapsedTicks < 75U) return;
+    const auto impactTicks = static_cast<std::uint16_t>(elapsedTicks - 75U);
+    const auto* boss = gameplay.boss();
+    const auto x = static_cast<std::int16_t>(std::round(boss->x - camera.x));
+    const auto y = static_cast<std::int16_t>(std::round(boss->y - camera.y));
+    if (impactTicks < 30U) {
+        const auto progress = smoothStep(static_cast<float>(impactTicks) / 30.0F);
+        const auto radius = 10.0F + progress * 58.0F;
+        const auto color = static_cast<std::uint8_t>(impactTicks < 11U ? 148U : 201U);
+        pixel_twins::drawEllipse(target, x, y,
+            static_cast<std::uint16_t>(std::round(radius)),
+            static_cast<std::uint16_t>(std::max(3.0F, std::round(radius * 0.24F))), color);
+        for (std::uint8_t ray = 0; ray < 12; ++ray) {
+            const auto angle = static_cast<float>(ray) * 6.2831853F / 12.0F;
+            const auto inner = 12.0F + progress * 8.0F;
+            const auto outer = 24.0F + progress * 66.0F;
+            pixel_twins::drawLine(target,
+                static_cast<std::int16_t>(std::round(static_cast<float>(x) + std::cos(angle) * inner)),
+                static_cast<std::int16_t>(std::round(static_cast<float>(y) + std::sin(angle) * inner * 0.34F)),
+                static_cast<std::int16_t>(std::round(static_cast<float>(x) + std::cos(angle) * outer)),
+                static_cast<std::int16_t>(std::round(static_cast<float>(y) + std::sin(angle) * outer * 0.34F)),
+                color);
+        }
+    }
+    if (impactTicks < 6U && (impactTicks / 2U) % 2U == 0U) {
+        pixel_twins::fillRectangle(target, 0, 0, 160, 120, 148);
+    }
+}
+
 PIXEL_TWINS_SRAM void drawOffscreenPartnerArrow(pixel_twins::RenderTarget target,
                                const GameplayState& gameplay,
                                const CameraState& camera,
@@ -393,6 +443,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     map.draw(target, assets.background(), static_cast<std::int32_t>(camera.x),
              static_cast<std::int32_t>(camera.y));
     drawActiveSeals(target, map, gameplay, camera);
+    drawBossIntroShadow(target, gameplay, camera);
     spriteBuckets.reset();
     for (const auto& bullet : gameplay.bullets()) {
         if (!bullet.active) continue;
@@ -425,6 +476,13 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     for (const auto& enemy : gameplay.enemies()) {
         if ((!enemy.active && enemy.deathTicks == 0) || enemy.spawnDelayTicks > 0) continue;
         const auto dying = !enemy.active && enemy.deathTicks > 0;
+        auto drawEnemyY = enemy.y;
+        if (enemy.kind == EnemyKind::Boss && gameplay.bossIntroTicks() > 0) {
+            const auto elapsedTicks = static_cast<std::uint16_t>(183U - gameplay.bossIntroTicks());
+            if (elapsedTicks < 54U) continue;
+            const auto progress = std::clamp(static_cast<float>(elapsedTicks - 54U) / 21.0F, 0.0F, 1.0F);
+            drawEnemyY = enemy.y - 132.0F * (1.0F - progress * progress * progress);
+        }
         auto asset = assets::SpriteAssetId::SlimeEnemyWalk16x164fSmallerSheet;
         float anchorX = 8.0F;
         float anchorY = 12.0F;
@@ -460,6 +518,9 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
             asset = dying ? assets::SpriteAssetId::MonsterMageEnemyLinelessDeath18x183fSheet
                           : assets::SpriteAssetId::MonsterMageEnemyLinelessWalk18x184fSheet;
             anchorX = 9.0F; anchorY = 15.0F; spriteWidth = 18; spriteHeight = 18; break;
+        case EnemyKind::Boss:
+            asset = assets::SpriteAssetId::SealedStoneGuardianBossWalk48x483fSheet;
+            anchorX = 24.0F; anchorY = 42.0F; spriteWidth = 48; spriteHeight = 48; break;
         }
         const auto animationFrame = dying
             ? static_cast<std::uint32_t>(std::min<std::uint16_t>(2U,
@@ -471,7 +532,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
             const auto progress = std::clamp(1.0F - static_cast<float>(enemy.bornTicks) / 23.0F,
                                              0.0F, 1.0F);
             const auto footX = static_cast<std::int16_t>(std::round(enemy.x - camera.x));
-            const auto footY = static_cast<std::int16_t>(std::round(enemy.y - camera.y));
+            const auto footY = static_cast<std::int16_t>(std::round(drawEnemyY - camera.y));
             const auto shadowWidth = static_cast<std::uint16_t>(std::max(2.0F, std::round(2.0F + progress * 8.0F)));
             pixel_twins::fillRectangle(target,
                 static_cast<std::int16_t>(footX - static_cast<std::int16_t>(shadowWidth / 2U)),
@@ -513,17 +574,17 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
             queueScaledAsset(spriteBuckets, assets, asset, animationFrame,
                 fourDirectionRow(enemy.facing),
                 static_cast<std::int16_t>(std::round(enemy.x - camera.x - anchorX * scaleX)),
-                static_cast<std::int16_t>(std::round(enemy.y - camera.y - anchorY * scaleY)),
-                width, height, enemy.y - camera.y);
+                static_cast<std::int16_t>(std::round(drawEnemyY - camera.y - anchorY * scaleY)),
+                width, height, drawEnemyY - camera.y);
             continue;
         }
         queueAsset(spriteBuckets, assets, asset, animationFrame,
                    static_cast<std::int16_t>(enemy.x - camera.x - anchorX),
-                   static_cast<std::int16_t>(enemy.y - camera.y - anchorY), enemy.y - camera.y,
+                   static_cast<std::int16_t>(drawEnemyY - camera.y - anchorY), drawEnemyY - camera.y,
                    fourDirectionRow(enemy.facing));
     }
     for (const auto& bullet : gameplay.enemyBullets()) {
-        if (!bullet.active) continue;
+        if (!bullet.active || bullet.launchDelayTicks > 0) continue;
         if (bullet.type == EnemyBulletType::Arrow) {
             auto angle = std::atan2(bullet.velocityY, bullet.velocityX);
             if (angle < 0.0F) angle += 6.2831853F;
@@ -533,6 +594,11 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        directionFrame,
                        static_cast<std::int16_t>(bullet.x - camera.x - 6.0F),
                        static_cast<std::int16_t>(bullet.y - camera.y - 6.0F), bullet.y - camera.y);
+        } else if (bullet.type == EnemyBulletType::BossFire) {
+            queueAsset(spriteBuckets, assets, assets::SpriteAssetId::BossBlueFireball1616x163fSheet,
+                       frame / 7U,
+                       static_cast<std::int16_t>(bullet.x - camera.x - 8.0F),
+                       static_cast<std::int16_t>(bullet.y - camera.y - 8.0F), bullet.y - camera.y);
         } else {
             queueAsset(spriteBuckets, assets, assets::SpriteAssetId::EnemyMagicOrb88x83fSheet,
                        frame / 7U,
@@ -635,6 +701,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                    player.y - camera.y, directionRow);
     }
     spriteBuckets.draw(target);
+    drawBossIntroOverlay(target, gameplay, camera);
     for (std::size_t playerIndex = 0; playerIndex < pixel_twins::kControllerCount; ++playerIndex) {
         const auto& player = gameplay.player(playerIndex);
         if (player.bombEffectTicks == 0) continue;
@@ -695,6 +762,17 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     char scoreBuffer[12]{};
     drawRightAlignedText(target, formatUnsigned(gameplay.score(viewer), scoreBuffer), 155, 5);
     drawTimer(target, gameplay.elapsedTicks());
+    if (const auto* boss = gameplay.boss()) {
+        constexpr std::int16_t kBossBarX = 42;
+        constexpr std::int16_t kBossBarY = 14;
+        constexpr std::uint16_t kBossBarWidth = 78;
+        pixel_twins::fillRectangle(target, kBossBarX, kBossBarY, kBossBarWidth, 6, 28);
+        pixel_twins::fillRectangle(target, kBossBarX + 1, kBossBarY + 1, kBossBarWidth - 2U, 4, 34);
+        const auto fill = static_cast<std::uint16_t>(std::clamp<std::int32_t>(
+            static_cast<std::int32_t>(kBossBarWidth - 2U) * boss->hp / std::max<std::int16_t>(1, boss->maxHp),
+            0, kBossBarWidth - 2U));
+        if (fill > 0) pixel_twins::fillRectangle(target, kBossBarX + 1, kBossBarY + 1, fill, 4, 15);
+    }
     if (gameplay.sealNoticeTicks() > 0) {
         char sealText[] = "SEAL 0/3";
         sealText[5] = static_cast<char>('0' + gameplay.activeSealCount());

@@ -248,6 +248,21 @@ int main() {
     assert(gameplay.sealNoticeTicks() == 132);
     assert(gameplay.score(0) + gameplay.score(1) == 1000);
 
+    map.seals.fill({50, 50});
+    gameplay.reset(map);
+    gameplay.tick(idle, map);
+    for (int frame = 0; frame < 52; ++frame) gameplay.tick(idle, map);
+    assert(gameplay.bossSpawned());
+    assert(gameplay.boss() != nullptr);
+    assert(gameplay.boss()->hp == 900);
+    assert(gameplay.boss()->maxHp == 900);
+    assert(gameplay.bossIntroTicks() == 183);
+    for (int frame = 0; frame < 183 + 80; ++frame) gameplay.tick(idle, map);
+    assert(std::any_of(gameplay.enemyBullets().begin(), gameplay.enemyBullets().end(),
+        [](const auto& bullet) {
+            return bullet.active && bullet.type == wizward::game::EnemyBulletType::BossFire;
+        }));
+
     wizward::world::WorldMap blockedMap;
     blockedMap.tiles.fill(wizward::world::kCollisionBit);
     gameplay.reset(blockedMap);

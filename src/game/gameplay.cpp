@@ -93,6 +93,38 @@ void updateCamera(CameraState& camera, const PlayerState& player) noexcept {
                           0.0F, kMapPixelHeight - static_cast<float>(pixel_twins::kScreenHeight));
 }
 
+void updateBossIntroCameras(
+    std::array<CameraState, pixel_twins::kControllerCount>& cameras,
+    const std::array<PlayerState, pixel_twins::kControllerCount>& players,
+    const EnemyState& boss,
+    std::uint16_t elapsedTicks) noexcept {
+    const auto smooth = [](float value) noexcept {
+        const auto t = std::clamp(value, 0.0F, 1.0F);
+        return t * t * (3.0F - 2.0F * t);
+    };
+    const auto toBoss = smooth(static_cast<float>(elapsedTicks) / 41.0F);
+    const auto backToPlayer = smooth((static_cast<float>(elapsedTicks) - 132.0F) / 51.0F);
+    for (std::size_t index = 0; index < cameras.size(); ++index) {
+        const auto playerFocusX = players[index].x;
+        const auto playerFocusY = players[index].y - kCameraVerticalOffset;
+        auto focusX = playerFocusX + (boss.x - playerFocusX) * toBoss;
+        auto focusY = playerFocusY + (boss.y - kCameraVerticalOffset - playerFocusY) * toBoss;
+        focusX += (playerFocusX - focusX) * backToPlayer;
+        focusY += (playerFocusY - focusY) * backToPlayer;
+        if (elapsedTicks >= 75U && elapsedTicks < 104U) {
+            const auto strength = 1.0F - static_cast<float>(elapsedTicks - 75U) / 29.0F;
+            focusX += (elapsedTicks & 1U) != 0U ? -std::ceil(3.0F * strength)
+                                                : std::ceil(3.0F * strength);
+            focusY += (elapsedTicks & 2U) != 0U ? std::ceil(2.0F * strength)
+                                                : -std::ceil(2.0F * strength);
+        }
+        cameras[index].x = std::clamp(focusX - static_cast<float>(pixel_twins::kPanelWidth) * 0.5F,
+                                      0.0F, kMapPixelWidth - static_cast<float>(pixel_twins::kPanelWidth));
+        cameras[index].y = std::clamp(focusY - static_cast<float>(pixel_twins::kScreenHeight) * 0.5F,
+                                      0.0F, kMapPixelHeight - static_cast<float>(pixel_twins::kScreenHeight));
+    }
+}
+
 void movePlayer(PlayerState& player,
                 const pixel_twins::ControllerState& controller,
                 const world::WorldMap& map) noexcept {
@@ -187,15 +219,20 @@ bool spawnEnemyBullet(std::array<EnemyBulletState, kMaximumEnemyBullets>& bullet
     const auto slot = std::find_if(bullets.begin(), bullets.end(),
         [](const EnemyBulletState& bullet) { return !bullet.active; });
     if (slot == bullets.end()) return false;
-    const auto speed = type == EnemyBulletType::Arrow ? 82.0F / 60.0F : 48.0F / 60.0F;
+    const auto speed = type == EnemyBulletType::Arrow ? 82.0F / 60.0F
+        : type == EnemyBulletType::BossFire ? 124.0F / 60.0F : 48.0F / 60.0F;
     slot->x = enemy.x;
     slot->y = enemy.y;
     slot->velocityX = directionX * speed;
     slot->velocityY = directionY * speed;
-    slot->radius = type == EnemyBulletType::Arrow ? 2.0F : 4.0F;
-    slot->remainingTicks = type == EnemyBulletType::Arrow ? 132 : 192;
+    slot->radius = type == EnemyBulletType::Arrow ? 2.0F
+        : type == EnemyBulletType::BossFire ? 6.0F : 4.0F;
+    slot->remainingTicks = type == EnemyBulletType::Arrow ? 132
+        : type == EnemyBulletType::BossFire ? 210 : 192;
     slot->ageTicks = 0;
-    slot->damage = type == EnemyBulletType::Arrow ? 4 : 5;
+    slot->launchDelayTicks = 0;
+    slot->damage = type == EnemyBulletType::Arrow ? 4
+        : type == EnemyBulletType::BossFire ? 8 : 5;
     slot->type = type;
     slot->active = true;
     return true;
@@ -256,11 +293,15 @@ void killEnemy(EnemyState& enemy,
                std::uint8_t owner,
                std::array<XpGemState, kMaximumXpGems>& xpGems,
                std::array<std::uint32_t, pixel_twins::kControllerCount>& scores) noexcept {
-    const auto gem = std::find_if(xpGems.begin(), xpGems.end(),
-        [](const XpGemState& candidate) { return !candidate.active; });
-    if (gem != xpGems.end()) *gem = {enemy.x, enemy.y, enemy.xpValue, true};
-    constexpr std::array<std::uint16_t, 7> kScores{{10, 15, 45, 100, 30, 25, 60}};
-    if (owner < scores.size()) scores[owner] += kScores[static_cast<std::size_t>(enemy.kind)];
+    if (enemy.kind == EnemyKind::Boss) {
+        for (auto& score : scores) score += 5000;
+    } else {
+        const auto gem = std::find_if(xpGems.begin(), xpGems.end(),
+            [](const XpGemState& candidate) { return !candidate.active; });
+        if (gem != xpGems.end()) *gem = {enemy.x, enemy.y, enemy.xpValue, true};
+        constexpr std::array<std::uint16_t, 7> kScores{{10, 15, 45, 100, 30, 25, 60}};
+        if (owner < scores.size()) scores[owner] += kScores[static_cast<std::size_t>(enemy.kind)];
+    }
     enemy.active = false;
     enemy.deathTicks = 16;
 }
@@ -308,8 +349,40 @@ EnemyState makeEnemyState(EnemyKind kind, float x, float y,
         enemy.attackCooldownTicks = static_cast<std::uint16_t>(
             std::round((0.6F + randomUnit(randomState) * 0.8F) * 60.0F));
         break;
+    case EnemyKind::Boss:
+        enemy.radius = 20.0F; enemy.hp = 900; enemy.xpValue = 0; enemy.speedPerTick = 24.0F / 60.0F;
+        enemy.attackCooldownTicks = 72;
+        break;
     }
+    enemy.maxHp = enemy.hp;
     return enemy;
+}
+
+void fireBossRadial(EnemyState& enemy,
+                    std::array<EnemyBulletState, kMaximumEnemyBullets>& bullets) noexcept {
+    const auto count = static_cast<std::uint8_t>(enemy.hp < enemy.maxHp / 2 ? 8 : 6);
+    const auto step = kTau / static_cast<float>(count);
+    const auto base = (enemy.volleyIndex & 1U) != 0U ? step * 0.5F : 0.0F;
+    ++enemy.volleyIndex;
+    for (std::uint8_t direction = 0; direction < count; ++direction) {
+        const auto angle = base + static_cast<float>(direction) * step;
+        for (std::uint8_t chain = 0; chain < 3; ++chain) {
+            const auto slot = std::find_if(bullets.begin(), bullets.end(),
+                [](const EnemyBulletState& bullet) { return !bullet.active; });
+            if (slot == bullets.end()) return;
+            *slot = {};
+            slot->x = enemy.x;
+            slot->y = enemy.y - 12.0F;
+            slot->velocityX = std::cos(angle) * (124.0F / 60.0F);
+            slot->velocityY = std::sin(angle) * (124.0F / 60.0F);
+            slot->radius = 6.0F;
+            slot->remainingTicks = 210;
+            slot->launchDelayTicks = static_cast<std::uint16_t>(chain * 5U);
+            slot->damage = 8;
+            slot->type = EnemyBulletType::BossFire;
+            slot->active = true;
+        }
+    }
 }
 
 void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
@@ -338,7 +411,13 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
         normalize(dx, dy);
         enemy.facing = facingFor(dx, dy);
 
-        if (enemy.kind == EnemyKind::Bat) {
+        if (enemy.kind == EnemyKind::Boss) {
+            moveActor(enemy, dx * speed, dy * speed, map);
+            if (enemy.attackCooldownTicks == 0) {
+                fireBossRadial(enemy, enemyBullets);
+                enemy.attackCooldownTicks = enemy.hp < enemy.maxHp / 2 ? 81 : 105;
+            }
+        } else if (enemy.kind == EnemyKind::Bat) {
             if (enemy.dashTicks > 0) {
                 --enemy.dashTicks;
                 moveActor(enemy, enemy.dashVelocityX, enemy.dashVelocityY, map);
@@ -390,7 +469,8 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
             const auto contactRange = enemy.radius + kPlayerRadius;
             if (squaredDistance(enemy.x, enemy.y, player.x, player.y) < contactRange * contactRange) {
                 auto damage = kContactDamage;
-                if (enemy.kind == EnemyKind::Golem || enemy.kind == EnemyKind::Skeleton) damage = 6;
+                if (enemy.kind == EnemyKind::Boss) damage = 8;
+                else if (enemy.kind == EnemyKind::Golem || enemy.kind == EnemyKind::Skeleton) damage = 6;
                 else if (enemy.kind == EnemyKind::Bat) damage = 4;
                 player.hp = static_cast<std::int16_t>(std::max(0, player.hp - damage));
                 player.invulnerabilityTicks = kContactInvulnerabilityTicks;
@@ -722,6 +802,10 @@ void updateEnemyBullets(std::array<EnemyBulletState, kMaximumEnemyBullets>& bull
                         std::array<PlayerState, pixel_twins::kControllerCount>& players) noexcept {
     for (auto& bullet : bullets) {
         if (!bullet.active) continue;
+        if (bullet.launchDelayTicks > 0) {
+            --bullet.launchDelayTicks;
+            if (bullet.launchDelayTicks > 0) continue;
+        }
         ++bullet.ageTicks;
         bullet.x += bullet.velocityX;
         bullet.y += bullet.velocityY;
@@ -928,7 +1012,8 @@ void updateSealStones(
     std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
     std::uint32_t elapsedTicks,
     std::uint8_t& activeCount,
-    std::uint16_t& noticeTicks) noexcept {
+    std::uint16_t& noticeTicks,
+    std::uint16_t& bossSpawnPendingTicks) noexcept {
     constexpr float kActivationRange = 42.0F;
     constexpr std::uint32_t kSealScore = 1000;
     for (std::size_t sealIndex = 0; sealIndex < seals.size(); ++sealIndex) {
@@ -947,9 +1032,21 @@ void updateSealStones(
             scores[playerIndex] += kSealScore;
             activeCount = static_cast<std::uint8_t>(activeCount + 1U);
             noticeTicks = 132;
+            if (activeCount == seals.size()) bossSpawnPendingTicks = 53;
             break;
         }
     }
+}
+
+bool spawnBoss(std::array<EnemyState, kMaximumEnemies>& enemies,
+               std::uint32_t elapsedTicks,
+               std::uint32_t& randomState) noexcept {
+    auto slot = std::find_if(enemies.begin(), enemies.end(),
+        [](const EnemyState& enemy) { return !enemy.active && enemy.deathTicks == 0; });
+    if (slot == enemies.end()) slot = std::prev(enemies.end());
+    *slot = makeEnemyState(EnemyKind::Boss, kMapPixelWidth * 0.5F,
+                           kMapPixelHeight * 0.5F, elapsedTicks, randomState, false);
+    return true;
 }
 
 void updatePerkChoice(PlayerState& player, const pixel_twins::ControllerState& controller,
@@ -1029,7 +1126,8 @@ EnemyKind rollEnemyKind(std::uint32_t elapsedTicks, std::uint32_t& randomState) 
 bool spawnEnemyNear(std::array<EnemyState, kMaximumEnemies>& enemies,
                     const PlayerState& focus, const world::WorldMap& map,
                     EnemyKind kind, std::uint32_t elapsedTicks,
-                    std::uint32_t& randomState, std::uint16_t delayTicks = 0) noexcept {
+                    std::uint32_t& randomState, const EnemyState* boss,
+                    std::uint16_t delayTicks = 0) noexcept {
     const auto slot = std::find_if(enemies.begin(), enemies.end(),
         [](const EnemyState& enemy) { return !enemy.active && enemy.deathTicks == 0; });
     if (slot == enemies.end()) return false;
@@ -1038,6 +1136,7 @@ bool spawnEnemyNear(std::array<EnemyState, kMaximumEnemies>& enemies,
         const auto range = 88.0F + randomUnit(randomState) * 132.0F;
         const auto x = std::clamp(focus.x + std::cos(angle) * range, 20.0F, kMapPixelWidth - 20.0F);
         const auto y = std::clamp(focus.y + std::sin(angle) * range, 20.0F, kMapPixelHeight - 20.0F);
+        if (boss != nullptr && squaredDistance(x, y, boss->x, boss->y) < 60.0F * 60.0F) continue;
         if (!circlePositionIsWalkable(map, x, y, 8.0F)) continue;
         *slot = makeEnemyState(kind, x, y, elapsedTicks, randomState, true);
         slot->spawnDelayTicks = delayTicks;
@@ -1117,6 +1216,9 @@ void GameplayState::reset(const world::WorldMap&) noexcept {
     seals_.fill({});
     sealNoticeTicks_ = 0;
     activeSealCount_ = 0;
+    bossSpawnPendingTicks_ = 0;
+    bossIntroTicks_ = 0;
+    bossSpawned_ = false;
     outcome_ = GameplayOutcome::Running;
     for (std::size_t index = 0; index < cameras_.size(); ++index) {
         updateCamera(cameras_[index], players_[index]);
@@ -1126,6 +1228,14 @@ void GameplayState::reset(const world::WorldMap&) noexcept {
 void GameplayState::tick(const pixel_twins::Controllers& controllers,
                          const world::WorldMap& map) noexcept {
     if (outcome_ != GameplayOutcome::Running) return;
+    if (bossIntroTicks_ > 0) {
+        --bossIntroTicks_;
+        if (const auto* introBoss = boss()) {
+            updateBossIntroCameras(cameras_, players_, *introBoss,
+                                   static_cast<std::uint16_t>(183U - bossIntroTicks_));
+        }
+        return;
+    }
     ++elapsedTicks_;
     if (elapsedTicks_ >= 300U * 60U) {
         outcome_ = GameplayOutcome::TimeUp;
@@ -1161,10 +1271,23 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
     }
     processLinkShares(players_);
     if (sealNoticeTicks_ > 0) --sealNoticeTicks_;
-    updateSealStones(players_, map, seals_, scores_, elapsedTicks_, activeSealCount_, sealNoticeTicks_);
+    updateSealStones(players_, map, seals_, scores_, elapsedTicks_, activeSealCount_, sealNoticeTicks_,
+                     bossSpawnPendingTicks_);
+    if (!bossSpawned_ && bossSpawnPendingTicks_ > 0) {
+        --bossSpawnPendingTicks_;
+        if (bossSpawnPendingTicks_ == 0) {
+            bossSpawned_ = spawnBoss(enemies_, elapsedTicks_, randomState_);
+            if (bossSpawned_) {
+                bossIntroTicks_ = 183;
+                sealNoticeTicks_ = 0;
+                return;
+            }
+        }
+    }
     if (spawnCooldownTicks_ > 0) --spawnCooldownTicks_;
     if (swarmCooldownTicks_ > 0) --swarmCooldownTicks_;
-    if (swarmCooldownTicks_ == 0 && enemyCount() < kMaximumEnemies - 8U) {
+    const auto* activeBoss = boss();
+    if (activeBoss == nullptr && swarmCooldownTicks_ == 0 && enemyCount() < kMaximumEnemies - 8U) {
         spawnSwarm(enemies_, players_, map, elapsedTicks_, randomState_);
         swarmCooldownTicks_ = static_cast<std::uint16_t>(
             std::round((34.0F + randomUnit(randomState_) * 24.0F) * 60.0F));
@@ -1175,11 +1298,13 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         const auto& focus = players_[players_[focusIndex].hp > 0 ? focusIndex : 1U - focusIndex];
         for (std::uint8_t index = 0; index < requestedCount; ++index) {
             (void)spawnEnemyNear(enemies_, focus, map,
-                                 rollEnemyKind(elapsedTicks_, randomState_), elapsedTicks_, randomState_);
+                                 rollEnemyKind(elapsedTicks_, randomState_), elapsedTicks_, randomState_,
+                                 activeBoss);
         }
         const auto intervalSeconds = std::max(0.38F,
             1.25F - static_cast<float>(elapsedTicks_) / 60.0F / 420.0F);
-        spawnCooldownTicks_ = static_cast<std::uint16_t>(std::round(intervalSeconds * 60.0F));
+        spawnCooldownTicks_ = static_cast<std::uint16_t>(std::round(
+            intervalSeconds * (activeBoss != nullptr ? 3.0F : 1.0F) * 60.0F));
     }
     moveEnemies(enemies_, players_, enemyBullets_, map, randomState_);
     for (std::size_t index = 0; index < players_.size(); ++index) {
@@ -1257,6 +1382,13 @@ std::size_t GameplayState::enemyCount() const noexcept {
 std::size_t GameplayState::bulletCount() const noexcept {
     return static_cast<std::size_t>(std::count_if(bullets_.begin(), bullets_.end(),
         [](const PlayerBulletState& bullet) { return bullet.active; }));
+}
+
+const EnemyState* GameplayState::boss() const noexcept {
+    const auto result = std::find_if(enemies_.begin(), enemies_.end(), [](const EnemyState& enemy) {
+        return enemy.active && enemy.kind == EnemyKind::Boss;
+    });
+    return result == enemies_.end() ? nullptr : &*result;
 }
 
 std::uint16_t xpNeededForLevel(std::uint8_t level) noexcept {

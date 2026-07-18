@@ -60,11 +60,13 @@ enum class EnemyKind : std::uint8_t {
     Archer,
     Wisp,
     Mage,
+    Boss,
 };
 
 enum class EnemyBulletType : std::uint8_t {
     Arrow,
     Magic,
+    BossFire,
 };
 
 enum class GameplayOutcome : std::uint8_t {
@@ -144,6 +146,7 @@ struct EnemyState {
     float dashVelocityX = 0.0F;
     float dashVelocityY = 0.0F;
     std::int16_t hp = 0;
+    std::int16_t maxHp = 0;
     std::uint16_t slowTicks = 0;
     std::uint16_t bornTicks = 0;
     std::uint16_t spawnDelayTicks = 0;
@@ -152,6 +155,7 @@ struct EnemyState {
     std::uint16_t dashTicks = 0;
     std::uint16_t deathTicks = 0;
     std::uint8_t xpValue = 2;
+    std::uint8_t volleyIndex = 0;
     EnemyKind kind = EnemyKind::Imp;
     Facing facing = Facing::South;
     bool active = false;
@@ -165,6 +169,7 @@ struct EnemyBulletState {
     float radius = 0.0F;
     std::uint16_t remainingTicks = 0;
     std::uint16_t ageTicks = 0;
+    std::uint16_t launchDelayTicks = 0;
     std::uint8_t damage = 0;
     EnemyBulletType type = EnemyBulletType::Arrow;
     bool active = false;
@@ -257,6 +262,9 @@ public:
     }
     [[nodiscard]] std::uint8_t activeSealCount() const noexcept { return activeSealCount_; }
     [[nodiscard]] std::uint16_t sealNoticeTicks() const noexcept { return sealNoticeTicks_; }
+    [[nodiscard]] bool bossSpawned() const noexcept { return bossSpawned_; }
+    [[nodiscard]] std::uint16_t bossIntroTicks() const noexcept { return bossIntroTicks_; }
+    [[nodiscard]] const EnemyState* boss() const noexcept;
 
 private:
     std::array<PlayerState, pixel_twins::kControllerCount> players_{};
@@ -275,6 +283,9 @@ private:
     std::array<SealState, 3> seals_{};
     std::uint16_t sealNoticeTicks_ = 0;
     std::uint8_t activeSealCount_ = 0;
+    std::uint16_t bossSpawnPendingTicks_ = 0;
+    std::uint16_t bossIntroTicks_ = 0;
+    bool bossSpawned_ = false;
     GameplayOutcome outcome_ = GameplayOutcome::Running;
 };
 
