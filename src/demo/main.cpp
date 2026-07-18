@@ -12,11 +12,9 @@
 #include "pixel_twins/sprite.hpp"
 
 #include <algorithm>
-#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <string_view>
-#include <thread>
 
 namespace {
 
@@ -199,7 +197,7 @@ int main(int argc, char** argv) {
     };
     moveCamera(rightCamera, pixel_twins::ControllerState{});
 
-    pixel_twins::sdl::Presenter presenter;
+    pixel_twins::sdl::Presenter presenter(4, !once);
     pixel_twins::sdl::ControllerInput controllerInput;
     pixel_twins::Controllers controllers;
     std::uint32_t frame = 0;
@@ -225,7 +223,6 @@ int main(int argc, char** argv) {
         presenter.present(framebuffer);
         ++frame;
         if (once) break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
     return 0;
 }
