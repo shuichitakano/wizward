@@ -106,6 +106,9 @@ struct PlayerState {
     std::uint8_t orbLevel = 0;
     std::uint8_t familiarLevel = 0;
     std::uint8_t speedLevel = 0;
+    std::uint8_t maxHpLevel = 0;
+    std::array<std::uint8_t, 9> linkedUpgradeTenths{};
+    std::uint8_t linkedHpHalfUnits = 0;
     bool choosingPerk = false;
     std::array<Perk, 4> perkChoices{{Perk::Light, Perk::Fire, Perk::Wind, Perk::Thunder}};
     Perk perkFlash = Perk::Light;
@@ -118,6 +121,8 @@ struct PlayerState {
     std::uint16_t bombEffectTicks = 0;
     float bombEffectX = 0.0F;
     float bombEffectY = 0.0F;
+    bool sharePending = false;
+    Perk sharePerk = Perk::Light;
 };
 
 struct CameraState {

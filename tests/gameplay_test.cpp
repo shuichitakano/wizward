@@ -39,7 +39,7 @@ std::uint8_t perkLevel(const wizward::game::PlayerState& player, wizward::game::
     case Perk::Orb: return player.orbLevel;
     case Perk::Familiar: return player.familiarLevel;
     case Perk::Speed: return player.speedLevel;
-    case Perk::MaxHp: return static_cast<std::uint8_t>((player.maxHp - 30) / 5);
+    case Perk::MaxHp: return player.maxHpLevel;
     case Perk::Heal:
     case Perk::Bomb: return 0;
     }
@@ -228,6 +228,14 @@ int main() {
         [](const auto& enemy) {
             return enemy.kind == wizward::game::EnemyKind::Golem && enemy.hp <= 54;
         }));
+
+    gameplay.reset(map);
+    for (int level = 0; level < 4; ++level) {
+        grantPerk(gameplay, map, wizward::game::Perk::Fire);
+    }
+    const auto fireIndex = static_cast<std::size_t>(wizward::game::Perk::Fire);
+    assert(gameplay.player(1).fireLevel == 1);
+    assert(gameplay.player(1).linkedUpgradeTenths[fireIndex] == 2);
 
     wizward::world::WorldMap blockedMap;
     blockedMap.tiles.fill(wizward::world::kCollisionBit);

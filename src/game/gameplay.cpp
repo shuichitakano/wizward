@@ -105,7 +105,9 @@ void movePlayer(PlayerState& player,
     inputX /= length;
     inputY /= length;
     player.facing = facingFor(inputX, inputY);
-    const auto speed = kPlayerSpeedPerTick + static_cast<float>(player.speedLevel) * kSpeedPerLevelPerTick;
+    const auto speedLevels = static_cast<float>(player.speedLevel)
+        + static_cast<float>(player.linkedUpgradeTenths[static_cast<std::size_t>(Perk::Speed)]) * 0.1F;
+    const auto speed = kPlayerSpeedPerTick + speedLevels * kSpeedPerLevelPerTick;
     const auto nextX = player.x + inputX * speed;
     if (playerPositionIsWalkable(map, nextX, player.y)) player.x = nextX;
     const auto nextY = player.y + inputY * speed;
@@ -771,7 +773,7 @@ std::uint8_t perkLevel(const PlayerState& player, Perk perk) noexcept {
     case Perk::Orb: return player.orbLevel;
     case Perk::Familiar: return player.familiarLevel;
     case Perk::Speed: return player.speedLevel;
-    case Perk::MaxHp: return static_cast<std::uint8_t>((player.maxHp - 30) / 5);
+    case Perk::MaxHp: return player.maxHpLevel;
     case Perk::Heal:
     case Perk::Bomb: return 0;
     }
@@ -857,6 +859,7 @@ void applyPerk(PlayerState& player, Perk perk) noexcept {
         if (player.speedLevel < 255) ++player.speedLevel;
         break;
     case Perk::MaxHp:
+        if (player.maxHpLevel < 255) ++player.maxHpLevel;
         player.maxHp = static_cast<std::int16_t>(std::min<std::int32_t>(999, player.maxHp + 5));
         player.hp = static_cast<std::int16_t>(std::min<std::int32_t>(player.maxHp, player.hp + 5));
         break;
@@ -865,7 +868,56 @@ void applyPerk(PlayerState& player, Perk perk) noexcept {
         break;
     case Perk::Bomb:
         player.bombPending = true;
-        break;
+        return;
+    }
+    player.sharePending = true;
+    player.sharePerk = perk;
+}
+
+void applyLinkedUpgrade(PlayerState& player, Perk perk) noexcept {
+    const auto index = static_cast<std::size_t>(perk);
+    if (index >= player.linkedUpgradeTenths.size()) return;
+    auto& tenths = player.linkedUpgradeTenths[index];
+    tenths = static_cast<std::uint8_t>(tenths + 3U);
+    if (perk == Perk::MaxHp) {
+        player.linkedHpHalfUnits = static_cast<std::uint8_t>(player.linkedHpHalfUnits + 3U);
+        while (player.linkedHpHalfUnits >= 2U) {
+            player.linkedHpHalfUnits = static_cast<std::uint8_t>(player.linkedHpHalfUnits - 2U);
+            player.maxHp = static_cast<std::int16_t>(std::min<std::int32_t>(999, player.maxHp + 1));
+            player.hp = static_cast<std::int16_t>(std::min<std::int32_t>(player.maxHp, player.hp + 1));
+        }
+    }
+    while (tenths >= 10U) {
+        tenths = static_cast<std::uint8_t>(tenths - 10U);
+        switch (perk) {
+        case Perk::Light: if (player.lightLevel < 255) ++player.lightLevel; break;
+        case Perk::Fire: if (player.fireLevel < 255) ++player.fireLevel; break;
+        case Perk::Wind: if (player.windLevel < 255) ++player.windLevel; break;
+        case Perk::Thunder: if (player.thunderLevel < 255) ++player.thunderLevel; break;
+        case Perk::Ice: if (player.iceLevel < 255) ++player.iceLevel; break;
+        case Perk::Orb: if (player.orbLevel < 255) ++player.orbLevel; break;
+        case Perk::Familiar: if (player.familiarLevel < 255) ++player.familiarLevel; break;
+        case Perk::Speed: if (player.speedLevel < 255) ++player.speedLevel; break;
+        case Perk::MaxHp: if (player.maxHpLevel < 255) ++player.maxHpLevel; break;
+        case Perk::Heal:
+        case Perk::Bomb: break;
+        }
+    }
+}
+
+void processLinkShares(std::array<PlayerState, pixel_twins::kControllerCount>& players) noexcept {
+    constexpr float kLinkRange = 140.0F;
+    for (std::size_t ownerIndex = 0; ownerIndex < players.size(); ++ownerIndex) {
+        auto& owner = players[ownerIndex];
+        if (!owner.sharePending) continue;
+        owner.sharePending = false;
+        auto& partner = players[1U - ownerIndex];
+        if (squaredDistance(owner.x, owner.y, partner.x, partner.y) > kLinkRange * kLinkRange) continue;
+        if (owner.sharePerk == Perk::Heal) {
+            partner.hp = static_cast<std::int16_t>(std::min<std::int32_t>(partner.maxHp, partner.hp + 18));
+        } else if (owner.sharePerk != Perk::Bomb) {
+            applyLinkedUpgrade(partner, owner.sharePerk);
+        }
     }
 }
 
@@ -1073,6 +1125,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         }
         updateCamera(cameras_[index], players_[index]);
     }
+    processLinkShares(players_);
     if (spawnCooldownTicks_ > 0) --spawnCooldownTicks_;
     if (swarmCooldownTicks_ > 0) --swarmCooldownTicks_;
     if (swarmCooldownTicks_ == 0 && enemyCount() < kMaximumEnemies - 8U) {
