@@ -1,0 +1,11 @@
+{
+  "format": "pixel-twins-raw-image",
+  "version": 1,
+  "source_intermediate": "intermediate.json",
+  "asset_id": "title_screen_selected__title_screen_160x120",
+  "binary": "screen.bin",
+  "width": 160,
+  "height": 120,
+  "pixel_bytes": 19200,
+  "sha256": "83d41a04940ec448ce8a2e1a6c722dc3915731d249ea8eeaf65f8151daacadee"
+}

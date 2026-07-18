@@ -1,0 +1,250 @@
+{
+  "version": 1,
+  "intermediate": "../converted/gameplay/intermediate.json",
+  "tile_width": 32,
+  "tile_height": 32,
+  "max_patterns": 128,
+  "variants_per_terrain": 4,
+  "masks_per_boundary": 16,
+  "cpp_namespace": "wizward::assets",
+  "terrains": [
+    {
+      "id": "water",
+      "assets": [
+        "map_tiles_selected__terrain__water_0",
+        "map_tiles_selected__terrain__water_1",
+        "map_tiles_selected__terrain__water_2",
+        "map_tiles_selected__terrain__water_3"
+      ]
+    },
+    {
+      "id": "sand",
+      "assets": [
+        "map_tiles_selected__terrain__sand_0",
+        "map_tiles_selected__terrain__sand_1",
+        "map_tiles_selected__terrain__sand_2",
+        "map_tiles_selected__terrain__sand_3"
+      ]
+    },
+    {
+      "id": "grass",
+      "assets": [
+        "map_tiles_selected__terrain__grass_0",
+        "map_tiles_selected__terrain__grass_1",
+        "map_tiles_selected__terrain__grass_2",
+        "map_tiles_selected__terrain__grass_3"
+      ]
+    },
+    {
+      "id": "dirt",
+      "assets": [
+        "map_tiles_selected__terrain__dirt_0",
+        "map_tiles_selected__terrain__dirt_1",
+        "map_tiles_selected__terrain__dirt_2",
+        "map_tiles_selected__terrain__dirt_3"
+      ]
+    },
+    {
+      "id": "road",
+      "assets": [
+        "map_tiles_selected__terrain__road_0",
+        "map_tiles_selected__terrain__road_1",
+        "map_tiles_selected__terrain__road_2",
+        "map_tiles_selected__terrain__road_3"
+      ]
+    },
+    {
+      "id": "plaza",
+      "assets": [
+        "map_tiles_selected__terrain__plaza_0",
+        "map_tiles_selected__terrain__plaza_1",
+        "map_tiles_selected__terrain__plaza_2",
+        "map_tiles_selected__terrain__plaza_3"
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "id": "water_to_sand",
+      "assets": [
+        "map_tiles_selected__boundaries__water_to_sand_00",
+        "map_tiles_selected__boundaries__water_to_sand_01",
+        "map_tiles_selected__boundaries__water_to_sand_02",
+        "map_tiles_selected__boundaries__water_to_sand_03",
+        "map_tiles_selected__boundaries__water_to_sand_04",
+        "map_tiles_selected__boundaries__water_to_sand_05",
+        "map_tiles_selected__boundaries__water_to_sand_06",
+        "map_tiles_selected__boundaries__water_to_sand_07",
+        "map_tiles_selected__boundaries__water_to_sand_08",
+        "map_tiles_selected__boundaries__water_to_sand_09",
+        "map_tiles_selected__boundaries__water_to_sand_10",
+        "map_tiles_selected__boundaries__water_to_sand_11",
+        "map_tiles_selected__boundaries__water_to_sand_12",
+        "map_tiles_selected__boundaries__water_to_sand_13",
+        "map_tiles_selected__boundaries__water_to_sand_14",
+        "map_tiles_selected__boundaries__water_to_sand_15"
+      ]
+    },
+    {
+      "id": "sand_to_grass",
+      "assets": [
+        "map_tiles_selected__boundaries__sand_to_grass_00",
+        "map_tiles_selected__boundaries__sand_to_grass_01",
+        "map_tiles_selected__boundaries__sand_to_grass_02",
+        "map_tiles_selected__boundaries__sand_to_grass_03",
+        "map_tiles_selected__boundaries__sand_to_grass_04",
+        "map_tiles_selected__boundaries__sand_to_grass_05",
+        "map_tiles_selected__boundaries__sand_to_grass_06",
+        "map_tiles_selected__boundaries__sand_to_grass_07",
+        "map_tiles_selected__boundaries__sand_to_grass_08",
+        "map_tiles_selected__boundaries__sand_to_grass_09",
+        "map_tiles_selected__boundaries__sand_to_grass_10",
+        "map_tiles_selected__boundaries__sand_to_grass_11",
+        "map_tiles_selected__boundaries__sand_to_grass_12",
+        "map_tiles_selected__boundaries__sand_to_grass_13",
+        "map_tiles_selected__boundaries__sand_to_grass_14",
+        "map_tiles_selected__boundaries__sand_to_grass_15"
+      ]
+    },
+    {
+      "id": "grass_to_dirt",
+      "assets": [
+        "map_tiles_selected__boundaries__grass_to_dirt_00",
+        "map_tiles_selected__boundaries__grass_to_dirt_01",
+        "map_tiles_selected__boundaries__grass_to_dirt_02",
+        "map_tiles_selected__boundaries__grass_to_dirt_03",
+        "map_tiles_selected__boundaries__grass_to_dirt_04",
+        "map_tiles_selected__boundaries__grass_to_dirt_05",
+        "map_tiles_selected__boundaries__grass_to_dirt_06",
+        "map_tiles_selected__boundaries__grass_to_dirt_07",
+        "map_tiles_selected__boundaries__grass_to_dirt_08",
+        "map_tiles_selected__boundaries__grass_to_dirt_09",
+        "map_tiles_selected__boundaries__grass_to_dirt_10",
+        "map_tiles_selected__boundaries__grass_to_dirt_11",
+        "map_tiles_selected__boundaries__grass_to_dirt_12",
+        "map_tiles_selected__boundaries__grass_to_dirt_13",
+        "map_tiles_selected__boundaries__grass_to_dirt_14",
+        "map_tiles_selected__boundaries__grass_to_dirt_15"
+      ]
+    },
+    {
+      "id": "dirt_to_road",
+      "assets": [
+        "map_tiles_selected__boundaries__dirt_to_road_00",
+        "map_tiles_selected__boundaries__dirt_to_road_01",
+        "map_tiles_selected__boundaries__dirt_to_road_02",
+        "map_tiles_selected__boundaries__dirt_to_road_03",
+        "map_tiles_selected__boundaries__dirt_to_road_04",
+        "map_tiles_selected__boundaries__dirt_to_road_05",
+        "map_tiles_selected__boundaries__dirt_to_road_06",
+        "map_tiles_selected__boundaries__dirt_to_road_07",
+        "map_tiles_selected__boundaries__dirt_to_road_08",
+        "map_tiles_selected__boundaries__dirt_to_road_09",
+        "map_tiles_selected__boundaries__dirt_to_road_10",
+        "map_tiles_selected__boundaries__dirt_to_road_11",
+        "map_tiles_selected__boundaries__dirt_to_road_12",
+        "map_tiles_selected__boundaries__dirt_to_road_13",
+        "map_tiles_selected__boundaries__dirt_to_road_14",
+        "map_tiles_selected__boundaries__dirt_to_road_15"
+      ]
+    },
+    {
+      "id": "dirt_to_plaza",
+      "assets": [
+        "map_tiles_selected__boundaries__dirt_to_plaza_00",
+        "map_tiles_selected__boundaries__dirt_to_plaza_01",
+        "map_tiles_selected__boundaries__dirt_to_plaza_02",
+        "map_tiles_selected__boundaries__dirt_to_plaza_03",
+        "map_tiles_selected__boundaries__dirt_to_plaza_04",
+        "map_tiles_selected__boundaries__dirt_to_plaza_05",
+        "map_tiles_selected__boundaries__dirt_to_plaza_06",
+        "map_tiles_selected__boundaries__dirt_to_plaza_07",
+        "map_tiles_selected__boundaries__dirt_to_plaza_08",
+        "map_tiles_selected__boundaries__dirt_to_plaza_09",
+        "map_tiles_selected__boundaries__dirt_to_plaza_10",
+        "map_tiles_selected__boundaries__dirt_to_plaza_11",
+        "map_tiles_selected__boundaries__dirt_to_plaza_12",
+        "map_tiles_selected__boundaries__dirt_to_plaza_13",
+        "map_tiles_selected__boundaries__dirt_to_plaza_14",
+        "map_tiles_selected__boundaries__dirt_to_plaza_15"
+      ]
+    },
+    {
+      "id": "road_to_plaza",
+      "assets": [
+        "map_tiles_selected__boundaries__road_to_plaza_00",
+        "map_tiles_selected__boundaries__road_to_plaza_01",
+        "map_tiles_selected__boundaries__road_to_plaza_02",
+        "map_tiles_selected__boundaries__road_to_plaza_03",
+        "map_tiles_selected__boundaries__road_to_plaza_04",
+        "map_tiles_selected__boundaries__road_to_plaza_05",
+        "map_tiles_selected__boundaries__road_to_plaza_06",
+        "map_tiles_selected__boundaries__road_to_plaza_07",
+        "map_tiles_selected__boundaries__road_to_plaza_08",
+        "map_tiles_selected__boundaries__road_to_plaza_09",
+        "map_tiles_selected__boundaries__road_to_plaza_10",
+        "map_tiles_selected__boundaries__road_to_plaza_11",
+        "map_tiles_selected__boundaries__road_to_plaza_12",
+        "map_tiles_selected__boundaries__road_to_plaza_13",
+        "map_tiles_selected__boundaries__road_to_plaza_14",
+        "map_tiles_selected__boundaries__road_to_plaza_15"
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "id": "rock_grass",
+      "assets": [
+        "map_tiles_selected__objects_baked__rock_grass_0"
+      ]
+    },
+    {
+      "id": "grass_clump_grass",
+      "assets": [
+        "map_tiles_selected__objects_baked__grass_clump_grass_0"
+      ]
+    },
+    {
+      "id": "flower_white_grass",
+      "assets": [
+        "map_tiles_selected__objects_baked__flower_white_grass_0"
+      ]
+    },
+    {
+      "id": "flower_blue_grass",
+      "assets": [
+        "map_tiles_selected__objects_baked__flower_blue_grass_0"
+      ]
+    },
+    {
+      "id": "flower_yellow_grass",
+      "assets": [
+        "map_tiles_selected__objects_baked__flower_yellow_grass_0"
+      ]
+    },
+    {
+      "id": "shrub_grass",
+      "assets": [
+        "map_tiles_selected__objects_baked__shrub_grass_0"
+      ]
+    },
+    {
+      "id": "plaza_pedestal",
+      "assets": [
+        "map_tiles_selected__objects_baked__plaza_pedestal_0"
+      ]
+    },
+    {
+      "id": "seal_inactive_plaza",
+      "assets": [
+        "map_tiles_selected__objects_baked__seal_inactive_plaza_0"
+      ]
+    },
+    {
+      "id": "seal_active_plaza",
+      "assets": [
+        "map_tiles_selected__objects_baked__seal_active_plaza_0"
+      ]
+    }
+  ]
+}

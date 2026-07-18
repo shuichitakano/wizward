@@ -1,0 +1,30 @@
+{
+  "format": "wizward-asset-memory-layout",
+  "version": 1,
+  "rp2350_sram_bytes": 532480,
+  "asset_sram": {
+    "background_pixels": 125952,
+    "sprite_metadata": 5984,
+    "sprite_pixels": 167139,
+    "font_glyphs": 1710,
+    "total": 300785
+  },
+  "flash_only": {
+    "background_metadata": 164,
+    "gameplay_palette_source": 768,
+    "title_screen": 19200,
+    "title_sprites": 2020,
+    "title_palette_source": 768,
+    "total": 22920
+  },
+  "runtime_sram": {
+    "framebuffers": 76800,
+    "tilemap": 10000,
+    "active_palette": 768,
+    "terrain_generation_workspace": 5000,
+    "steady_total_including_assets": 388353,
+    "generation_peak_including_assets": 393353,
+    "remaining_at_generation_peak_before_code_stack_audio_game_state": 139127
+  },
+  "note": "SRAM初期値はFlashにもロードイメージを持つ"
+}

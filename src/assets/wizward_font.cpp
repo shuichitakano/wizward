@@ -7,7 +7,7 @@ namespace wizward {
 namespace assets {
 namespace {
 
-constexpr std::array<pixel_twins::Glyph, 95> kGlyphs{{
+PIXEL_TWINS_ASSET_SRAM const std::array<pixel_twins::Glyph, 95> kGlyphs{{
     pixel_twins::Glyph{{pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}}},
     pixel_twins::Glyph{{pixel_twins::GlyphRow{0x38, 0x00}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x38, 0x00}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x38, 0x00}}},
     pixel_twins::Glyph{{pixel_twins::GlyphRow{0x7c, 0x00}, pixel_twins::GlyphRow{0x54, 0x28}, pixel_twins::GlyphRow{0x54, 0x28}, pixel_twins::GlyphRow{0x54, 0x28}, pixel_twins::GlyphRow{0x7c, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}}},

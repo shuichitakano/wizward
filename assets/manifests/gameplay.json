@@ -1,0 +1,2250 @@
+{
+  "version": 1,
+  "name": "wizward-gameplay",
+  "palette": {
+    "asset_range": [
+      32,
+      254
+    ],
+    "sample_pixels": 1000000,
+    "max_pixels_per_asset": 4096,
+    "quantizer": "fast_octree",
+    "reserved": [
+      {
+        "index": 2,
+        "name": "effect fire",
+        "color": "#ff7b32"
+      },
+      {
+        "index": 3,
+        "name": "effect wind",
+        "color": "#79f05b"
+      },
+      {
+        "index": 4,
+        "name": "effect thunder",
+        "color": "#ffe35a"
+      },
+      {
+        "index": 5,
+        "name": "effect ice",
+        "color": "#8de9ff"
+      },
+      {
+        "index": 6,
+        "name": "effect orb",
+        "color": "#9b7cff"
+      },
+      {
+        "index": 7,
+        "name": "effect familiar",
+        "color": "#ff8bd1"
+      },
+      {
+        "index": 8,
+        "name": "effect speed",
+        "color": "#39e6d0"
+      },
+      {
+        "index": 9,
+        "name": "effect hp",
+        "color": "#ff4c6d"
+      },
+      {
+        "index": 10,
+        "name": "effect heal",
+        "color": "#57f287"
+      },
+      {
+        "index": 11,
+        "name": "effect gold",
+        "color": "#ffcf5a"
+      },
+      {
+        "index": 12,
+        "name": "effect energy blue",
+        "color": "#5ec8ff"
+      },
+      {
+        "index": 13,
+        "name": "effect energy pale",
+        "color": "#e8fbff"
+      },
+      {
+        "index": 14,
+        "name": "effect damage",
+        "color": "#ff3d5a"
+      },
+      {
+        "index": 15,
+        "name": "effect highlight",
+        "color": "#ffd96a"
+      },
+      {
+        "index": 16,
+        "name": "effect success",
+        "color": "#70ff9b"
+      },
+      {
+        "index": 17,
+        "name": "effect magic",
+        "color": "#b88cff"
+      },
+      {
+        "index": 18,
+        "name": "font body default",
+        "color": "#f1ead8"
+      },
+      {
+        "index": 19,
+        "name": "player 1 marker",
+        "color": "#ff7648"
+      },
+      {
+        "index": 20,
+        "name": "player 2 marker",
+        "color": "#69a8ff"
+      },
+      {
+        "index": 21,
+        "name": "ranking title",
+        "color": "#8fd7ff"
+      },
+      {
+        "index": 22,
+        "name": "result down",
+        "color": "#ff8b7a"
+      },
+      {
+        "index": 23,
+        "name": "result time up",
+        "color": "#ffb86b"
+      },
+      {
+        "index": 24,
+        "name": "seal cyan",
+        "color": "#61dff2"
+      },
+      {
+        "index": 25,
+        "name": "seal deep cyan",
+        "color": "#286b8d"
+      },
+      {
+        "index": 26,
+        "name": "seal pale cyan",
+        "color": "#dffcff"
+      },
+      {
+        "index": 27,
+        "name": "panel dark",
+        "color": "#111816"
+      },
+      {
+        "index": 28,
+        "name": "gauge dark",
+        "color": "#141716"
+      },
+      {
+        "index": 29,
+        "name": "collision map",
+        "color": "#425245"
+      },
+      {
+        "index": 30,
+        "name": "minimap field",
+        "color": "#315344"
+      },
+      {
+        "index": 31,
+        "name": "ui beige outline",
+        "color": "#f4d8a6"
+      }
+    ]
+  },
+  "assets": [
+    {
+      "id": "attack_sprites_selected__downscaled__boss_blue_fireball_16_16x16_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/boss_blue_fireball_16_16x16_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/boss_blue_fireball_16_16x16_3f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__cast_spark_12_12x12_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 12,
+        "height": 12
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/cast_spark_12_12x12_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/cast_spark_12_12x12_3f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__familiar_impact_12_12x12_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 12,
+        "height": 12
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/familiar_impact_12_12x12_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/familiar_impact_12_12x12_3f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__familiar_pink_16_16x16_20f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/familiar_pink_16_16x16_20f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/familiar_pink_16_16x16_20f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__familiar_projectile_6_6x6_1f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 6,
+        "height": 6
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/familiar_projectile_6_6x6_1f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/familiar_projectile_6_6x6_1f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__fire_impact_16_16x16_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/fire_impact_16_16x16_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/fire_impact_16_16x16_3f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__fireball_12_12x12_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 12,
+        "height": 12
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/fireball_12_12x12_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/fireball_12_12x12_3f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__fireball_16_16x16_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/fireball_16_16x16_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/fireball_16_16x16_3f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__ice_impact_16_16x16_5f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/ice_impact_16_16x16_5f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/ice_impact_16_16x16_5f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__ice_shard_12_8dir_12x12_8f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 12,
+        "height": 12
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/ice_shard_12_8dir_12x12_8f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/ice_shard_12_8dir_12x12_8f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__impact_burst_16_16x16_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/impact_burst_16_16x16_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/impact_burst_16_16x16_3f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__light_impact_12_12x12_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 12,
+        "height": 12
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/light_impact_12_12x12_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/light_impact_12_12x12_3f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__light_orb_8_8x8_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 8,
+        "height": 8
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/light_orb_8_8x8_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/light_orb_8_8x8_3f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__orb_impact_12_12x12_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 12,
+        "height": 12
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/orb_impact_12_12x12_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/orb_impact_12_12x12_3f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__orb_satellite_8_8x8_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 8,
+        "height": 8
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/orb_satellite_8_8x8_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/orb_satellite_8_8x8_3f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__thunder_impact_16_16x16_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/thunder_impact_16_16x16_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/thunder_impact_16_16x16_3f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__thunder_pillar_24x60_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 24,
+        "height": 60
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/thunder_pillar_24x60_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/thunder_pillar_24x60_3f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__wind_impact_16_16x16_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/wind_impact_16_16x16_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/wind_impact_16_16x16_3f_sheet.png"
+    },
+    {
+      "id": "attack_sprites_selected__downscaled__wind_slash_16_16x16_8f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/wind_slash_16_16x16_8f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/attack_sprites_selected/downscaled/wind_slash_16_16x16_8f_sheet.png"
+    },
+    {
+      "id": "enemy_projectiles_selected__downscaled__archer_arrow_12x4_16dir_12x12_16f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 12,
+        "height": 12
+      },
+      "source": "../source/gameplay/enemy_projectiles_selected/downscaled/archer_arrow_12x4_16dir_12x12_16f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_projectiles_selected/downscaled/archer_arrow_12x4_16dir_12x12_16f_sheet.png"
+    },
+    {
+      "id": "enemy_projectiles_selected__downscaled__enemy_magic_orb_8_8x8_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 8,
+        "height": 8
+      },
+      "source": "../source/gameplay/enemy_projectiles_selected/downscaled/enemy_magic_orb_8_8x8_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_projectiles_selected/downscaled/enemy_magic_orb_8_8x8_3f_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__bat_enemy_lineless_death_18x18_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 18,
+        "height": 18
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/bat_enemy_lineless_death_18x18_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/bat_enemy_lineless_death_18x18_3f_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__bat_enemy_lineless_walk_18x18_4f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 18,
+        "height": 18
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/bat_enemy_lineless_walk_18x18_4f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/bat_enemy_lineless_walk_18x18_4f_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__goblin_archer_enemy_lineless_death_16x16_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/goblin_archer_enemy_lineless_death_16x16_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/goblin_archer_enemy_lineless_death_16x16_3f_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__goblin_archer_enemy_lineless_shoot_16x16_4f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/goblin_archer_enemy_lineless_shoot_16x16_4f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/goblin_archer_enemy_lineless_shoot_16x16_4f_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__goblin_archer_enemy_lineless_walk_16x16_4f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/goblin_archer_enemy_lineless_walk_16x16_4f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/goblin_archer_enemy_lineless_walk_16x16_4f_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__golem_enemy_lineless_death_24x24_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 24,
+        "height": 24
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/golem_enemy_lineless_death_24x24_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/golem_enemy_lineless_death_24x24_3f_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__golem_enemy_lineless_walk_24x24_4f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 24,
+        "height": 24
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/golem_enemy_lineless_walk_24x24_4f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/golem_enemy_lineless_walk_24x24_4f_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__monster_mage_enemy_lineless_death_18x18_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 18,
+        "height": 18
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/monster_mage_enemy_lineless_death_18x18_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/monster_mage_enemy_lineless_death_18x18_3f_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__monster_mage_enemy_lineless_walk_18x18_4f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 18,
+        "height": 18
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/monster_mage_enemy_lineless_walk_18x18_4f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/monster_mage_enemy_lineless_walk_18x18_4f_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__sealed_stone_guardian_boss_walk_48x48_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 48,
+        "height": 48
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/sealed_stone_guardian_boss_walk_48x48_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/sealed_stone_guardian_boss_walk_48x48_3f_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__skeleton_enemy_death_24x24_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 24,
+        "height": 24
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/skeleton_enemy_death_24x24_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/skeleton_enemy_death_24x24_3f_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__skeleton_enemy_walk_24x24_4f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 24,
+        "height": 24
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/skeleton_enemy_walk_24x24_4f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/skeleton_enemy_walk_24x24_4f_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__slime_enemy_death_16x16_3f_smaller_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/slime_enemy_death_16x16_3f_smaller_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/slime_enemy_death_16x16_3f_smaller_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__slime_enemy_walk_16x16_4f_smaller_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/slime_enemy_walk_16x16_4f_smaller_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/slime_enemy_walk_16x16_4f_smaller_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__wisp_enemy_lineless_death_18x18_3f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 18,
+        "height": 18
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/wisp_enemy_lineless_death_18x18_3f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/wisp_enemy_lineless_death_18x18_3f_sheet.png"
+    },
+    {
+      "id": "enemy_sprites_selected__downscaled__wisp_enemy_lineless_walk_18x18_4f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 18,
+        "height": 18
+      },
+      "source": "../source/gameplay/enemy_sprites_selected/downscaled/wisp_enemy_lineless_walk_18x18_4f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/enemy_sprites_selected/downscaled/wisp_enemy_lineless_walk_18x18_4f_sheet.png"
+    },
+    {
+      "id": "fonts_selected__outlined_8x9_ascii",
+      "kind": "sprite",
+      "pack_kind": "font",
+      "frame": {
+        "width": 8,
+        "height": 9
+      },
+      "source": "../source/gameplay/fonts_selected/outlined_8x9_ascii.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/fonts_selected/outlined_8x9_ascii.png"
+    },
+    {
+      "id": "icons_selected__downscaled__powerup_icons_16_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/icons_selected/downscaled/powerup_icons_16_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/icons_selected/downscaled/powerup_icons_16_sheet.png"
+    },
+    {
+      "id": "icons_selected__downscaled__powerup_icons_8_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 8,
+        "height": 8
+      },
+      "source": "../source/gameplay/icons_selected/downscaled/powerup_icons_8_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/icons_selected/downscaled/powerup_icons_8_sheet.png"
+    },
+    {
+      "id": "item_sprites_selected__downscaled__xp_gem_8_8x8_1f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 8,
+        "height": 8
+      },
+      "source": "../source/gameplay/item_sprites_selected/downscaled/xp_gem_8_8x8_1f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/item_sprites_selected/downscaled/xp_gem_8_8x8_1f_sheet.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_00",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_00.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_00.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_01",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_01.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_01.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_02",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_02.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_02.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_03",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_03.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_03.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_04",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_04.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_04.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_05",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_05.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_05.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_06",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_06.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_06.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_07",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_07.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_07.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_08",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_08.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_08.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_09",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_09.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_09.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_10",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_10.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_10.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_11",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_11.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_11.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_12",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_12.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_12.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_13",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_13.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_13.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_14",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_14.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_14.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_plaza_15",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_plaza_15.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_plaza_15.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_00",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_00.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_00.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_01",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_01.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_01.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_02",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_02.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_02.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_03",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_03.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_03.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_04",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_04.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_04.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_05",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_05.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_05.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_06",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_06.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_06.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_07",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_07.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_07.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_08",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_08.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_08.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_09",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_09.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_09.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_10",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_10.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_10.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_11",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_11.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_11.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_12",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_12.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_12.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_13",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_13.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_13.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_14",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_14.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_14.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__dirt_to_road_15",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/dirt_to_road_15.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/dirt_to_road_15.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_00",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_00.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_00.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_01",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_01.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_01.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_02",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_02.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_02.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_03",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_03.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_03.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_04",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_04.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_04.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_05",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_05.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_05.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_06",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_06.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_06.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_07",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_07.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_07.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_08",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_08.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_08.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_09",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_09.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_09.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_10",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_10.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_10.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_11",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_11.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_11.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_12",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_12.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_12.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_13",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_13.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_13.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_14",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_14.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_14.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__grass_to_dirt_15",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/grass_to_dirt_15.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/grass_to_dirt_15.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_00",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_00.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_00.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_01",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_01.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_01.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_02",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_02.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_02.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_03",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_03.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_03.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_04",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_04.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_04.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_05",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_05.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_05.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_06",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_06.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_06.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_07",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_07.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_07.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_08",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_08.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_08.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_09",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_09.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_09.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_10",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_10.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_10.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_11",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_11.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_11.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_12",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_12.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_12.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_13",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_13.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_13.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_14",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_14.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_14.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__road_to_plaza_15",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/road_to_plaza_15.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/road_to_plaza_15.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_00",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_00.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_00.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_01",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_01.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_01.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_02",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_02.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_02.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_03",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_03.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_03.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_04",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_04.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_04.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_05",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_05.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_05.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_06",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_06.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_06.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_07",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_07.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_07.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_08",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_08.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_08.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_09",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_09.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_09.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_10",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_10.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_10.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_11",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_11.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_11.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_12",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_12.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_12.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_13",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_13.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_13.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_14",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_14.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_14.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__sand_to_grass_15",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/sand_to_grass_15.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/sand_to_grass_15.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_00",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_00.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_00.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_01",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_01.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_01.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_02",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_02.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_02.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_03",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_03.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_03.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_04",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_04.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_04.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_05",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_05.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_05.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_06",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_06.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_06.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_07",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_07.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_07.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_08",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_08.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_08.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_09",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_09.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_09.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_10",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_10.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_10.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_11",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_11.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_11.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_12",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_12.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_12.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_13",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_13.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_13.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_14",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_14.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_14.png"
+    },
+    {
+      "id": "map_tiles_selected__boundaries__water_to_sand_15",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/boundaries/water_to_sand_15.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/boundaries/water_to_sand_15.png"
+    },
+    {
+      "id": "map_tiles_selected__objects_baked__flower_blue_grass_0",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/objects_baked/flower_blue_grass_0.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/objects_baked/flower_blue_grass_0.png"
+    },
+    {
+      "id": "map_tiles_selected__objects_baked__flower_white_grass_0",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/objects_baked/flower_white_grass_0.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/objects_baked/flower_white_grass_0.png"
+    },
+    {
+      "id": "map_tiles_selected__objects_baked__flower_yellow_grass_0",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/objects_baked/flower_yellow_grass_0.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/objects_baked/flower_yellow_grass_0.png"
+    },
+    {
+      "id": "map_tiles_selected__objects_baked__grass_clump_grass_0",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/objects_baked/grass_clump_grass_0.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/objects_baked/grass_clump_grass_0.png"
+    },
+    {
+      "id": "map_tiles_selected__objects_baked__plaza_pedestal_0",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/objects_baked/plaza_pedestal_0.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/objects_baked/plaza_pedestal_0.png"
+    },
+    {
+      "id": "map_tiles_selected__objects_baked__rock_grass_0",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/objects_baked/rock_grass_0.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/objects_baked/rock_grass_0.png"
+    },
+    {
+      "id": "map_tiles_selected__objects_baked__seal_active_plaza_0",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/objects_baked/seal_active_plaza_0.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/objects_baked/seal_active_plaza_0.png"
+    },
+    {
+      "id": "map_tiles_selected__objects_baked__seal_inactive_plaza_0",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/objects_baked/seal_inactive_plaza_0.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/objects_baked/seal_inactive_plaza_0.png"
+    },
+    {
+      "id": "map_tiles_selected__objects_baked__shrub_grass_0",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/objects_baked/shrub_grass_0.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/objects_baked/shrub_grass_0.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__dirt_0",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/dirt_0.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/dirt_0.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__dirt_1",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/dirt_1.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/dirt_1.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__dirt_2",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/dirt_2.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/dirt_2.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__dirt_3",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/dirt_3.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/dirt_3.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__grass_0",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/grass_0.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/grass_0.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__grass_1",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/grass_1.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/grass_1.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__grass_2",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/grass_2.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/grass_2.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__grass_3",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/grass_3.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/grass_3.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__plaza_0",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/plaza_0.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/plaza_0.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__plaza_1",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/plaza_1.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/plaza_1.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__plaza_2",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/plaza_2.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/plaza_2.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__plaza_3",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/plaza_3.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/plaza_3.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__road_0",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/road_0.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/road_0.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__road_1",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/road_1.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/road_1.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__road_2",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/road_2.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/road_2.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__road_3",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/road_3.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/road_3.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__sand_0",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/sand_0.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/sand_0.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__sand_1",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/sand_1.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/sand_1.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__sand_2",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/sand_2.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/sand_2.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__sand_3",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/sand_3.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/sand_3.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__water_0",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/water_0.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/water_0.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__water_1",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/water_1.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/water_1.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__water_2",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/water_2.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/water_2.png"
+    },
+    {
+      "id": "map_tiles_selected__terrain__water_3",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/gameplay/map_tiles_selected/terrain/water_3.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/map_tiles_selected/terrain/water_3.png"
+    },
+    {
+      "id": "perk_effects_selected__downscaled__bomb_core_48x48_7f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 48,
+        "height": 48
+      },
+      "source": "../source/gameplay/perk_effects_selected/downscaled/bomb_core_48x48_7f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/perk_effects_selected/downscaled/bomb_core_48x48_7f_sheet.png"
+    },
+    {
+      "id": "perk_effects_selected__downscaled__bomb_fragment_8x8_4f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 8,
+        "height": 8
+      },
+      "source": "../source/gameplay/perk_effects_selected/downscaled/bomb_fragment_8x8_4f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/perk_effects_selected/downscaled/bomb_fragment_8x8_4f_sheet.png"
+    },
+    {
+      "id": "perk_effects_selected__downscaled__bomb_ground_wave_64x32_6f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 64,
+        "height": 32
+      },
+      "source": "../source/gameplay/perk_effects_selected/downscaled/bomb_ground_wave_64x32_6f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/perk_effects_selected/downscaled/bomb_ground_wave_64x32_6f_sheet.png"
+    },
+    {
+      "id": "perk_effects_selected__downscaled__bomb_ray_16x16_4f_8dir_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/perk_effects_selected/downscaled/bomb_ray_16x16_4f_8dir_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/perk_effects_selected/downscaled/bomb_ray_16x16_4f_8dir_sheet.png"
+    },
+    {
+      "id": "perk_effects_selected__downscaled__common_rising_mote_6x8_4f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 6,
+        "height": 8
+      },
+      "source": "../source/gameplay/perk_effects_selected/downscaled/common_rising_mote_6x8_4f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/perk_effects_selected/downscaled/common_rising_mote_6x8_4f_sheet.png"
+    },
+    {
+      "id": "perk_effects_selected__downscaled__common_white_spark_6x6_4f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 6,
+        "height": 6
+      },
+      "source": "../source/gameplay/perk_effects_selected/downscaled/common_white_spark_6x6_4f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/perk_effects_selected/downscaled/common_white_spark_6x6_4f_sheet.png"
+    },
+    {
+      "id": "perk_effects_selected__downscaled__heal_core_16x24_5f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 24
+      },
+      "source": "../source/gameplay/perk_effects_selected/downscaled/heal_core_16x24_5f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/perk_effects_selected/downscaled/heal_core_16x24_5f_sheet.png"
+    },
+    {
+      "id": "perk_effects_selected__downscaled__heal_ground_ring_32x16_5f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 32,
+        "height": 16
+      },
+      "source": "../source/gameplay/perk_effects_selected/downscaled/heal_ground_ring_32x16_5f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/perk_effects_selected/downscaled/heal_ground_ring_32x16_5f_sheet.png"
+    },
+    {
+      "id": "perk_effects_selected__downscaled__hp_up_core_20x20_6f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 20,
+        "height": 20
+      },
+      "source": "../source/gameplay/perk_effects_selected/downscaled/hp_up_core_20x20_6f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/perk_effects_selected/downscaled/hp_up_core_20x20_6f_sheet.png"
+    },
+    {
+      "id": "perk_effects_selected__downscaled__hp_up_ground_ring_32x16_5f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 32,
+        "height": 16
+      },
+      "source": "../source/gameplay/perk_effects_selected/downscaled/hp_up_ground_ring_32x16_5f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/perk_effects_selected/downscaled/hp_up_ground_ring_32x16_5f_sheet.png"
+    },
+    {
+      "id": "perk_effects_selected__downscaled__hp_up_mark_8x8_4f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 8,
+        "height": 8
+      },
+      "source": "../source/gameplay/perk_effects_selected/downscaled/hp_up_mark_8x8_4f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/perk_effects_selected/downscaled/hp_up_mark_8x8_4f_sheet.png"
+    },
+    {
+      "id": "perk_effects_selected__downscaled__level_up_core_24x24_6f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 24,
+        "height": 24
+      },
+      "source": "../source/gameplay/perk_effects_selected/downscaled/level_up_core_24x24_6f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/perk_effects_selected/downscaled/level_up_core_24x24_6f_sheet.png"
+    },
+    {
+      "id": "perk_effects_selected__downscaled__level_up_ground_ring_40x20_5f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 40,
+        "height": 20
+      },
+      "source": "../source/gameplay/perk_effects_selected/downscaled/level_up_ground_ring_40x20_5f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/perk_effects_selected/downscaled/level_up_ground_ring_40x20_5f_sheet.png"
+    },
+    {
+      "id": "perk_effects_selected__downscaled__level_up_ray_16x16_4f_8dir_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 16,
+        "height": 16
+      },
+      "source": "../source/gameplay/perk_effects_selected/downscaled/level_up_ray_16x16_4f_8dir_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/perk_effects_selected/downscaled/level_up_ray_16x16_4f_8dir_sheet.png"
+    },
+    {
+      "id": "player_sprites_selected__downscaled__boy_mage_downed_32x32_1f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 32,
+        "height": 32
+      },
+      "source": "../source/gameplay/player_sprites_selected/downscaled/boy_mage_downed_32x32_1f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/player_sprites_selected/downscaled/boy_mage_downed_32x32_1f_sheet.png"
+    },
+    {
+      "id": "player_sprites_selected__downscaled__boy_mage_idle_staff_28x32_4f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 28,
+        "height": 32
+      },
+      "source": "../source/gameplay/player_sprites_selected/downscaled/boy_mage_idle_staff_28x32_4f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/player_sprites_selected/downscaled/boy_mage_idle_staff_28x32_4f_sheet.png"
+    },
+    {
+      "id": "player_sprites_selected__downscaled__boy_mage_walk_staff_28x32_6f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 28,
+        "height": 32
+      },
+      "source": "../source/gameplay/player_sprites_selected/downscaled/boy_mage_walk_staff_28x32_6f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/player_sprites_selected/downscaled/boy_mage_walk_staff_28x32_6f_sheet.png"
+    },
+    {
+      "id": "player_sprites_selected__downscaled__girl_mage_downed_28x32_1f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 28,
+        "height": 32
+      },
+      "source": "../source/gameplay/player_sprites_selected/downscaled/girl_mage_downed_28x32_1f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/player_sprites_selected/downscaled/girl_mage_downed_28x32_1f_sheet.png"
+    },
+    {
+      "id": "player_sprites_selected__downscaled__girl_mage_idle_24x32_4f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 24,
+        "height": 32
+      },
+      "source": "../source/gameplay/player_sprites_selected/downscaled/girl_mage_idle_24x32_4f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/player_sprites_selected/downscaled/girl_mage_idle_24x32_4f_sheet.png"
+    },
+    {
+      "id": "player_sprites_selected__downscaled__girl_mage_walk_24x32_4f_sheet",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 24,
+        "height": 32
+      },
+      "source": "../source/gameplay/player_sprites_selected/downscaled/girl_mage_walk_24x32_4f_sheet.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/player_sprites_selected/downscaled/girl_mage_walk_24x32_4f_sheet.png"
+    }
+  ]
+}

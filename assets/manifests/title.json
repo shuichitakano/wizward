@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "name": "wizward-title",
+  "palette": {
+    "asset_range": [
+      2,
+      254
+    ],
+    "sample_pixels": 1000000,
+    "max_pixels_per_asset": 4096,
+    "quantizer": "median_cut",
+    "reserved": []
+  },
+  "assets": [
+    {
+      "id": "title_screen_selected__title_screen_160x120",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/title/title_screen_selected/title_screen_160x120.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/title_screen_selected/title_screen_160x120.png"
+    },
+    {
+      "id": "title_screen_selected__wizward_logo_104x20",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 104,
+        "height": 20
+      },
+      "source": "../source/title/title_screen_selected/wizward_logo_104x20.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/title_screen_selected/wizward_logo_104x20.png"
+    }
+  ]
+}

@@ -2,3 +2,6 @@
 /build-*/
 .DS_Store
 CMakeUserPresets.json
+
+# クラウド同期などで生成される番号付きの競合コピー
+assets/converted/**/* [2-9].*

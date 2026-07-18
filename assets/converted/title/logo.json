@@ -1,0 +1,61 @@
+{
+  "format": "pixel-twins-sprite-pack",
+  "version": 1,
+  "source_intermediate": "intermediate.json",
+  "binary": "logo.bin",
+  "header": "title_sprites.hpp",
+  "sha256": "7c4c7059c0e656dcbce57f12c5e5f058f404caae4d86918f975e792f1b616ce1",
+  "layout": {
+    "byte_order": "little-endian",
+    "header_bytes": 24,
+    "asset_descriptor_bytes": 12,
+    "frame_descriptor_bytes": 8,
+    "pixel_data_offset": 44,
+    "empty_pixel_offset": 4294967295
+  },
+  "summary": {
+    "asset_count": 1,
+    "frame_count": 1,
+    "empty_frame_count": 0,
+    "untrimmed_pixel_bytes": 2080,
+    "trimmed_pixel_bytes": 1976,
+    "unique_pixel_bytes": 1976,
+    "transparent_border_saved_bytes": 104,
+    "dedup_saved_bytes": 0,
+    "asset_table_bytes": 12,
+    "frame_table_bytes": 8,
+    "alignment_padding_bytes": 0,
+    "binary_bytes": 2020
+  },
+  "assets": [
+    {
+      "id": "title_screen_selected__wizward_logo_104x20",
+      "asset_index": 0,
+      "first_frame": 0,
+      "frame_count": 1,
+      "columns": 1,
+      "rows": 1,
+      "logical_width": 104,
+      "logical_height": 20,
+      "empty_frames": 0,
+      "untrimmed_pixel_bytes": 2080,
+      "trimmed_pixel_bytes": 1976,
+      "local_unique_pixel_bytes": 1976,
+      "transparent_border_saved_bytes": 104,
+      "local_dedup_saved_bytes": 0,
+      "frames": [
+        {
+          "index": 0,
+          "column": 0,
+          "row": 0,
+          "pixel_offset": 0,
+          "trim_x": 0,
+          "trim_y": 1,
+          "width": 104,
+          "height": 19,
+          "pixel_bytes": 1976
+        }
+      ]
+    }
+  ]
+}
