@@ -496,17 +496,21 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     for (std::size_t index = 0; index < pixel_twins::kControllerCount; ++index) {
         const auto& player = gameplay.player(index);
         if (player.invulnerabilityTicks > 0 && (player.invulnerabilityTicks / 3U) % 2U != 0U) continue;
-        const auto animationFrame = frame / (player.moving ? 7U : 10U);
-        const auto anchorX = index == 0 ? 12.0F : 14.0F;
+        const auto downed = player.hp <= 0;
+        const auto animationFrame = downed ? 0U : frame / (player.moving ? 7U : 10U);
+        const auto anchorX = downed ? (index == 0 ? 14.0F : 16.0F)
+                                         : (index == 0 ? 12.0F : 14.0F);
         constexpr float kPlayerAnchorY = 30.0F;
         const auto screenX = static_cast<std::int16_t>(player.x - camera.x - anchorX);
         const auto screenY = static_cast<std::int16_t>(player.y - camera.y - kPlayerAnchorY);
         const auto directionRow = static_cast<std::uint8_t>(player.facing);
         const auto asset = index == 0
-            ? (player.moving ? assets::SpriteAssetId::GirlMageWalk24x324fSheet
-                             : assets::SpriteAssetId::GirlMageIdle24x324fSheet)
-            : (player.moving ? assets::SpriteAssetId::BoyMageWalkStaff28x326fSheet
-                             : assets::SpriteAssetId::BoyMageIdleStaff28x324fSheet);
+            ? (downed ? assets::SpriteAssetId::GirlMageDowned28x321fSheet
+                : (player.moving ? assets::SpriteAssetId::GirlMageWalk24x324fSheet
+                                 : assets::SpriteAssetId::GirlMageIdle24x324fSheet))
+            : (downed ? assets::SpriteAssetId::BoyMageDowned32x321fSheet
+                : (player.moving ? assets::SpriteAssetId::BoyMageWalkStaff28x326fSheet
+                                 : assets::SpriteAssetId::BoyMageIdleStaff28x324fSheet));
         queueAsset(spriteBuckets, assets, asset, animationFrame, screenX, screenY,
                    player.y - camera.y, directionRow);
     }
@@ -554,13 +558,18 @@ bool Game::initialize(Scene initialScene) noexcept {
 UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
     scene_ = scene;
     sceneFrame_ = 0;
-    if (scene_ == Scene::Gameplay) gameplay_.reset(worldMap_);
+    if (scene_ == Scene::Gameplay) {
+        gameplay_.reset(worldMap_);
+        resultOutcome_ = GameplayOutcome::Running;
+    }
     const bool paletteApplied = scene_ == Scene::Title
         ? titleAssets_.applyPalette(framebuffer_)
         : gameAssets_.applyPalette(framebuffer_);
     AudioEvent audio = AudioEvent::StopBgm;
     if (scene_ == Scene::Gameplay) audio = AudioEvent::PlayField;
-    if (scene_ == Scene::Result) audio = AudioEvent::PlayVictory;
+    if (scene_ == Scene::Result && resultOutcome_ == GameplayOutcome::Running) {
+        audio = AudioEvent::PlayVictory;
+    }
     return {audio, playStartSfx, paletteApplied};
 }
 
@@ -580,6 +589,13 @@ UpdateResult Game::tick(const pixel_twins::Controllers& controllers) noexcept {
     }
     if (scene_ == Scene::Gameplay) {
         gameplay_.tick(controllers, worldMap_);
+        if (gameplay_.outcome() != GameplayOutcome::Running) {
+            resultOutcome_ = gameplay_.outcome();
+            auto result = changeScene(Scene::Result, false);
+            ++frame_;
+            ++sceneFrame_;
+            return result;
+        }
     }
     ++frame_;
     ++sceneFrame_;
@@ -601,8 +617,12 @@ void Game::render() noexcept {
         const auto right = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Right);
         pixel_twins::fillRectangle(left, 0, 0, 160, 120, 0);
         pixel_twins::fillRectangle(right, 0, 0, 160, 120, 0);
-        pixel_twins::drawText(left, assets::kWizwardFont, 53, 48, "RESULT", 255);
-        pixel_twins::drawText(right, assets::kWizwardFont, 53, 48, "RESULT", 255);
+        const auto text = resultOutcome_ == GameplayOutcome::Down
+            ? std::string_view{"GAME OVER"}
+            : (resultOutcome_ == GameplayOutcome::TimeUp
+                ? std::string_view{"TIME UP"} : std::string_view{"RESULT"});
+        drawCenteredText(left, text, 80, 48);
+        drawCenteredText(right, text, 80, 48);
     }
     framebuffer_.flip();
 }

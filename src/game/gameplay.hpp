@@ -65,6 +65,12 @@ enum class EnemyBulletType : std::uint8_t {
     Magic,
 };
 
+enum class GameplayOutcome : std::uint8_t {
+    Running,
+    Down,
+    TimeUp,
+};
+
 struct PlayerState {
     float x = 0.0F;
     float y = 0.0F;
@@ -96,6 +102,7 @@ struct PlayerState {
     std::uint8_t perkFlashSlot = 0;
     std::uint8_t perkFlashTicks = 0;
     float orbAngle = 0.0F;
+    float hpRegenAccumulator = 0.0F;
 };
 
 struct CameraState {
@@ -216,6 +223,7 @@ public:
     [[nodiscard]] std::size_t enemyCount() const noexcept;
     [[nodiscard]] std::size_t bulletCount() const noexcept;
     [[nodiscard]] std::uint32_t elapsedTicks() const noexcept { return elapsedTicks_; }
+    [[nodiscard]] GameplayOutcome outcome() const noexcept { return outcome_; }
     [[nodiscard]] std::uint32_t score(std::size_t playerIndex) const noexcept {
         return scores_[playerIndex];
     }
@@ -234,6 +242,7 @@ private:
     std::uint16_t swarmCooldownTicks_ = 0;
     std::uint32_t elapsedTicks_ = 0;
     std::array<std::uint32_t, pixel_twins::kControllerCount> scores_{};
+    GameplayOutcome outcome_ = GameplayOutcome::Running;
 };
 
 [[nodiscard]] bool playerPositionIsWalkable(

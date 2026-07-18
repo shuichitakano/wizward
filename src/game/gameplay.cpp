@@ -609,6 +609,26 @@ void updateEnemyBullets(std::array<EnemyBulletState, kMaximumEnemyBullets>& bull
     }
 }
 
+GameplayOutcome updateRevives(
+    std::array<PlayerState, pixel_twins::kControllerCount>& players) noexcept {
+    constexpr float kReviveRange = kPlayerRadius * 2.0F + 12.0F;
+    constexpr std::int16_t kDonorCost = 2;
+    constexpr std::int16_t kReviveHp = 2;
+    for (std::size_t downedIndex = 0; downedIndex < players.size(); ++downedIndex) {
+        auto& downed = players[downedIndex];
+        auto& donor = players[1U - downedIndex];
+        if (downed.hp > 0 || donor.hp <= kDonorCost) continue;
+        if (squaredDistance(downed.x, downed.y, donor.x, donor.y)
+            > kReviveRange * kReviveRange) continue;
+        donor.hp = static_cast<std::int16_t>(std::max(1, donor.hp - kDonorCost));
+        downed.hp = kReviveHp;
+        downed.invulnerabilityTicks = 72;
+        downed.hpRegenAccumulator = 0.0F;
+    }
+    return players[0].hp <= 0 && players[1].hp <= 0
+        ? GameplayOutcome::Down : GameplayOutcome::Running;
+}
+
 std::uint8_t perkLevel(const PlayerState& player, Perk perk) noexcept {
     switch (perk) {
     case Perk::Light: return player.lightLevel;
@@ -875,6 +895,7 @@ void GameplayState::reset(const world::WorldMap&) noexcept {
     swarmCooldownTicks_ = 28U * 60U;
     elapsedTicks_ = 0;
     scores_.fill(0);
+    outcome_ = GameplayOutcome::Running;
     for (std::size_t index = 0; index < cameras_.size(); ++index) {
         updateCamera(cameras_[index], players_[index]);
     }
@@ -882,10 +903,18 @@ void GameplayState::reset(const world::WorldMap&) noexcept {
 
 void GameplayState::tick(const pixel_twins::Controllers& controllers,
                          const world::WorldMap& map) noexcept {
+    if (outcome_ != GameplayOutcome::Running) return;
     ++elapsedTicks_;
+    if (elapsedTicks_ >= 300U * 60U) {
+        outcome_ = GameplayOutcome::TimeUp;
+        return;
+    }
     for (std::size_t index = 0; index < players_.size(); ++index) {
-        updatePerkChoice(players_[index], controllers[index], randomState_);
-        movePlayer(players_[index], controllers[index], map);
+        if (players_[index].hp > 0) {
+            updatePerkChoice(players_[index], controllers[index], randomState_);
+            movePlayer(players_[index], controllers[index], map);
+        }
+        else players_[index].moving = false;
         if (players_[index].invulnerabilityTicks > 0) --players_[index].invulnerabilityTicks;
         if (players_[index].lightCooldownTicks > 0) --players_[index].lightCooldownTicks;
         if (players_[index].fireCooldownTicks > 0) --players_[index].fireCooldownTicks;
@@ -893,7 +922,18 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         if (players_[index].thunderCooldownTicks > 0) --players_[index].thunderCooldownTicks;
         if (players_[index].iceCooldownTicks > 0) --players_[index].iceCooldownTicks;
         if (players_[index].orbCooldownTicks > 0) --players_[index].orbCooldownTicks;
-        players_[index].orbAngle -= (8.1F + static_cast<float>(players_[index].orbLevel) * 0.72F) / 60.0F;
+        if (players_[index].hp > 0) {
+            players_[index].orbAngle -= (8.1F + static_cast<float>(players_[index].orbLevel) * 0.72F) / 60.0F;
+            if (players_[index].hp < players_[index].maxHp) {
+                players_[index].hpRegenAccumulator += 0.225F / 60.0F;
+                if (players_[index].hpRegenAccumulator >= 1.0F) {
+                    ++players_[index].hp;
+                    players_[index].hpRegenAccumulator -= 1.0F;
+                }
+            } else {
+                players_[index].hpRegenAccumulator = 0.0F;
+            }
+        }
         updateCamera(cameras_[index], players_[index]);
     }
     if (spawnCooldownTicks_ > 0) --spawnCooldownTicks_;
@@ -960,6 +1000,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
     updateThunderStrikes(thunderStrikes_);
     updateEnemyBullets(enemyBullets_, players_);
     updateXpGems(xpGems_, players_, randomState_);
+    outcome_ = updateRevives(players_);
     for (auto& enemy : enemies_) {
         if (!enemy.active && enemy.deathTicks > 0) --enemy.deathTicks;
     }

@@ -194,5 +194,11 @@ int main() {
     assert(std::any_of(gameplay.thunderStrikes().begin(), gameplay.thunderStrikes().end(),
         [](const auto& strike) { return strike.active; }));
     assert(gameplay.player(0).orbCooldownTicks > 0);
+
+    wizward::world::WorldMap blockedMap;
+    blockedMap.tiles.fill(wizward::world::kCollisionBit);
+    gameplay.reset(blockedMap);
+    for (int frame = 0; frame < 300 * 60; ++frame) gameplay.tick(idle, blockedMap);
+    assert(gameplay.outcome() == wizward::game::GameplayOutcome::TimeUp);
     return 0;
 }

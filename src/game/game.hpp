@@ -61,6 +61,7 @@ private:
     Scene scene_ = Scene::Title;
     std::uint32_t frame_ = 0;
     std::uint32_t sceneFrame_ = 0;
+    GameplayOutcome resultOutcome_ = GameplayOutcome::Running;
 };
 
 } // namespace wizward::game
