@@ -25,7 +25,9 @@ enum class Scene : std::uint8_t {
 enum class AudioEvent : std::uint8_t {
     None,
     PlayField,
+    PlayBoss,
     PlayVictory,
+    PlayNameEntry,
     StopBgm,
 };
 
@@ -33,6 +35,8 @@ struct UpdateResult {
     AudioEvent audio = AudioEvent::None;
     bool playStartSfx = false;
     bool succeeded = true;
+    std::array<SfxCue, kMaximumSfxCuesPerTick> sfxCues{};
+    std::size_t sfxCueCount = 0;
 };
 
 inline constexpr std::size_t kRankingLimit = 20;
@@ -101,6 +105,7 @@ private:
     std::uint32_t sceneFrame_ = 0;
     std::uint8_t startingPlayer_ = 0;
     bool paused_ = false;
+    bool nameEntryBgmStarted_ = false;
     std::array<std::uint32_t, pixel_twins::kControllerCount> timeBonuses_{};
     std::array<std::uint32_t, pixel_twins::kControllerCount> finalScores_{};
     std::array<RankingRecord, kRankingLimit> rankings_{};

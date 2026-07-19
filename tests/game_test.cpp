@@ -85,7 +85,12 @@ int main() {
     const auto earlyContinue = pressedController(0, ControllerButton::choiceRight);
     (void)game.processInput(earlyContinue);
     assert(game.scene() == Scene::Result);
-    for (std::uint16_t tick = 0; tick < 160U; ++tick) (void)game.tick(idle);
+    bool playedNameEntry = false;
+    for (std::uint16_t tick = 0; tick < 160U; ++tick) {
+        const auto result = game.tick(idle);
+        playedNameEntry = playedNameEntry || result.audio == AudioEvent::PlayNameEntry;
+    }
+    assert(playedNameEntry == (game.rankingEntry(0).active || game.rankingEntry(1).active));
 
     std::size_t submitted = 0;
     for (std::size_t player = 0; player < pixel_twins::kControllerCount; ++player) {

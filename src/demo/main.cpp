@@ -30,10 +30,49 @@ bool applyAudioEvent(wizward::game::AudioEvent event,
     switch (event) {
     case wizward::game::AudioEvent::None: return true;
     case wizward::game::AudioEvent::PlayField: return player.playBgm(wizward::audio::kField);
+    case wizward::game::AudioEvent::PlayBoss: return player.playBgm(wizward::audio::kBoss);
     case wizward::game::AudioEvent::PlayVictory: return player.playBgm(wizward::audio::kVictory);
+    case wizward::game::AudioEvent::PlayNameEntry: return player.playBgm(wizward::audio::kNameEntry);
     case wizward::game::AudioEvent::StopBgm: return player.stopBgm();
     }
     return false;
+}
+
+const pixel_twins::SfxPreset& sfxPreset(wizward::game::SfxId id) noexcept {
+    using wizward::game::SfxId;
+    switch (id) {
+    case SfxId::UiMove: return wizward::audio::kUiMove;
+    case SfxId::Start: return wizward::audio::kStart;
+    case SfxId::LightCast: return wizward::audio::kLightCast;
+    case SfxId::FireCast: return wizward::audio::kFireCast;
+    case SfxId::WindCast: return wizward::audio::kWindCast;
+    case SfxId::ThunderCast: return wizward::audio::kThunderCast;
+    case SfxId::IceCast: return wizward::audio::kIceCast;
+    case SfxId::FamiliarCast: return wizward::audio::kFamiliarCast;
+    case SfxId::Hit: return wizward::audio::kHit;
+    case SfxId::Deflect: return wizward::audio::kDeflect;
+    case SfxId::Kill: return wizward::audio::kKill;
+    case SfxId::PlayerDamage: return wizward::audio::kPlayerDamage;
+    case SfxId::Xp: return wizward::audio::kXp;
+    case SfxId::Level: return wizward::audio::kLevel;
+    case SfxId::Heal: return wizward::audio::kHeal;
+    case SfxId::HpUp: return wizward::audio::kHpUp;
+    case SfxId::Bomb: return wizward::audio::kBomb;
+    case SfxId::SealJingle: return wizward::audio::kSealJingle;
+    case SfxId::BossImpact: return wizward::audio::kBossImpact;
+    case SfxId::BossRock: return wizward::audio::kBossRock;
+    case SfxId::EnemySpawn: return wizward::audio::kEnemySpawn;
+    case SfxId::EnemyShoot: return wizward::audio::kEnemyShoot;
+    case SfxId::BossShoot: return wizward::audio::kBossShoot;
+    case SfxId::BossGather: return wizward::audio::kBossGather;
+    case SfxId::BossDeathImpact: return wizward::audio::kBossDeathImpact;
+    case SfxId::BossDeathBlast: return wizward::audio::kBossDeathBlast;
+    case SfxId::Clear: return wizward::audio::kClear;
+    case SfxId::Down: return wizward::audio::kDown;
+    case SfxId::Revive: return wizward::audio::kRevive;
+    case SfxId::GameOver: return wizward::audio::kGameOver;
+    }
+    return wizward::audio::kUiMove;
 }
 
 bool applyUpdate(const wizward::game::UpdateResult& result,
@@ -42,6 +81,14 @@ bool applyUpdate(const wizward::game::UpdateResult& result,
     if (!result.succeeded || !applyAudioEvent(result.audio, player)) return false;
     if (result.playStartSfx) {
         (void)audio.playSfx(pixel_twins::makeSfxRequest(wizward::audio::kStart));
+    }
+    for (std::size_t index = 0; index < result.sfxCueCount; ++index) {
+        const auto& cue = result.sfxCues[index];
+        auto request = pixel_twins::makeSfxRequest(sfxPreset(cue.id), cue.pan);
+        request.voice.frequency *= cue.pitchScale;
+        request.voice.endFrequency *= cue.pitchScale;
+        request.voice.velocity *= cue.volumeScale;
+        (void)audio.playSfx(request);
     }
     return true;
 }

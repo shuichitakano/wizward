@@ -20,6 +20,47 @@ inline constexpr std::size_t kMaximumWindSlashes = 8;
 inline constexpr std::size_t kMaximumThunderStrikes = 16;
 inline constexpr std::size_t kMaximumEnemyBullets = 128;
 inline constexpr std::size_t kMaximumFamiliarsPerPlayer = 3;
+inline constexpr std::size_t kMaximumSfxCuesPerTick = 16;
+
+enum class SfxId : std::uint8_t {
+    UiMove,
+    Start,
+    LightCast,
+    FireCast,
+    WindCast,
+    ThunderCast,
+    IceCast,
+    FamiliarCast,
+    Hit,
+    Deflect,
+    Kill,
+    PlayerDamage,
+    Xp,
+    Level,
+    Heal,
+    HpUp,
+    Bomb,
+    SealJingle,
+    BossImpact,
+    BossRock,
+    EnemySpawn,
+    EnemyShoot,
+    BossShoot,
+    BossGather,
+    BossDeathImpact,
+    BossDeathBlast,
+    Clear,
+    Down,
+    Revive,
+    GameOver,
+};
+
+struct SfxCue {
+    SfxId id = SfxId::UiMove;
+    float pan = 0.0F;
+    float pitchScale = 1.0F;
+    float volumeScale = 1.0F;
+};
 
 enum class Facing : std::uint8_t {
     South,
@@ -275,6 +316,10 @@ public:
     [[nodiscard]] bool playerIsManual(std::size_t index) const noexcept {
         return manualPlayers_[index];
     }
+    [[nodiscard]] const std::array<SfxCue, kMaximumSfxCuesPerTick>& sfxCues() const noexcept {
+        return sfxCues_;
+    }
+    [[nodiscard]] std::size_t sfxCueCount() const noexcept { return sfxCueCount_; }
 
 private:
     std::array<PlayerState, pixel_twins::kControllerCount> players_{};
@@ -302,6 +347,11 @@ private:
     float clearY_ = 0.0F;
     Facing clearFacing_ = Facing::South;
     GameplayOutcome outcome_ = GameplayOutcome::Running;
+    std::array<SfxCue, kMaximumSfxCuesPerTick> sfxCues_{};
+    std::size_t sfxCueCount_ = 0;
+
+    void pushSfx(SfxId id, float pan = 0.0F,
+                 float pitchScale = 1.0F, float volumeScale = 1.0F) noexcept;
 };
 
 [[nodiscard]] bool playerPositionIsWalkable(

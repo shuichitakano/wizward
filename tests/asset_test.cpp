@@ -1,5 +1,6 @@
 #include "assets/game_assets.hpp"
 #include "assets/title_assets.hpp"
+#include "audio/sfx_data.hpp"
 
 #include "pixel_twins/framebuffer.hpp"
 #include "pixel_twins/render_target.hpp"
@@ -45,5 +46,7 @@ int main() {
     assert(framebuffer.drawBuffer()[0] == wizward::assets::kTitleScreenData[0]);
     assert(title.makeLogo(28, 12, sprite));
     assert(sprite.p != nullptr && sprite.sw <= 104 && sprite.sh <= 20);
+    assert(wizward::audio::kLightCast.timbre.wave != nullptr);
+    assert(wizward::audio::kBossDeathBlast.priority > wizward::audio::kHit.priority);
     return 0;
 }

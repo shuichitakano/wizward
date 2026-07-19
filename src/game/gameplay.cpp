@@ -1330,6 +1330,12 @@ bool playerPositionIsWalkable(const world::WorldMap& map, float x, float y) noex
     return map.circleIsWalkable(x, y, kPlayerCollisionRadius);
 }
 
+void GameplayState::pushSfx(SfxId id, float pan,
+                            float pitchScale, float volumeScale) noexcept {
+    if (sfxCueCount_ >= sfxCues_.size()) return;
+    sfxCues_[sfxCueCount_++] = {id, pan, pitchScale, volumeScale};
+}
+
 void GameplayState::reset(const world::WorldMap&, std::size_t startingPlayer) noexcept {
     constexpr float kCenter = 50.5F * static_cast<float>(kWorldTileSize);
     players_[0] = {kCenter - 28.0F, kCenter, Facing::East};
@@ -1358,6 +1364,7 @@ void GameplayState::reset(const world::WorldMap&, std::size_t startingPlayer) no
     clearY_ = 0.0F;
     clearFacing_ = Facing::South;
     outcome_ = GameplayOutcome::Running;
+    sfxCueCount_ = 0;
     for (std::size_t index = 0; index < cameras_.size(); ++index) {
         updateCamera(cameras_[index], players_[index]);
     }
@@ -1365,9 +1372,23 @@ void GameplayState::reset(const world::WorldMap&, std::size_t startingPlayer) no
 
 void GameplayState::tick(const pixel_twins::Controllers& controllers,
                          const world::WorldMap& map) noexcept {
+    sfxCueCount_ = 0;
     if (outcome_ != GameplayOutcome::Running) return;
     if (clearSequenceTicks_ > 0) {
         ++clearSequenceTicks_;
+        constexpr std::array<std::uint16_t, 7> kGatherTicks{{22, 42, 60, 77, 92, 106, 119}};
+        if (std::find(kGatherTicks.begin(), kGatherTicks.end(), clearSequenceTicks_)
+            != kGatherTicks.end()) {
+            pushSfx(SfxId::BossGather, 0.0F,
+                    1.0F + static_cast<float>(clearSequenceTicks_) / 180.0F, 0.9F);
+        }
+        if (clearSequenceTicks_ == 141U) {
+            pushSfx(SfxId::BossDeathImpact);
+            pushSfx(SfxId::BossDeathBlast);
+        }
+        constexpr std::array<std::uint16_t, 7> kDebrisTicks{{146, 150, 154, 160, 166, 173, 182}};
+        if (std::find(kDebrisTicks.begin(), kDebrisTicks.end(), clearSequenceTicks_)
+            != kDebrisTicks.end()) pushSfx(SfxId::BossRock, 0.0F, 0.8F, 1.2F);
         if (clearSequenceTicks_ == 246U) {
             for (auto& player : players_) {
                 player.facing = Facing::South;
@@ -1375,20 +1396,57 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
             }
         }
         updateClearCameras(cameras_, players_, clearX_, clearY_, clearSequenceTicks_);
-        if (clearSequenceTicks_ >= 309U) outcome_ = GameplayOutcome::Clear;
+        if (clearSequenceTicks_ >= 309U) {
+            outcome_ = GameplayOutcome::Clear;
+            pushSfx(SfxId::Clear);
+        }
         return;
     }
     if (bossIntroTicks_ > 0) {
         --bossIntroTicks_;
+        const auto elapsed = static_cast<std::uint16_t>(183U - bossIntroTicks_);
+        if (elapsed == 75U) pushSfx(SfxId::BossImpact);
+        constexpr std::array<std::uint16_t, 5> kRockTicks{{82, 86, 91, 97, 104}};
+        if (std::find(kRockTicks.begin(), kRockTicks.end(), elapsed) != kRockTicks.end()) {
+            pushSfx(SfxId::BossRock, (elapsed & 1U) != 0U ? -0.35F : 0.35F,
+                    0.65F + static_cast<float>(elapsed % 11U) * 0.035F);
+        }
         if (const auto* introBoss = boss()) {
             updateBossIntroCameras(cameras_, players_, *introBoss,
-                                   static_cast<std::uint16_t>(183U - bossIntroTicks_));
+                                   elapsed);
         }
         return;
     }
+    const auto playersBefore = players_;
+    const auto manualBefore = manualPlayers_;
+    std::array<bool, kMaximumEnemies> enemyActiveBefore{};
+    std::array<std::int16_t, kMaximumEnemies> enemyHpBefore{};
+    std::array<std::uint16_t, kMaximumEnemies> enemySpawnDelayBefore{};
+    std::array<std::uint16_t, kMaximumEnemies> enemyDashBefore{};
+    for (std::size_t index = 0; index < enemies_.size(); ++index) {
+        enemyActiveBefore[index] = enemies_[index].active;
+        enemyHpBefore[index] = enemies_[index].hp;
+        enemySpawnDelayBefore[index] = enemies_[index].spawnDelayTicks;
+        enemyDashBefore[index] = enemies_[index].dashTicks;
+    }
+    std::array<bool, kMaximumEnemyBullets> enemyBulletBefore{};
+    std::array<std::uint16_t, kMaximumEnemyBullets> enemyBulletDelayBefore{};
+    std::array<std::uint16_t, kMaximumEnemyBullets> enemyBulletLifeBefore{};
+    for (std::size_t index = 0; index < enemyBullets_.size(); ++index) {
+        enemyBulletBefore[index] = enemyBullets_[index].active;
+        enemyBulletDelayBefore[index] = enemyBullets_[index].launchDelayTicks;
+        enemyBulletLifeBefore[index] = enemyBullets_[index].remainingTicks;
+    }
+    std::array<bool, kMaximumXpGems> xpGemBefore{};
+    for (std::size_t index = 0; index < xpGems_.size(); ++index) {
+        xpGemBefore[index] = xpGems_[index].active;
+    }
+    const auto sealCountBefore = activeSealCount_;
+    const auto clearBefore = clearSequenceTicks_;
     ++elapsedTicks_;
     if (elapsedTicks_ >= 300U * 60U) {
         outcome_ = GameplayOutcome::TimeUp;
+        pushSfx(SfxId::GameOver);
         return;
     }
     for (std::size_t index = 0; index < players_.size(); ++index) {
@@ -1542,6 +1600,102 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         outcome_ = GameplayOutcome::Running;
         clearSequenceTicks_ = 1;
     }
+
+    constexpr std::array<float, pixel_twins::kControllerCount> kPlayerPans{{-0.32F, 0.32F}};
+    bool playerDamaged = false;
+    for (std::size_t player = 0; player < players_.size(); ++player) {
+        const auto& before = playersBefore[player];
+        const auto& after = players_[player];
+        const auto pan = kPlayerPans[player];
+        if (after.lightCooldownTicks > before.lightCooldownTicks) pushSfx(SfxId::LightCast, pan);
+        if (after.fireCooldownTicks > before.fireCooldownTicks) pushSfx(SfxId::FireCast, pan);
+        if (after.windCooldownTicks > before.windCooldownTicks) pushSfx(SfxId::WindCast, pan);
+        if (after.thunderCooldownTicks > before.thunderCooldownTicks) pushSfx(SfxId::ThunderCast, pan);
+        if (after.iceCooldownTicks > before.iceCooldownTicks) pushSfx(SfxId::IceCast, pan);
+        if (after.familiarCooldownTicks > before.familiarCooldownTicks) pushSfx(SfxId::FamiliarCast, pan);
+        if (before.hp > 0 && after.hp <= 0) {
+            playerDamaged = true;
+            pushSfx(SfxId::Down, pan);
+        } else if (after.hp < before.hp) {
+            playerDamaged = true;
+            pushSfx(SfxId::PlayerDamage, pan);
+        }
+        else if (before.hp <= 0 && after.hp > 0) pushSfx(SfxId::Revive, pan);
+        if (after.level > before.level) pushSfx(SfxId::Level, pan);
+        if (after.perkFlashTicks > before.perkFlashTicks) {
+            pushSfx(SfxId::UiMove, pan, 1.0F, 0.6F);
+            if (after.perkFlash == Perk::Heal) pushSfx(SfxId::Heal, pan);
+            else if (after.perkFlash == Perk::MaxHp) pushSfx(SfxId::HpUp, pan);
+        }
+        if (before.bombEffectTicks == 0 && after.bombEffectTicks > 0) pushSfx(SfxId::Bomb, pan);
+        if (!manualBefore[player] && manualPlayers_[player]) pushSfx(SfxId::UiMove, pan);
+    }
+    bool hitPlayed = false;
+    bool killPlayed = false;
+    bool spawnPlayed = false;
+    bool enemyShoot = false;
+    for (std::size_t index = 0; index < enemies_.size(); ++index) {
+        const auto& enemy = enemies_[index];
+        if (!enemyActiveBefore[index] && enemy.active && enemy.bornTicks > 0
+            && enemy.spawnDelayTicks == 0) spawnPlayed = true;
+        if (enemyActiveBefore[index] && enemySpawnDelayBefore[index] > 0
+            && enemy.spawnDelayTicks == 0) spawnPlayed = true;
+        if (enemyActiveBefore[index] && !enemy.active && enemy.deathTicks > 0
+            && enemy.kind != EnemyKind::Boss) {
+            killPlayed = true;
+            hitPlayed = true;
+        }
+        if (enemyActiveBefore[index] && enemy.active && enemy.hp < enemyHpBefore[index]) hitPlayed = true;
+        if (enemy.kind == EnemyKind::Bat && enemyDashBefore[index] == 0 && enemy.dashTicks > 0) {
+            enemyShoot = true;
+        }
+    }
+    if (spawnPlayed) pushSfx(SfxId::EnemySpawn);
+    if (hitPlayed) pushSfx(SfxId::Hit);
+    if (killPlayed) pushSfx(SfxId::Kill);
+    bool bossShoot = false;
+    bool deflected = false;
+    for (std::size_t index = 0; index < enemyBullets_.size(); ++index) {
+        const auto& bullet = enemyBullets_[index];
+        const auto launched = (!enemyBulletBefore[index] && bullet.active && bullet.launchDelayTicks == 0)
+            || (enemyBulletBefore[index] && enemyBulletDelayBefore[index] > 0
+                && bullet.active && bullet.launchDelayTicks == 0);
+        if (launched) {
+            if (bullet.type == EnemyBulletType::BossFire) bossShoot = true;
+            else enemyShoot = true;
+        }
+        if (enemyBulletBefore[index] && !bullet.active && enemyBulletLifeBefore[index] > 1U) {
+            deflected = true;
+        }
+    }
+    if (enemyShoot) pushSfx(SfxId::EnemyShoot);
+    if (bossShoot) pushSfx(SfxId::BossShoot);
+    if (deflected && !playerDamaged) pushSfx(SfxId::Deflect);
+    bool xpCollected = false;
+    for (std::size_t index = 0; index < xpGems_.size(); ++index) {
+        xpCollected = xpCollected || (xpGemBefore[index] && !xpGems_[index].active);
+    }
+    if (xpCollected) pushSfx(SfxId::Xp);
+    if (activeSealCount_ > sealCountBefore) pushSfx(SfxId::SealJingle);
+    for (const auto& seal : seals_) {
+        if (!seal.active || elapsedTicks_ < seal.activatedAtTicks) continue;
+        const auto age = elapsedTicks_ - seal.activatedAtTicks;
+        const auto stage = static_cast<std::uint8_t>(std::count_if(
+            seals_.begin(), seals_.end(), [&](const SealState& candidate) {
+                return candidate.active && candidate.activatedAtTicks <= seal.activatedAtTicks;
+            }));
+        if ((stage == 1U && age == 9U) || (stage == 2U && age == 13U)
+            || (stage == 3U && age == 12U)) pushSfx(SfxId::SealJingle, 0.0F, 988.0F / 659.0F);
+        if ((stage == 2U && age == 7U) || (stage == 3U && age == 6U)) {
+            pushSfx(SfxId::SealJingle, 0.0F, 784.0F / 659.0F);
+        }
+        if ((stage == 2U && age == 22U) || (stage == 3U && age == 20U)) {
+            pushSfx(SfxId::SealJingle, 0.0F, 1175.0F / 659.0F);
+        }
+        if (stage == 3U && age == 30U) pushSfx(SfxId::SealJingle, 0.0F, 1568.0F / 659.0F);
+    }
+    if (clearBefore == 0 && clearSequenceTicks_ > 0) pushSfx(SfxId::BossGather);
+    if (outcome_ == GameplayOutcome::Down) pushSfx(SfxId::GameOver);
 }
 
 void GameplayState::grantXp(std::size_t playerIndex, std::uint16_t amount) noexcept {

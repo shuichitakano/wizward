@@ -1,26 +1,34 @@
 {
   "presets": [
-    {
-      "name": "ui_move",
-      "wave": "square",
-      "frequency": 660,
-      "endFrequency": 880,
-      "pitchSeconds": 0.04,
-      "holdSeconds": 0.035,
-      "volume": 0.16,
-      "envelope": {"attack": 0, "decay": 0.025, "sustain": 0.45, "release": 0.035},
-      "priority": 32
-    },
-    {
-      "name": "start",
-      "wave": "spark",
-      "frequency": 440,
-      "endFrequency": 1320,
-      "pitchSeconds": 0.12,
-      "holdSeconds": 0.13,
-      "volume": 0.28,
-      "envelope": {"attack": 0.005, "decay": 0.07, "sustain": 0.6, "release": 0.12},
-      "priority": 96
-    }
+    {"name":"ui_move","wave":"bell","frequency":620,"endFrequency":780,"pitchSeconds":0.025,"holdSeconds":0.025,"volume":0.18,"envelope":{"attack":0.002,"decay":0.025,"sustain":0.2,"release":0.025},"priority":32},
+    {"name":"start","wave":"bell","frequency":300,"endFrequency":520,"pitchSeconds":0.08,"holdSeconds":0.08,"volume":0.24,"envelope":{"attack":0.004,"decay":0.055,"sustain":0.45,"release":0.05},"priority":96},
+    {"name":"light_cast","wave":"bell","frequency":2200,"endFrequency":31.5,"pitchSeconds":0.36,"holdSeconds":0.02,"volume":0.13,"envelope":{"attack":0.001,"decay":0.165,"sustain":0.29,"release":0.005},"priority":28},
+    {"name":"fire_cast","wave":"bell","frequency":582,"endFrequency":30,"pitchSeconds":0.764,"holdSeconds":0.005,"volume":0.18,"envelope":{"attack":0.001,"decay":0.248,"sustain":0.06,"release":0.005},"priority":30},
+    {"name":"wind_cast","wave":"noise","frequency":40,"endFrequency":30,"pitchSeconds":0.476,"holdSeconds":0.018,"volume":0.21,"envelope":{"attack":0.037,"decay":0.095,"sustain":0.24,"release":0.005},"priority":40},
+    {"name":"thunder_cast","wave":"noise","frequency":2400,"endFrequency":30,"pitchSeconds":0.244,"holdSeconds":0.095,"volume":0.47,"envelope":{"attack":0.021,"decay":0.082,"sustain":0.13,"release":0.005},"priority":72},
+    {"name":"ice_cast","wave":"spark","frequency":937,"endFrequency":1155,"pitchSeconds":0.1,"holdSeconds":0.018,"volume":0.14,"envelope":{"attack":0.115,"decay":0.357,"sustain":0.08,"release":0.045},"priority":34},
+    {"name":"familiar_cast","wave":"pulse","frequency":720,"endFrequency":980,"pitchSeconds":0.035,"holdSeconds":0.035,"volume":0.12,"envelope":{"attack":0.002,"decay":0.025,"sustain":0.22,"release":0.035},"priority":26},
+    {"name":"hit","wave":"noise","frequency":352,"endFrequency":37,"pitchSeconds":0.188,"holdSeconds":0.018,"volume":0.12,"envelope":{"attack":0.001,"decay":0.03,"sustain":0.23,"release":0.015},"priority":20},
+    {"name":"deflect","wave":"spark","frequency":980,"endFrequency":460,"pitchSeconds":0.016,"holdSeconds":0.016,"volume":0.13,"envelope":{"attack":0.001,"decay":0.018,"sustain":0.12,"release":0.025},"priority":32},
+    {"name":"kill","wave":"noise","frequency":197,"endFrequency":30,"pitchSeconds":0.344,"holdSeconds":0.005,"volume":0.27,"envelope":{"attack":0.021,"decay":0.198,"sustain":0.01,"release":0.09},"priority":44},
+    {"name":"player_damage","wave":"square","frequency":180,"endFrequency":75,"pitchSeconds":0.18,"holdSeconds":0.055,"volume":0.24,"envelope":{"attack":0.001,"decay":0.06,"sustain":0.2,"release":0.045},"priority":88},
+    {"name":"xp","wave":"sine","frequency":388,"endFrequency":1360,"pitchSeconds":0.12,"holdSeconds":0.005,"volume":0.21,"envelope":{"attack":0.033,"decay":0.166,"sustain":0.01,"release":0.005},"priority":24},
+    {"name":"level","wave":"pulse","frequency":40,"endFrequency":912,"pitchSeconds":0.608,"holdSeconds":0.555,"volume":0.13,"envelope":{"attack":0.022,"decay":0.085,"sustain":0.81,"release":0.465},"priority":104},
+    {"name":"heal","wave":"bell","frequency":279,"endFrequency":2400,"pitchSeconds":0.804,"holdSeconds":0.185,"volume":0.26,"envelope":{"attack":0.001,"decay":0.207,"sustain":0.82,"release":0.055},"priority":96},
+    {"name":"hp_up","wave":"sine","frequency":40,"endFrequency":1488,"pitchSeconds":0.6,"holdSeconds":0.115,"volume":0.26,"envelope":{"attack":0.022,"decay":0.223,"sustain":0.42,"release":0.005},"priority":96},
+    {"name":"bomb","wave":"pulse","frequency":360,"endFrequency":30,"pitchSeconds":0.492,"holdSeconds":0.115,"volume":0.5,"envelope":{"attack":0.075,"decay":0.072,"sustain":0.13,"release":0.095},"priority":112},
+    {"name":"seal_jingle","wave":"bell","frequency":659,"endFrequency":988,"pitchSeconds":0.12,"holdSeconds":0.075,"volume":0.24,"envelope":{"attack":0.003,"decay":0.055,"sustain":0.42,"release":0.12},"priority":108},
+    {"name":"boss_impact","wave":"triangle","frequency":138,"endFrequency":34,"pitchSeconds":0.2,"holdSeconds":0.24,"volume":0.95,"envelope":{"attack":0.001,"decay":0.16,"sustain":0.52,"release":0.3},"priority":160},
+    {"name":"boss_rock","wave":"noise","frequency":220,"endFrequency":90,"pitchSeconds":0.08,"holdSeconds":0.03,"volume":0.48,"envelope":{"attack":0.001,"decay":0.04,"sustain":0.14,"release":0.075},"priority":72},
+    {"name":"enemy_spawn","wave":"spark","frequency":280,"endFrequency":1380,"pitchSeconds":0.2,"holdSeconds":0.08,"volume":0.18,"envelope":{"attack":0.002,"decay":0.06,"sustain":0.26,"release":0.1},"priority":36},
+    {"name":"enemy_shoot","wave":"pulse","frequency":300,"endFrequency":180,"pitchSeconds":0.06,"holdSeconds":0.03,"volume":0.13,"envelope":{"attack":0.002,"decay":0.026,"sustain":0.18,"release":0.03},"priority":30},
+    {"name":"boss_shoot","wave":"saw","frequency":150,"endFrequency":80,"pitchSeconds":0.12,"holdSeconds":0.08,"volume":0.24,"envelope":{"attack":0.002,"decay":0.055,"sustain":0.22,"release":0.05},"priority":76},
+    {"name":"boss_gather","wave":"noise","frequency":90,"endFrequency":620,"pitchSeconds":0.54,"holdSeconds":0.34,"volume":0.2,"envelope":{"attack":0.025,"decay":0.14,"sustain":0.55,"release":0.22},"priority":92},
+    {"name":"boss_death_impact","wave":"triangle","frequency":126,"endFrequency":30,"pitchSeconds":0.3,"holdSeconds":0.38,"volume":1.18,"envelope":{"attack":0.001,"decay":0.2,"sustain":0.58,"release":0.52},"priority":192},
+    {"name":"boss_death_blast","wave":"noise","frequency":420,"endFrequency":48,"pitchSeconds":0.24,"holdSeconds":0.14,"volume":0.88,"envelope":{"attack":0.001,"decay":0.19,"sustain":0.3,"release":0.32},"priority":184},
+    {"name":"clear","wave":"bell","frequency":220,"endFrequency":1320,"pitchSeconds":0.28,"holdSeconds":0.28,"volume":0.32,"envelope":{"attack":0.01,"decay":0.16,"sustain":0.45,"release":0.18},"priority":144},
+    {"name":"down","wave":"saw","frequency":260,"endFrequency":58,"pitchSeconds":0.18,"holdSeconds":0.08,"volume":0.24,"envelope":{"attack":0.002,"decay":0.08,"sustain":0.2,"release":0.12},"priority":120},
+    {"name":"revive","wave":"bell","frequency":310,"endFrequency":1320,"pitchSeconds":0.22,"holdSeconds":0.18,"volume":0.22,"envelope":{"attack":0.006,"decay":0.12,"sustain":0.58,"release":0.12},"priority":116},
+    {"name":"game_over","wave":"saw","frequency":180,"endFrequency":42,"pitchSeconds":0.62,"holdSeconds":0.34,"volume":0.3,"envelope":{"attack":0.02,"decay":0.24,"sustain":0.5,"release":0.36},"priority":180}
   ]
 }

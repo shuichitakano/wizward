@@ -78,6 +78,13 @@ std::size_t tileIndex(std::uint16_t x, std::uint16_t y) {
     return static_cast<std::size_t>(y) * wizward::world::kMapColumns + x;
 }
 
+bool hasSfx(const wizward::game::GameplayState& gameplay, wizward::game::SfxId wanted) {
+    return std::any_of(gameplay.sfxCues().begin(),
+                       gameplay.sfxCues().begin()
+                           + static_cast<std::ptrdiff_t>(gameplay.sfxCueCount()),
+                       [wanted](const wizward::game::SfxCue& cue) { return cue.id == wanted; });
+}
+
 } // namespace
 
 int main() {
@@ -128,6 +135,7 @@ int main() {
     const auto idle = controllersWith(0, 0);
     gameplay.tick(idle, map);
     assert(gameplay.bulletCount() > 0);
+    assert(hasSfx(gameplay, wizward::game::SfxId::LightCast));
     for (int frame = 0; frame < 120; ++frame) gameplay.tick(idle, map);
     assert(gameplay.score(0) + gameplay.score(1) > 0);
 
@@ -136,6 +144,7 @@ int main() {
     assert(gameplay.addEnemy(contactPlayer.x, contactPlayer.y));
     gameplay.tick(idle, map);
     assert(gameplay.player(0).hp == 27);
+    assert(hasSfx(gameplay, wizward::game::SfxId::PlayerDamage));
     gameplay.tick(idle, map);
     assert(gameplay.player(0).hp == 27);
     assert(gameplay.player(0).invulnerabilityTicks > 0);

@@ -24,6 +24,11 @@ constexpr std::uint16_t kResultAutoReturnTicks = 300;
 constexpr std::uint32_t kTimeBonusPerSecond = 200;
 constexpr std::string_view kRankingCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.- ";
 
+void copySfxCues(const GameplayState& gameplay, UpdateResult& result) noexcept {
+    result.sfxCueCount = std::min(gameplay.sfxCueCount(), result.sfxCues.size());
+    std::copy_n(gameplay.sfxCues().begin(), result.sfxCueCount, result.sfxCues.begin());
+}
+
 std::uint8_t fourDirectionRow(Facing facing) noexcept {
     switch (facing) {
     case Facing::South:
@@ -1029,6 +1034,7 @@ UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
     sceneFrame_ = 0;
     paused_ = false;
     resultContinueTicks_ = 0;
+    nameEntryBgmStarted_ = false;
     if (scene_ == Scene::Gameplay) {
         (void)worldMap_.resetSeals(gameAssets_.background());
         gameplay_.reset(worldMap_, startingPlayer_);
@@ -1056,7 +1062,17 @@ UpdateResult Game::processInput(const pixel_twins::Controllers& controllers) noe
     }
     if (scene_ == Scene::Result) {
         if (sceneFrame_ < kRankingResultDelayTicks) return {};
+        const auto hadPendingRanking = hasPendingRanking();
         updateRankingInput(controllers);
+        if (hadPendingRanking) {
+            for (std::size_t index = 0; index < pixel_twins::kControllerCount; ++index) {
+                if (controllers[index].pressed == 0) continue;
+                UpdateResult result{};
+                result.sfxCues[0] = {SfxId::UiMove, index == 0 ? -0.32F : 0.32F};
+                result.sfxCueCount = 1;
+                return result;
+            }
+        }
         if (hasPendingRanking() || resultOutcome_ != GameplayOutcome::Clear
             || resultContinueTicks_ < kResultContinueDelayTicks) return {};
         for (std::size_t index = 0; index < pixel_twins::kControllerCount; ++index) {
@@ -1069,14 +1085,27 @@ UpdateResult Game::processInput(const pixel_twins::Controllers& controllers) noe
         if (!gameplay_.playerIsManual(index)
             || !controllers[index].isPressed(pixel_twins::ControllerButton::start)) continue;
         paused_ = !paused_;
-        break;
+        UpdateResult result{};
+        result.sfxCues[0] = {SfxId::UiMove, index == 0 ? -0.32F : 0.32F};
+        result.sfxCueCount = 1;
+        return result;
     }
     return {};
 }
 
 UpdateResult Game::tick(const pixel_twins::Controllers& controllers) noexcept {
     if (scene_ == Scene::Gameplay && !paused_) {
+        const auto bossIntroBefore = gameplay_.bossIntroTicks();
+        const auto clearBefore = gameplay_.clearSequenceActive();
         gameplay_.tick(controllers, worldMap_);
+        UpdateResult tickResult{};
+        copySfxCues(gameplay_, tickResult);
+        if (bossIntroBefore == 0 && gameplay_.bossIntroTicks() > 0) {
+            tickResult.audio = AudioEvent::StopBgm;
+        } else if (bossIntroBefore > 0 && gameplay_.bossIntroTicks() == 0) {
+            tickResult.audio = AudioEvent::PlayBoss;
+        }
+        if (!clearBefore && gameplay_.clearSequenceActive()) tickResult.audio = AudioEvent::StopBgm;
         for (std::uint8_t index = 0; index < worldMap_.seals.size(); ++index) {
             if (gameplay_.seal(index).active) {
                 (void)worldMap_.activateSeal(index, gameAssets_.background());
@@ -1086,11 +1115,22 @@ UpdateResult Game::tick(const pixel_twins::Controllers& controllers) noexcept {
             resultOutcome_ = gameplay_.outcome();
             finalizeResult();
             auto result = changeScene(Scene::Result, false);
+            copySfxCues(gameplay_, result);
             ++frame_;
             ++sceneFrame_;
             return result;
         }
+        ++frame_;
+        ++sceneFrame_;
+        return tickResult;
     } else if (scene_ == Scene::Result && sceneFrame_ >= kRankingResultDelayTicks) {
+        if (resultOutcome_ != GameplayOutcome::Clear
+            && hasPendingRanking() && !nameEntryBgmStarted_) {
+            nameEntryBgmStarted_ = true;
+            ++frame_;
+            ++sceneFrame_;
+            return {AudioEvent::PlayNameEntry};
+        }
         if (hasPendingRanking()
             && sceneFrame_ >= kRankingResultDelayTicks + kRankingInputTimeoutTicks) {
             for (std::size_t player = 0; player < rankingEntries_.size(); ++player) {
