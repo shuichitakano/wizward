@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 
 namespace wizward::game {
 namespace {
@@ -390,9 +391,15 @@ void killEnemy(EnemyState& enemy,
     if (enemy.kind == EnemyKind::Boss) {
         for (auto& score : scores) score += 5000;
     } else {
-        const auto gem = std::find_if(xpGems.begin(), xpGems.end(),
+        auto gem = std::find_if(xpGems.begin(), xpGems.end(),
             [](const XpGemState& candidate) { return !candidate.active; });
-        if (gem != xpGems.end()) *gem = {enemy.x, enemy.y, enemy.xpValue, true};
+        if (gem == xpGems.end()) {
+            gem = std::max_element(xpGems.begin(), xpGems.end(),
+                [](const XpGemState& lhs, const XpGemState& rhs) {
+                    return lhs.ageTicks < rhs.ageTicks;
+                });
+        }
+        *gem = {enemy.x, enemy.y, 0, enemy.xpValue, true};
         constexpr std::array<std::uint16_t, 7> kScores{{10, 15, 45, 100, 30, 25, 60}};
         if (owner < scores.size()) scores[owner] += kScores[static_cast<std::size_t>(enemy.kind)];
     }
@@ -1219,6 +1226,7 @@ void updateXpGems(std::array<XpGemState, kMaximumXpGems>& xpGems,
                   std::uint32_t& randomState) noexcept {
     for (auto& gem : xpGems) {
         if (!gem.active) continue;
+        if (gem.ageTicks < std::numeric_limits<std::uint16_t>::max()) ++gem.ageTicks;
         PlayerState* nearest = nullptr;
         auto nearestSquared = kXpPullRange * kXpPullRange;
         for (auto& player : players) {

@@ -15,7 +15,7 @@ inline constexpr float kPlayerRadius = 5.0F;
 inline constexpr float kPlayerCollisionRadius = 8.0F;
 inline constexpr std::size_t kMaximumEnemies = 90;
 inline constexpr std::size_t kMaximumPlayerBullets = 128;
-inline constexpr std::size_t kMaximumXpGems = 128;
+inline constexpr std::size_t kMaximumXpGems = 256;
 inline constexpr std::size_t kMaximumWindSlashes = 8;
 inline constexpr std::size_t kMaximumThunderStrikes = 16;
 inline constexpr std::size_t kMaximumEnemyBullets = 128;
@@ -259,6 +259,7 @@ struct ThunderStrikeState {
 struct XpGemState {
     float x = 0.0F;
     float y = 0.0F;
+    std::uint16_t ageTicks = 0;
     std::uint8_t value = 0;
     bool active = false;
 };
