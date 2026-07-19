@@ -15,6 +15,6 @@ set(WIZWARD_BUILD_DEMO OFF CACHE BOOL "" FORCE)
 add_subdirectory(.. wizward)
 
 add_executable(wizward_rp2350 main.cpp)
-target_link_libraries(wizward_rp2350 PRIVATE wizward::core pixel_twins::rp2350)
+target_link_libraries(wizward_rp2350 PRIVATE wizward::core pixel_twins::rp2350 pico_rand)
 target_compile_features(wizward_rp2350 PRIVATE cxx_std_17)
 pico_add_extra_outputs(wizward_rp2350)

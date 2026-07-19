@@ -3,6 +3,7 @@
 #include "pixel_twins/audio_system.hpp"
 
 #include "pico/stdlib.h"
+#include "pico/rand.h"
 
 namespace {
 
@@ -15,7 +16,7 @@ pixel_twins::AudioSystem audioSystem;
 
 int main() {
     stdio_init_all();
-    if (!game.initialize()) {
+    if (!game.initialize(wizward::game::Scene::Title, get_rand_32())) {
         while (true) tight_loop_contents();
     }
     game.render();

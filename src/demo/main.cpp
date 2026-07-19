@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <string_view>
 
 namespace {
@@ -24,6 +25,26 @@ bool hasArgument(int argc, char** argv, std::string_view expected) noexcept {
         if (std::string_view(argv[index]) == expected) return true;
     }
     return false;
+}
+
+std::uint32_t mapSeed(int argc, char** argv) noexcept {
+    for (int index = 1; index < argc; ++index) {
+        std::string_view argument(argv[index]);
+        const char* value = nullptr;
+        if (argument == "--seed" && index + 1 < argc) value = argv[++index];
+        else if (argument.rfind("--seed=", 0) == 0) value = argv[index] + 7;
+        if (value == nullptr) continue;
+        char* end = nullptr;
+        const auto parsed = std::strtoul(value, &end, 0);
+        if (end != value && *end == '\0') return static_cast<std::uint32_t>(parsed);
+    }
+    const auto ticks = static_cast<std::uint64_t>(
+        std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    auto seed = static_cast<std::uint32_t>(ticks) ^ static_cast<std::uint32_t>(ticks >> 32U);
+    seed ^= seed >> 16U;
+    seed *= 2246822519U;
+    seed ^= seed >> 13U;
+    return seed != 0U ? seed : 1U;
 }
 
 bool applyAudioEvent(wizward::game::AudioEvent event,
@@ -119,7 +140,7 @@ int main(int argc, char** argv) {
     const auto once = hasArgument(argc, argv, "--once");
     const auto initialScene = hasArgument(argc, argv, "--gameplay")
         ? wizward::game::Scene::Gameplay : wizward::game::Scene::Title;
-    if (!game.initialize(initialScene)) {
+    if (!game.initialize(initialScene, mapSeed(argc, argv))) {
         std::fputs("Wizwardアセットまたはマップの初期化に失敗しました\n", stderr);
         return 1;
     }

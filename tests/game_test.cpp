@@ -37,6 +37,7 @@ int main() {
     using wizward::game::Scene;
 
     assert(game.initialize());
+    const auto initialMapSeed = game.mapSeed();
     assert(game.scene() == Scene::Title);
     game.render();
     const auto& titlePixels = game.framebuffer().displayBuffer();
@@ -59,6 +60,7 @@ int main() {
     assert(startResult.audio == AudioEvent::PlayField);
     assert(startResult.playStartSfx);
     assert(game.scene() == Scene::Gameplay);
+    assert(game.mapSeed() != initialMapSeed);
     assert(!game.gameplay().playerIsManual(0));
     assert(game.gameplay().playerIsManual(1));
 

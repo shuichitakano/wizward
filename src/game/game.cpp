@@ -1273,10 +1273,11 @@ PIXEL_TWINS_SRAM void drawResultPanel(
 
 } // namespace
 
-bool Game::initialize(Scene initialScene) noexcept {
+bool Game::initialize(Scene initialScene, std::uint32_t mapSeed) noexcept {
     world::MapGenerator mapGenerator;
+    mapSeedState_ = mapSeed != 0U ? mapSeed : 1U;
     if (!gameAssets_.initialize() || !titleAssets_.initialize()
-        || !mapGenerator.generate(0x57495aU, gameAssets_.background(), terrainWorkspace_, worldMap_)) {
+        || !mapGenerator.generate(mapSeedState_, gameAssets_.background(), terrainWorkspace_, worldMap_)) {
         return false;
     }
     gameplay_.reset(worldMap_, startingPlayer_);
@@ -1293,7 +1294,12 @@ UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
     resultContinueTicks_ = 0;
     nameEntryBgmStarted_ = false;
     if (scene_ == Scene::Gameplay) {
-        (void)worldMap_.resetSeals(gameAssets_.background());
+        mapSeedState_ = mapSeedState_ * 1664525U + 1013904223U;
+        world::MapGenerator mapGenerator;
+        if (!mapGenerator.generate(mapSeedState_, gameAssets_.background(),
+                                   terrainWorkspace_, worldMap_)) {
+            return {AudioEvent::StopBgm, playStartSfx, false};
+        }
         gameplay_.reset(worldMap_, startingPlayer_);
         resultOutcome_ = GameplayOutcome::Running;
     }

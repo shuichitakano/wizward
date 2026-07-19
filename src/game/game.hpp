@@ -59,7 +59,8 @@ struct RankingEntry {
 
 class Game {
 public:
-    [[nodiscard]] bool initialize(Scene initialScene = Scene::Title) noexcept;
+    [[nodiscard]] bool initialize(Scene initialScene = Scene::Title,
+                                  std::uint32_t mapSeed = 0x57495aU) noexcept;
     [[nodiscard]] UpdateResult processInput(const pixel_twins::Controllers& controllers) noexcept;
     [[nodiscard]] UpdateResult tick(const pixel_twins::Controllers& controllers) noexcept;
     void render() noexcept PIXEL_TWINS_SRAM;
@@ -68,6 +69,7 @@ public:
     [[nodiscard]] const pixel_twins::Framebuffer& framebuffer() const noexcept { return framebuffer_; }
     [[nodiscard]] Scene scene() const noexcept { return scene_; }
     [[nodiscard]] bool paused() const noexcept { return paused_; }
+    [[nodiscard]] std::uint32_t mapSeed() const noexcept { return worldMap_.seed; }
     [[nodiscard]] const GameplayState& gameplay() const noexcept { return gameplay_; }
     [[nodiscard]] std::uint32_t timeBonus(std::size_t player) const noexcept {
         return timeBonuses_[player];
@@ -106,6 +108,7 @@ private:
     std::uint32_t frame_ = 0;
     std::uint32_t sceneFrame_ = 0;
     std::uint8_t startingPlayer_ = 0;
+    std::uint32_t mapSeedState_ = 0x57495aU;
     bool paused_ = false;
     bool nameEntryBgmStarted_ = false;
     std::array<std::uint32_t, pixel_twins::kControllerCount> timeBonuses_{};

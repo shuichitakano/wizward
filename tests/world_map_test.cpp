@@ -77,6 +77,11 @@ int main() {
     wizward::world::WorldMap different;
     assert(generator.generate(54321, assets.background(), workspace, different));
     assert(first.tiles != different.tiles);
+    for (std::uint32_t seed = 1; seed <= 16; ++seed) {
+        wizward::world::WorldMap generated;
+        assert(generator.generate(seed * 2654435761U, assets.background(), workspace, generated));
+        assert(generated.seed == seed * 2654435761U);
+    }
 
     const auto seal = first.seals[0];
     const auto inactive = first.tile(seal.x, seal.y);
