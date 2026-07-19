@@ -540,6 +540,203 @@ PIXEL_TWINS_SRAM void queueScaledAsset(
     (void)buckets.addSpriteEx(bucket, sprite);
 }
 
+struct PerkSpriteSpec {
+    assets::SpriteAssetId asset;
+    std::uint8_t frames;
+    std::uint8_t width;
+    std::uint8_t height;
+};
+
+PIXEL_TWINS_SRAM bool perkEffectProgress(float age, float start, float end,
+                                        float& progress) noexcept {
+    progress = (age - start) / (end - start);
+    return progress >= 0.0F && progress < 1.0F;
+}
+
+PIXEL_TWINS_SRAM void drawPerkSpriteProgress(pixel_twins::RenderTarget target,
+                                             const assets::GameAssets& assets,
+                                             const CameraState& camera,
+                                             PerkSpriteSpec spec, float progress,
+                                             float x, float y,
+                                             std::uint8_t row = 0) noexcept {
+    if (progress < 0.0F || progress >= 1.0F) return;
+    const auto frame = static_cast<std::uint32_t>(std::min<std::uint8_t>(
+        static_cast<std::uint8_t>(spec.frames - 1U),
+        static_cast<std::uint8_t>(progress * static_cast<float>(spec.frames))));
+    pixel_twins::Sprite sprite{};
+    if (assets.makeLoopingSprite(spec.asset, frame, row,
+            static_cast<std::int16_t>(std::round(x - camera.x - spec.width * 0.5F)),
+            static_cast<std::int16_t>(std::round(y - camera.y - spec.height * 0.5F)), sprite)) {
+        pixel_twins::drawSprite(target, sprite);
+    }
+}
+
+PIXEL_TWINS_SRAM void drawPerkSpriteWindow(pixel_twins::RenderTarget target,
+                                           const assets::GameAssets& assets,
+                                           const CameraState& camera,
+                                           PerkSpriteSpec spec, float age,
+                                           float start, float end, float x, float y,
+                                           std::uint8_t row = 0) noexcept {
+    float progress = 0.0F;
+    if (!perkEffectProgress(age, start, end, progress)) return;
+    drawPerkSpriteProgress(target, assets, camera, spec, progress, x, y, row);
+}
+
+template<std::size_t Capacity, std::size_t ExCapacity>
+PIXEL_TWINS_SRAM void queuePerkSpriteWindow(
+        pixel_twins::SpriteBuckets<Capacity, ExCapacity>& buckets,
+        const assets::GameAssets& assets, const CameraState& camera,
+        PerkSpriteSpec spec, float age, float start, float end,
+        float x, float y, float sortY) noexcept {
+    float progress = 0.0F;
+    if (!perkEffectProgress(age, start, end, progress)) return;
+    const auto frame = static_cast<std::uint32_t>(std::min<std::uint8_t>(
+        static_cast<std::uint8_t>(spec.frames - 1U),
+        static_cast<std::uint8_t>(progress * static_cast<float>(spec.frames))));
+    queueAsset(buckets, assets, spec.asset, frame,
+        static_cast<std::int16_t>(std::round(x - camera.x - spec.width * 0.5F)),
+        static_cast<std::int16_t>(std::round(y - camera.y - spec.height * 0.5F)),
+        sortY - camera.y);
+}
+
+PIXEL_TWINS_SRAM void drawPerkSpark(pixel_twins::RenderTarget target,
+                                    const assets::GameAssets& assets,
+                                    const CameraState& camera,
+                                    float age, float start, float x, float y) noexcept {
+    constexpr PerkSpriteSpec kWhiteSpark{
+        assets::SpriteAssetId::CommonWhiteSpark6x64fSheet, 4, 6, 6};
+    float progress = 0.0F;
+    if (!perkEffectProgress(age, start, start + 0.24F, progress)) return;
+    drawPerkSpriteProgress(target, assets, camera, kWhiteSpark, progress, x, y);
+}
+
+template<std::size_t Capacity, std::size_t ExCapacity>
+PIXEL_TWINS_SRAM void queuePerkEffectUnder(
+        pixel_twins::SpriteBuckets<Capacity, ExCapacity>& buckets,
+        const assets::GameAssets& assets, const CameraState& camera,
+        const GameplayState& gameplay) noexcept {
+    constexpr PerkSpriteSpec kHealRing{
+        assets::SpriteAssetId::HealGroundRing32x165fSheet, 5, 32, 16};
+    constexpr PerkSpriteSpec kHpRing{
+        assets::SpriteAssetId::HpUpGroundRing32x165fSheet, 5, 32, 16};
+    constexpr PerkSpriteSpec kLevelRing{
+        assets::SpriteAssetId::LevelUpGroundRing40x205fSheet, 5, 40, 20};
+    for (const auto& effect : gameplay.perkEffects()) {
+        if (!effect.active || effect.owner >= pixel_twins::kControllerCount) continue;
+        const auto& player = gameplay.player(effect.owner);
+        const auto age = static_cast<float>(effect.ageTicks) / 60.0F;
+        if (effect.type == PerkEffectType::Heal) {
+            queuePerkSpriteWindow(buckets, assets, camera, kHealRing,
+                                  age, 0.0F, 0.48F, player.x, player.y, player.y);
+        } else if (effect.type == PerkEffectType::HpUp) {
+            queuePerkSpriteWindow(buckets, assets, camera, kHpRing,
+                                  age, 0.0F, 0.5F, player.x, player.y, player.y);
+        } else {
+            queuePerkSpriteWindow(buckets, assets, camera, kLevelRing,
+                                  age, 0.0F, 0.36F, player.x, player.y, player.y);
+        }
+    }
+}
+
+PIXEL_TWINS_SRAM void drawPerkEffectOver(pixel_twins::RenderTarget target,
+                                         const assets::GameAssets& assets,
+                                         const CameraState& camera,
+                                         const GameplayState& gameplay) noexcept {
+    constexpr PerkSpriteSpec kHealCore{
+        assets::SpriteAssetId::HealCore16x245fSheet, 5, 16, 24};
+    constexpr PerkSpriteSpec kHpCore{
+        assets::SpriteAssetId::HpUpCore20x206fSheet, 6, 20, 20};
+    constexpr PerkSpriteSpec kHpMark{
+        assets::SpriteAssetId::HpUpMark8x84fSheet, 4, 8, 8};
+    constexpr PerkSpriteSpec kLevelCore{
+        assets::SpriteAssetId::LevelUpCore24x246fSheet, 6, 24, 24};
+    constexpr PerkSpriteSpec kLevelRay{
+        assets::SpriteAssetId::LevelUpRay16x164f8dirSheet, 4, 16, 16};
+    constexpr PerkSpriteSpec kRisingMote{
+        assets::SpriteAssetId::CommonRisingMote6x84fSheet, 4, 6, 8};
+    constexpr PerkSpriteSpec kWhiteSpark{
+        assets::SpriteAssetId::CommonWhiteSpark6x64fSheet, 4, 6, 6};
+    constexpr float kPi = 3.1415927F;
+    for (const auto& effect : gameplay.perkEffects()) {
+        if (!effect.active || effect.owner >= pixel_twins::kControllerCount) continue;
+        const auto& player = gameplay.player(effect.owner);
+        const auto age = static_cast<float>(effect.ageTicks) / 60.0F;
+        const auto x = player.x;
+        const auto y = player.y;
+        if (effect.type == PerkEffectType::Heal) {
+            drawPerkSpriteWindow(target, assets, camera, kHealCore,
+                                 age, 0.02F, 0.48F, x, y - 14.0F);
+            for (std::uint8_t index = 0; index < 6; ++index) {
+                const auto start = 0.06F + static_cast<float>(index) * 0.055F;
+                const auto progress = std::clamp((age - start) / 0.38F, 0.0F, 1.0F);
+                if (progress <= 0.0F || progress >= 1.0F) continue;
+                const auto moteX = x + static_cast<float>(static_cast<int>(index % 3U) - 1) * 7.0F
+                    + std::sin(effect.seed + index * 1.8F + progress * 3.0F) * 2.0F;
+                const auto moteY = y - 3.0F - progress * (24.0F + (index % 2U) * 6.0F);
+                drawPerkSpriteProgress(target, assets, camera, kRisingMote,
+                                       progress, moteX, moteY, 1);
+            }
+            drawPerkSpark(target, assets, camera, age, 0.14F, x - 9.0F, y - 18.0F);
+            drawPerkSpark(target, assets, camera, age, 0.27F, x + 9.0F, y - 11.0F);
+            drawPerkSpark(target, assets, camera, age, 0.38F, x, y - 29.0F);
+        } else if (effect.type == PerkEffectType::HpUp) {
+            drawPerkSpriteWindow(target, assets, camera, kHpCore,
+                                 age, 0.03F, 0.54F, x, y - 15.0F);
+            for (std::uint8_t index = 0; index < 4; ++index) {
+                const auto start = 0.1F + static_cast<float>(index) * 0.06F;
+                const auto progress = std::clamp((age - start) / 0.4F, 0.0F, 1.0F);
+                if (progress <= 0.0F || progress >= 1.0F) continue;
+                const auto side = index % 2U == 0U ? -1.0F : 1.0F;
+                const auto markX = x + side * (6.0F + static_cast<float>(index / 2U) * 7.0F);
+                const auto markY = y - 4.0F - progress * (22.0F + index * 2.0F);
+                drawPerkSpriteProgress(target, assets, camera, kHpMark,
+                                       progress, markX, markY, index % 2U);
+            }
+            for (std::uint8_t index = 0; index < 3; ++index) {
+                const auto start = 0.18F + static_cast<float>(index) * 0.08F;
+                const auto progress = std::clamp((age - start) / 0.34F, 0.0F, 1.0F);
+                if (progress <= 0.0F || progress >= 1.0F) continue;
+                drawPerkSpriteProgress(target, assets, camera, kRisingMote, progress,
+                    x + static_cast<float>(static_cast<int>(index) - 1) * 8.0F,
+                    y - 5.0F - progress * 24.0F, 2);
+            }
+            drawPerkSpark(target, assets, camera, age, 0.35F, x + 7.0F, y - 27.0F);
+        } else if (effect.type == PerkEffectType::LevelUp) {
+            drawPerkSpriteWindow(target, assets, camera, kLevelCore,
+                                 age, 0.025F, 0.39F, x, y - 14.0F);
+            for (std::uint8_t row = 0; row < 8; ++row) {
+                const auto start = row % 2U == 0U ? 0.055F : 0.12F;
+                drawPerkSpriteWindow(target, assets, camera, kLevelRay,
+                                     age, start, start + 0.23F, x, y - 14.0F, row);
+            }
+            for (std::uint8_t index = 0; index < 4; ++index) {
+                const auto start = 0.12F + static_cast<float>(index) * 0.035F;
+                const auto progress = std::clamp((age - start) / 0.25F, 0.0F, 1.0F);
+                if (progress <= 0.0F || progress >= 1.0F) continue;
+                const auto angle = effect.seed + static_cast<float>(index) * kPi * 0.5F;
+                drawPerkSpriteProgress(target, assets, camera, kWhiteSpark, progress,
+                    x + std::cos(angle) * (7.0F + progress * 15.0F),
+                    y - 14.0F + std::sin(angle) * (5.0F + progress * 10.0F));
+            }
+        } else {
+            drawPerkSpriteWindow(target, assets, camera, kLevelCore,
+                                 age, 0.025F, 0.4F, x, y - 14.0F);
+            for (std::uint8_t index = 0; index < 5; ++index) {
+                const auto start = 0.04F + static_cast<float>(index) * 0.055F;
+                const auto progress = std::clamp((age - start) / 0.38F, 0.0F, 1.0F);
+                if (progress <= 0.0F || progress >= 1.0F) continue;
+                const auto moteX = x + static_cast<float>(static_cast<int>(index) - 2) * 6.0F
+                    + std::sin(effect.seed + index * 1.7F + progress * 2.5F) * 2.0F;
+                const auto moteY = y - 2.0F - progress * (24.0F + index % 2U * 7.0F);
+                drawPerkSpriteProgress(target, assets, camera, kRisingMote,
+                                       progress, moteX, moteY, 2);
+            }
+            drawPerkSpark(target, assets, camera, age, 0.16F, x - 10.0F, y - 18.0F);
+            drawPerkSpark(target, assets, camera, age, 0.28F, x + 9.0F, y - 25.0F);
+        }
+    }
+}
+
 PIXEL_TWINS_SRAM void drawTitle(pixel_twins::Framebuffer& framebuffer,
                const assets::TitleAssets& title,
                std::uint32_t frame) noexcept {
@@ -817,6 +1014,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        strike.y - camera.y);
         }
     }
+    queuePerkEffectUnder(spriteBuckets, assets, camera, gameplay);
     for (std::size_t playerIndex = 0; playerIndex < pixel_twins::kControllerCount; ++playerIndex) {
         const auto& player = gameplay.player(playerIndex);
         if (player.hp <= 0) continue;
@@ -867,6 +1065,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                    player.y - camera.y, directionRow);
     }
     spriteBuckets.draw(target);
+    drawPerkEffectOver(target, assets, camera, gameplay);
     drawBossIntroOverlay(target, gameplay, camera);
     drawClearSequence(target, assets, gameplay, camera, frame);
     for (std::size_t playerIndex = 0; playerIndex < pixel_twins::kControllerCount; ++playerIndex) {

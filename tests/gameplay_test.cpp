@@ -85,6 +85,15 @@ bool hasSfx(const wizward::game::GameplayState& gameplay, wizward::game::SfxId w
                        [wanted](const wizward::game::SfxCue& cue) { return cue.id == wanted; });
 }
 
+bool hasPerkEffect(const wizward::game::GameplayState& gameplay,
+                   wizward::game::PerkEffectType wanted,
+                   std::uint8_t owner = 0) {
+    return std::any_of(gameplay.perkEffects().begin(), gameplay.perkEffects().end(),
+        [wanted, owner](const wizward::game::PerkEffectState& effect) {
+            return effect.active && effect.type == wanted && effect.owner == owner;
+        });
+}
+
 } // namespace
 
 int main() {
@@ -198,6 +207,7 @@ int main() {
     gameplay.grantXp(0, 15);
     assert(gameplay.player(0).choosingPerk);
     assert(gameplay.player(0).level == 2);
+    assert(hasPerkEffect(gameplay, wizward::game::PerkEffectType::LevelUp));
     const auto selectedLeft = gameplay.player(0).perkChoices[1];
     const auto selectedLeftLevel = perkLevel(gameplay.player(0), selectedLeft);
     const auto chooseLeft = controllersWith(0, 0,
@@ -205,6 +215,9 @@ int main() {
     gameplay.tick(chooseLeft, map);
     if (selectedLeft != wizward::game::Perk::Heal && selectedLeft != wizward::game::Perk::Bomb) {
         assert(perkLevel(gameplay.player(0), selectedLeft) == selectedLeftLevel + 1);
+        const auto type = selectedLeft == wizward::game::Perk::MaxHp
+            ? wizward::game::PerkEffectType::HpUp : wizward::game::PerkEffectType::Upgrade;
+        assert(hasPerkEffect(gameplay, type));
     }
     assert(!gameplay.player(0).choosingPerk);
 
@@ -219,7 +232,27 @@ int main() {
     }
 
     gameplay.reset(map);
+    bool healSelected = false;
+    for (int attempt = 0; attempt < 24 && !healSelected; ++attempt) {
+        gameplay.grantXp(0, wizward::game::xpNeededForLevel(gameplay.player(0).level));
+        const auto& choices = gameplay.player(0).perkChoices;
+        const auto found = std::find(choices.begin(), choices.end(), wizward::game::Perk::Heal);
+        const auto choseHeal = found != choices.end();
+        const auto index = !choseHeal
+            ? 0U : static_cast<std::size_t>(found - choices.begin());
+        gameplay.tick(controllersWith(0, 0, choiceButton(index)), map);
+        healSelected = choseHeal;
+    }
+    assert(healSelected);
+    assert(hasPerkEffect(gameplay, wizward::game::PerkEffectType::Heal));
+
+    gameplay.reset(map);
+    grantPerk(gameplay, map, wizward::game::Perk::MaxHp);
+    assert(hasPerkEffect(gameplay, wizward::game::PerkEffectType::HpUp));
+
+    gameplay.reset(map);
     grantPerk(gameplay, map, wizward::game::Perk::Fire);
+    assert(hasPerkEffect(gameplay, wizward::game::PerkEffectType::Upgrade));
     grantPerk(gameplay, map, wizward::game::Perk::Wind);
     grantPerk(gameplay, map, wizward::game::Perk::Thunder);
     grantPerk(gameplay, map, wizward::game::Perk::Ice);

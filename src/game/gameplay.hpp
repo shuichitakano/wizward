@@ -19,6 +19,7 @@ inline constexpr std::size_t kMaximumXpGems = 256;
 inline constexpr std::size_t kMaximumWindSlashes = 8;
 inline constexpr std::size_t kMaximumThunderStrikes = 16;
 inline constexpr std::size_t kMaximumImpactEffects = 64;
+inline constexpr std::size_t kMaximumPerkEffects = 8;
 inline constexpr std::size_t kMaximumEnemyBullets = 128;
 inline constexpr std::size_t kMaximumFamiliarsPerPlayer = 3;
 inline constexpr std::size_t kMaximumSfxCuesPerTick = 16;
@@ -285,6 +286,22 @@ struct ImpactEffectState {
     bool active = false;
 };
 
+enum class PerkEffectType : std::uint8_t {
+    Heal,
+    HpUp,
+    LevelUp,
+    Upgrade,
+};
+
+struct PerkEffectState {
+    std::uint16_t ageTicks = 0;
+    std::uint16_t lifetimeTicks = 0;
+    float seed = 0.0F;
+    PerkEffectType type = PerkEffectType::Upgrade;
+    std::uint8_t owner = 0;
+    bool active = false;
+};
+
 class GameplayState {
 public:
     void reset(const world::WorldMap& map, std::size_t startingPlayer = 0) noexcept;
@@ -315,6 +332,9 @@ public:
     }
     [[nodiscard]] const std::array<ImpactEffectState, kMaximumImpactEffects>& impactEffects() const noexcept {
         return impactEffects_;
+    }
+    [[nodiscard]] const std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects() const noexcept {
+        return perkEffects_;
     }
     [[nodiscard]] const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets() const noexcept {
         return enemyBullets_;
@@ -356,6 +376,7 @@ private:
     std::array<WindSlashState, kMaximumWindSlashes> windSlashes_{};
     std::array<ThunderStrikeState, kMaximumThunderStrikes> thunderStrikes_{};
     std::array<ImpactEffectState, kMaximumImpactEffects> impactEffects_{};
+    std::array<PerkEffectState, kMaximumPerkEffects> perkEffects_{};
     std::array<EnemyBulletState, kMaximumEnemyBullets> enemyBullets_{};
     std::uint32_t randomState_ = 1;
     std::uint16_t spawnCooldownTicks_ = 0;

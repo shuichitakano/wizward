@@ -98,6 +98,7 @@ private:
             + kMaximumEnemyBullets
             + kMaximumWindSlashes * 3U + kMaximumThunderStrikes * 3U
             + kMaximumImpactEffects
+            + kMaximumPerkEffects
             + pixel_twins::kControllerCount * 10U
             + pixel_twins::kControllerCount * (4U + kMaximumFamiliarsPerPlayer),
         kMaximumEnemies> spriteBuckets_;

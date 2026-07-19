@@ -223,6 +223,47 @@ void updateImpacts(std::array<ImpactEffectState, kMaximumImpactEffects>& effects
     }
 }
 
+std::uint16_t perkEffectLifetimeTicks(PerkEffectType type) noexcept {
+    switch (type) {
+    case PerkEffectType::Heal: return 44;
+    case PerkEffectType::HpUp: return 46;
+    case PerkEffectType::LevelUp: return 30;
+    case PerkEffectType::Upgrade: return 34;
+    }
+    return 34;
+}
+
+void spawnPerkEffect(std::array<PerkEffectState, kMaximumPerkEffects>& effects,
+                     PerkEffectType type, std::uint8_t owner,
+                     std::uint32_t randomState) noexcept {
+    auto slot = std::find_if(effects.begin(), effects.end(),
+        [](const PerkEffectState& effect) { return !effect.active; });
+    if (slot == effects.end()) {
+        slot = std::max_element(effects.begin(), effects.end(),
+            [](const PerkEffectState& lhs, const PerkEffectState& rhs) {
+                return lhs.ageTicks < rhs.ageTicks;
+            });
+    }
+    auto effectRandom = randomState
+        ^ (static_cast<std::uint32_t>(owner) + 1U) * 2246822519U
+        ^ (static_cast<std::uint32_t>(type) + 1U) * 3266489917U;
+    effectRandom ^= effectRandom >> 15U;
+    effectRandom *= 2246822519U;
+    effectRandom ^= effectRandom >> 13U;
+    constexpr float kTau = 6.2831853F;
+    const auto seed = static_cast<float>(effectRandom >> 8U)
+        / static_cast<float>(0x00ffffffU) * kTau;
+    *slot = {0, perkEffectLifetimeTicks(type), seed, type, owner, true};
+}
+
+void updatePerkEffects(std::array<PerkEffectState, kMaximumPerkEffects>& effects) noexcept {
+    for (auto& effect : effects) {
+        if (!effect.active) continue;
+        ++effect.ageTicks;
+        if (effect.ageTicks >= effect.lifetimeTicks) effect.active = false;
+    }
+}
+
 float moveAiPlayerSmart(PlayerState& player, float targetX, float targetY,
                         const world::WorldMap& map, float stepScale) noexcept {
     auto directionX = targetX - player.x;
@@ -1064,17 +1105,24 @@ void beginPerkChoice(PlayerState& player, std::uint32_t& randomState) noexcept {
     player.choosingPerk = true;
 }
 
-void gainXp(PlayerState& player, std::uint16_t amount, std::uint32_t& randomState) noexcept {
+void gainXp(PlayerState& player, std::uint8_t owner, std::uint16_t amount,
+            std::uint32_t& randomState,
+            std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects) noexcept {
     player.xp = static_cast<std::uint16_t>(player.xp + amount);
+    auto leveledUp = false;
     while (player.xp >= xpNeededForLevel(player.level)) {
         player.xp = static_cast<std::uint16_t>(player.xp - xpNeededForLevel(player.level));
         if (player.level < 255) ++player.level;
         if (player.pendingPerkChoices < 255) ++player.pendingPerkChoices;
+        leveledUp = true;
     }
+    if (leveledUp) spawnPerkEffect(perkEffects, PerkEffectType::LevelUp, owner, randomState);
     beginPerkChoice(player, randomState);
 }
 
-void applyPerk(PlayerState& player, Perk perk) noexcept {
+void applyPerk(PlayerState& player, std::uint8_t owner, Perk perk,
+               std::uint32_t& randomState,
+               std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects) noexcept {
     switch (perk) {
     case Perk::Light:
         if (player.lightLevel < 255) ++player.lightLevel;
@@ -1112,13 +1160,18 @@ void applyPerk(PlayerState& player, Perk perk) noexcept {
         player.bombPending = true;
         return;
     }
+    const auto effect = perk == Perk::Heal ? PerkEffectType::Heal
+        : perk == Perk::MaxHp ? PerkEffectType::HpUp : PerkEffectType::Upgrade;
+    spawnPerkEffect(perkEffects, effect, owner, randomState);
     player.sharePending = true;
     player.sharePerk = perk;
 }
 
 void updateAutoPerkChoice(PlayerState& player,
+                          std::uint8_t owner,
                           const std::array<EnemyState, kMaximumEnemies>& enemies,
-                          std::uint32_t& randomState) noexcept {
+                          std::uint32_t& randomState,
+                          std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects) noexcept {
     if (!player.choosingPerk) return;
     constexpr std::array<float, 11> kWeights{{5.0F, 5.0F, 4.0F, 4.0F, 4.0F, 4.0F,
                                                4.0F, 3.0F, 3.0F, 4.0F, 3.0F}};
@@ -1156,7 +1209,7 @@ void updateAutoPerkChoice(PlayerState& player,
     player.perkFlash = player.perkChoices[selected];
     player.perkFlashSlot = kSlotsByPackIndex[selected];
     player.perkFlashTicks = 25;
-    applyPerk(player, player.perkChoices[selected]);
+    applyPerk(player, owner, player.perkChoices[selected], randomState, perkEffects);
     if (player.pendingPerkChoices > 0) --player.pendingPerkChoices;
     player.choosingPerk = false;
     beginPerkChoice(player, randomState);
@@ -1193,7 +1246,9 @@ void applyLinkedUpgrade(PlayerState& player, Perk perk) noexcept {
     }
 }
 
-void processLinkShares(std::array<PlayerState, pixel_twins::kControllerCount>& players) noexcept {
+void processLinkShares(std::array<PlayerState, pixel_twins::kControllerCount>& players,
+                       std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects,
+                       std::uint32_t& randomState) noexcept {
     constexpr float kLinkRange = 140.0F;
     for (std::size_t ownerIndex = 0; ownerIndex < players.size(); ++ownerIndex) {
         auto& owner = players[ownerIndex];
@@ -1203,8 +1258,14 @@ void processLinkShares(std::array<PlayerState, pixel_twins::kControllerCount>& p
         if (squaredDistance(owner.x, owner.y, partner.x, partner.y) > kLinkRange * kLinkRange) continue;
         if (owner.sharePerk == Perk::Heal) {
             partner.hp = static_cast<std::int16_t>(std::min<std::int32_t>(partner.maxHp, partner.hp + 18));
+            spawnPerkEffect(perkEffects, PerkEffectType::Heal,
+                            static_cast<std::uint8_t>(1U - ownerIndex), randomState);
         } else if (owner.sharePerk != Perk::Bomb) {
             applyLinkedUpgrade(partner, owner.sharePerk);
+            const auto effect = owner.sharePerk == Perk::MaxHp
+                ? PerkEffectType::HpUp : PerkEffectType::Upgrade;
+            spawnPerkEffect(perkEffects, effect,
+                            static_cast<std::uint8_t>(1U - ownerIndex), randomState);
         }
     }
 }
@@ -1254,7 +1315,8 @@ bool spawnBoss(std::array<EnemyState, kMaximumEnemies>& enemies,
 }
 
 void updatePerkChoice(PlayerState& player, const pixel_twins::ControllerState& controller,
-                      std::uint32_t& randomState) noexcept {
+                      std::uint8_t owner, std::uint32_t& randomState,
+                      std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects) noexcept {
     if (player.perkFlashTicks > 0) --player.perkFlashTicks;
     if (!player.choosingPerk) return;
     std::uint8_t choice = 255;
@@ -1267,7 +1329,7 @@ void updatePerkChoice(PlayerState& player, const pixel_twins::ControllerState& c
     player.perkFlash = player.perkChoices[choice];
     player.perkFlashSlot = slot;
     player.perkFlashTicks = 25;
-    applyPerk(player, player.perkChoices[choice]);
+    applyPerk(player, owner, player.perkChoices[choice], randomState, perkEffects);
     if (player.pendingPerkChoices > 0) --player.pendingPerkChoices;
     player.choosingPerk = false;
     beginPerkChoice(player, randomState);
@@ -1275,7 +1337,8 @@ void updatePerkChoice(PlayerState& player, const pixel_twins::ControllerState& c
 
 void updateXpGems(std::array<XpGemState, kMaximumXpGems>& xpGems,
                   std::array<PlayerState, pixel_twins::kControllerCount>& players,
-                  std::uint32_t& randomState) noexcept {
+                  std::uint32_t& randomState,
+                  std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects) noexcept {
     for (auto& gem : xpGems) {
         if (!gem.active) continue;
         if (gem.ageTicks < std::numeric_limits<std::uint16_t>::max()) ++gem.ageTicks;
@@ -1291,7 +1354,8 @@ void updateXpGems(std::array<XpGemState, kMaximumXpGems>& xpGems,
         }
         if (nearest == nullptr) continue;
         if (nearestSquared < kXpCollectRange * kXpCollectRange) {
-            gainXp(*nearest, gem.value, randomState);
+            const auto owner = static_cast<std::uint8_t>(nearest - players.data());
+            gainXp(*nearest, owner, gem.value, randomState, perkEffects);
             gem.active = false;
             continue;
         }
@@ -1411,6 +1475,7 @@ void GameplayState::reset(const world::WorldMap&, std::size_t startingPlayer) no
     windSlashes_.fill({});
     thunderStrikes_.fill({});
     impactEffects_.fill({});
+    perkEffects_.fill({});
     enemyBullets_.fill({});
     randomState_ = 0x57495aU;
     spawnCooldownTicks_ = 1;
@@ -1516,6 +1581,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         pushSfx(SfxId::GameOver);
         return;
     }
+    updatePerkEffects(perkEffects_);
     for (std::size_t index = 0; index < players_.size(); ++index) {
         if (!manualPlayers_[index] && (std::abs(controllers[index].x) >= kAxisDeadzone
             || std::abs(controllers[index].y) >= kAxisDeadzone
@@ -1524,10 +1590,12 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         }
         if (players_[index].hp > 0) {
             if (manualPlayers_[index]) {
-                updatePerkChoice(players_[index], controllers[index], randomState_);
+                updatePerkChoice(players_[index], controllers[index],
+                                 static_cast<std::uint8_t>(index), randomState_, perkEffects_);
                 movePlayer(players_[index], controllers[index], map);
             } else {
-                updateAutoPerkChoice(players_[index], enemies_, randomState_);
+                updateAutoPerkChoice(players_[index], static_cast<std::uint8_t>(index),
+                                     enemies_, randomState_, perkEffects_);
                 followAiPartner(players_[index], players_[1U - index], map);
             }
         }
@@ -1554,7 +1622,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         }
         updateCamera(cameras_[index], players_[index]);
     }
-    processLinkShares(players_);
+    processLinkShares(players_, perkEffects_, randomState_);
     if (sealNoticeTicks_ > 0) --sealNoticeTicks_;
     updateSealStones(players_, map, seals_, scores_, elapsedTicks_, activeSealCount_, sealNoticeTicks_,
                      bossSpawnPendingTicks_);
@@ -1642,7 +1710,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
                       impactEffects_);
     updateThunderStrikes(thunderStrikes_);
     updateEnemyBullets(enemyBullets_, players_);
-    updateXpGems(xpGems_, players_, randomState_);
+    updateXpGems(xpGems_, players_, randomState_, perkEffects_);
     outcome_ = updateRevives(players_);
     for (auto& enemy : enemies_) {
         if (!enemy.active && enemy.deathTicks > 0) --enemy.deathTicks;
@@ -1660,6 +1728,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         windSlashes_.fill({});
         thunderStrikes_.fill({});
         impactEffects_.fill({});
+        perkEffects_.fill({});
         enemyBullets_.fill({});
         for (auto& player : players_) {
             if (player.hp <= 0) {
@@ -1771,7 +1840,10 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
 }
 
 void GameplayState::grantXp(std::size_t playerIndex, std::uint16_t amount) noexcept {
-    if (playerIndex < players_.size()) gainXp(players_[playerIndex], amount, randomState_);
+    if (playerIndex < players_.size()) {
+        gainXp(players_[playerIndex], static_cast<std::uint8_t>(playerIndex), amount,
+               randomState_, perkEffects_);
+    }
 }
 
 bool GameplayState::addEnemy(float x, float y, EnemyKind kind) noexcept {
