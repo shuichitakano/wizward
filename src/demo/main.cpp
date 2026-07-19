@@ -95,14 +95,17 @@ bool applyUpdate(const wizward::game::UpdateResult& result,
     return true;
 }
 
-void updateBgmVoiceTitle(pixel_twins::sdl::Presenter& presenter, std::uint8_t muteMask) noexcept {
+void updateBgmTrackTitle(pixel_twins::sdl::Presenter& presenter, std::uint8_t muteMask) noexcept {
+    constexpr std::array<const char*, 7> kTrackNames{{
+        "BASS", "DRUMS", "PERC", "SYNTH", "LEAD", "DELAY", "KEYS",
+    }};
     std::array<char, 128> title{};
     auto offset = std::snprintf(title.data(), title.size(), "Wizward BGM");
-    for (unsigned voice = 0; voice < pixel_twins::kBgmVoiceCount; ++voice) {
+    for (std::size_t track = 0; track < kTrackNames.size(); ++track) {
         if (offset < 0 || static_cast<std::size_t>(offset) >= title.size()) break;
         offset += std::snprintf(title.data() + offset, title.size() - static_cast<std::size_t>(offset),
-                                "  F%u:%s", voice + 1U,
-                                (muteMask & (1U << voice)) != 0U ? "MUTE" : "ON");
+                                "  F%zu:%s=%s", track + 1U, kTrackNames[track],
+                                (muteMask & (1U << track)) != 0U ? "MUTE" : "ON");
     }
     presenter.setTitle(title.data());
 }
@@ -128,19 +131,19 @@ int main(int argc, char** argv) {
     if (initialScene == wizward::game::Scene::Gameplay
         && !audioPlayer.playBgm(wizward::audio::kField)) return 1;
     pixel_twins::Controllers controllers;
-    std::uint8_t bgmVoiceMuteMask = 0;
-    updateBgmVoiceTitle(presenter, bgmVoiceMuteMask);
+    std::uint8_t bgmTrackMuteMask = 0;
+    updateBgmTrackTitle(presenter, bgmTrackMuteMask);
     auto previousTime = std::chrono::steady_clock::now();
     auto accumulatedTime = std::chrono::steady_clock::duration::zero();
     std::uint32_t presentedFrames = 0;
     while (presenter.processEvents(&controllerInput)) {
-        const auto voiceToggles = controllerInput.takeBgmVoiceToggleMask();
-        if (voiceToggles != 0U) {
-            bgmVoiceMuteMask = static_cast<std::uint8_t>(bgmVoiceMuteMask ^ voiceToggles);
-            if (!audioPlayer.setBgmVoiceMuteMask(bgmVoiceMuteMask)) return 1;
-            updateBgmVoiceTitle(presenter, bgmVoiceMuteMask);
-            std::fprintf(stderr, "BGM voice mute mask: 0x%02x\n",
-                         static_cast<unsigned>(bgmVoiceMuteMask));
+        const auto trackToggles = controllerInput.takeBgmTrackToggleMask();
+        if (trackToggles != 0U) {
+            bgmTrackMuteMask = static_cast<std::uint8_t>(bgmTrackMuteMask ^ trackToggles);
+            if (!audioPlayer.setBgmTrackMuteMask(bgmTrackMuteMask)) return 1;
+            updateBgmTrackTitle(presenter, bgmTrackMuteMask);
+            std::fprintf(stderr, "BGM track mute mask: 0x%02x\n",
+                         static_cast<unsigned>(bgmTrackMuteMask));
         }
         const auto frameStart = std::chrono::steady_clock::now();
         const auto currentTime = std::chrono::steady_clock::now();
