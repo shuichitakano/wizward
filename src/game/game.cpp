@@ -17,6 +17,13 @@
 namespace wizward::game {
 namespace {
 
+constexpr std::uint32_t kRankingResultDelayTicks = 156;
+constexpr std::uint32_t kRankingInputTimeoutTicks = 1800;
+constexpr std::uint16_t kResultContinueDelayTicks = 15;
+constexpr std::uint16_t kResultAutoReturnTicks = 300;
+constexpr std::uint32_t kTimeBonusPerSecond = 200;
+constexpr std::string_view kRankingCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.- ";
+
 std::uint8_t fourDirectionRow(Facing facing) noexcept {
     switch (facing) {
     case Facing::South:
@@ -546,7 +553,8 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        const GameplayState& gameplay,
                        pixel_twins::SpriteBuckets<Capacity, ExCapacity>& spriteBuckets,
                        std::uint32_t frame,
-                       std::size_t viewer) noexcept {
+                       std::size_t viewer,
+                       bool showHud = true) noexcept {
     map.draw(target, assets.background(), static_cast<std::int32_t>(camera.x),
              static_cast<std::int32_t>(camera.y));
     drawActiveSeals(target, map, gameplay, camera);
@@ -857,6 +865,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
             static_cast<std::int16_t>(std::round(strike.y - camera.y)),
             thunderShockwaveRadius(strike.ageTicks), 4);
     }
+    if (!showHud) return;
     const auto& viewedPlayer = gameplay.player(viewer);
     const auto maxHpWidth = static_cast<std::uint16_t>(std::clamp<std::int16_t>(viewedPlayer.maxHp, 1, 60));
     const auto hpWidth = static_cast<std::uint16_t>(
@@ -894,6 +903,112 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     drawOffscreenPartnerArrow(target, gameplay, camera, viewer);
 }
 
+std::string_view outcomeText(GameplayOutcome outcome) noexcept {
+    if (outcome == GameplayOutcome::Down) return "GAME OVER";
+    if (outcome == GameplayOutcome::TimeUp) return "TIME'S UP";
+    if (outcome == GameplayOutcome::Clear) return "CONGRATULATIONS!";
+    return "RESULT";
+}
+
+struct ResultRankingRow {
+    std::array<char, 3> name{};
+    std::uint32_t score = 0;
+    std::uint8_t player = 0;
+    bool pending = false;
+};
+
+PIXEL_TWINS_SRAM void drawResultPanel(
+    pixel_twins::RenderTarget target,
+    const GameplayState& gameplay,
+    GameplayOutcome outcome,
+    std::uint32_t resultTicks,
+    std::uint16_t continueTicks,
+    std::size_t viewer,
+    const std::array<std::uint32_t, pixel_twins::kControllerCount>& timeBonuses,
+    const std::array<std::uint32_t, pixel_twins::kControllerCount>& finalScores,
+    const std::array<RankingRecord, kRankingLimit>& rankings,
+    std::size_t rankingCount,
+    const std::array<RankingEntry, pixel_twins::kControllerCount>& entries) noexcept {
+    const auto title = outcomeText(outcome);
+    if (resultTicks < kRankingResultDelayTicks) {
+        drawCenteredText(target, title, 80, 82);
+        return;
+    }
+    drawCenteredText(target, title, 80, 5);
+    char playerText[] = "P1 RESULT";
+    playerText[1] = static_cast<char>('1' + viewer);
+    pixel_twins::drawText(target, assets::kWizwardFont, 5, 20, playerText,
+                          viewer == 0 ? 19 : 20, 6);
+    pixel_twins::drawText(target, assets::kWizwardFont, 5, 32, "SCORE", 18, 6);
+    pixel_twins::drawText(target, assets::kWizwardFont, 5, 44, "TIME", 18, 6);
+    pixel_twins::drawText(target, assets::kWizwardFont, 5, 56, "TOTAL", 18, 6);
+    char scoreText[12]{};
+    char bonusText[12]{};
+    char totalText[12]{};
+    drawRightAlignedText(target, formatUnsigned(gameplay.score(viewer), scoreText), 78, 32);
+    drawRightAlignedText(target, formatUnsigned(timeBonuses[viewer], bonusText), 78, 44);
+    pixel_twins::drawText(target, assets::kWizwardFont, 42, 44, "+", 18, 6);
+    drawRightAlignedText(target, formatUnsigned(finalScores[viewer], totalText), 78, 56);
+
+    std::array<ResultRankingRow, kRankingLimit + pixel_twins::kControllerCount> board{};
+    std::size_t boardCount = 0;
+    for (std::size_t index = 0; index < rankingCount; ++index) {
+        board[boardCount++] = {rankings[index].name, rankings[index].score,
+                               rankings[index].player, false};
+    }
+    for (std::size_t player = 0; player < entries.size(); ++player) {
+        if (!entries[player].active || entries[player].submitted) continue;
+        board[boardCount++] = {entries[player].name, finalScores[player],
+                               static_cast<std::uint8_t>(player), true};
+    }
+    for (std::size_t index = 1; index < boardCount; ++index) {
+        const auto row = board[index];
+        auto destination = index;
+        while (destination > 0 && board[destination - 1U].score < row.score) {
+            board[destination] = board[destination - 1U];
+            --destination;
+        }
+        board[destination] = row;
+    }
+    auto focusRank = entries[viewer].active ? static_cast<std::size_t>(entries[viewer].rank) : 0U;
+    for (std::size_t index = 0; index < boardCount; ++index) {
+        if (board[index].pending && board[index].player == viewer) focusRank = index;
+    }
+    const auto rowCount = std::min<std::size_t>(5, boardCount);
+    const auto startRank = rowCount == 0 ? 0U
+        : std::min(focusRank > 2 ? focusRank - 2U : 0U, boardCount - rowCount);
+    pixel_twins::drawText(target, assets::kWizwardFont, 91, 20, "RANK", 25, 6);
+    for (std::size_t rowIndex = 0; rowIndex < rowCount; ++rowIndex) {
+        const auto rank = startRank + rowIndex;
+        const auto y = static_cast<std::int16_t>(32 + rowIndex * 10U);
+        char rankText[] = "01.";
+        rankText[0] = static_cast<char>('0' + ((rank + 1U) / 10U) % 10U);
+        rankText[1] = static_cast<char>('0' + (rank + 1U) % 10U);
+        const auto color = static_cast<std::uint8_t>(
+            rank == focusRank && entries[viewer].active ? 15 : 18);
+        pixel_twins::drawText(target, assets::kWizwardFont, 84, y, rankText, color, 6);
+        pixel_twins::drawText(target, assets::kWizwardFont, 102, y,
+                              std::string_view(board[rank].name.data(), 3), color, 6);
+        char rankScore[12]{};
+        drawRightAlignedText(target, formatUnsigned(board[rank].score, rankScore), 158, y, 5);
+    }
+    const auto& entry = entries[viewer];
+    if (entry.active && !entry.submitted) {
+        char rankLabel[] = "RANK #01";
+        rankLabel[6] = static_cast<char>('0' + ((entry.rank + 1U) / 10U) % 10U);
+        rankLabel[7] = static_cast<char>('0' + (entry.rank + 1U) % 10U);
+        pixel_twins::drawText(target, assets::kWizwardFont, 5, 68, rankLabel, 25, 6);
+        if ((resultTicks / 20U) % 2U == 0U) drawCenteredText(target, "ENTER YOUR NAME", 80, 82);
+        drawCenteredText(target, std::string_view(entry.name.data(), 3), 80, 96, 8);
+        pixel_twins::drawText(target, assets::kWizwardFont,
+                              static_cast<std::int16_t>(68 + entry.cursor * 8U), 106, "^", 18, 6);
+    } else if (outcome == GameplayOutcome::Clear
+               && continueTicks >= kResultContinueDelayTicks
+               && (resultTicks / 30U) % 2U == 0U) {
+        drawCenteredText(target, "PUSH ANY BUTTON", 80, 104);
+    }
+}
+
 } // namespace
 
 bool Game::initialize(Scene initialScene) noexcept {
@@ -913,6 +1028,7 @@ UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
     scene_ = scene;
     sceneFrame_ = 0;
     paused_ = false;
+    resultContinueTicks_ = 0;
     if (scene_ == Scene::Gameplay) {
         (void)worldMap_.resetSeals(gameAssets_.background());
         gameplay_.reset(worldMap_, startingPlayer_);
@@ -939,6 +1055,10 @@ UpdateResult Game::processInput(const pixel_twins::Controllers& controllers) noe
         return {};
     }
     if (scene_ == Scene::Result) {
+        if (sceneFrame_ < kRankingResultDelayTicks) return {};
+        updateRankingInput(controllers);
+        if (hasPendingRanking() || resultOutcome_ != GameplayOutcome::Clear
+            || resultContinueTicks_ < kResultContinueDelayTicks) return {};
         for (std::size_t index = 0; index < pixel_twins::kControllerCount; ++index) {
             if (controllers[index].pressed != 0) return changeScene(Scene::Title, false);
         }
@@ -964,7 +1084,29 @@ UpdateResult Game::tick(const pixel_twins::Controllers& controllers) noexcept {
         }
         if (gameplay_.outcome() != GameplayOutcome::Running) {
             resultOutcome_ = gameplay_.outcome();
+            finalizeResult();
             auto result = changeScene(Scene::Result, false);
+            ++frame_;
+            ++sceneFrame_;
+            return result;
+        }
+    } else if (scene_ == Scene::Result && sceneFrame_ >= kRankingResultDelayTicks) {
+        if (hasPendingRanking()
+            && sceneFrame_ >= kRankingResultDelayTicks + kRankingInputTimeoutTicks) {
+            for (std::size_t player = 0; player < rankingEntries_.size(); ++player) {
+                if (rankingEntries_[player].active && !rankingEntries_[player].submitted) {
+                    submitRanking(player);
+                }
+            }
+        }
+        if (hasPendingRanking()) {
+            resultContinueTicks_ = 0;
+        } else if (resultContinueTicks_ < kResultAutoReturnTicks) {
+            ++resultContinueTicks_;
+        }
+        if (resultOutcome_ != GameplayOutcome::Clear
+            && resultContinueTicks_ >= kResultAutoReturnTicks) {
+            auto result = changeScene(Scene::Title, false);
             ++frame_;
             ++sceneFrame_;
             return result;
@@ -973,6 +1115,87 @@ UpdateResult Game::tick(const pixel_twins::Controllers& controllers) noexcept {
     ++frame_;
     ++sceneFrame_;
     return {};
+}
+
+void Game::finalizeResult() noexcept {
+    const auto remainingTicks = gameplay_.elapsedTicks() < 300U * 60U
+        ? 300U * 60U - gameplay_.elapsedTicks() : 0U;
+    const auto remainingSeconds = (remainingTicks + 59U) / 60U;
+    const auto bonus = resultOutcome_ == GameplayOutcome::Clear
+        ? remainingSeconds * kTimeBonusPerSecond : 0U;
+    rankingEntries_.fill({});
+    for (std::size_t player = 0; player < finalScores_.size(); ++player) {
+        timeBonuses_[player] = bonus;
+        finalScores_[player] = gameplay_.score(player) + bonus;
+    }
+    for (std::size_t player = 0; player < finalScores_.size(); ++player) {
+        if (finalScores_[player] == 0) continue;
+        std::size_t rank = 0;
+        for (std::size_t index = 0; index < rankingCount_; ++index) {
+            if (rankings_[index].score >= finalScores_[player]) ++rank;
+        }
+        for (std::size_t other = 0; other < player; ++other) {
+            if (finalScores_[other] >= finalScores_[player]) ++rank;
+        }
+        for (std::size_t other = player + 1U; other < finalScores_.size(); ++other) {
+            if (finalScores_[other] > finalScores_[player]) ++rank;
+        }
+        if (rank >= kRankingLimit) continue;
+        rankingEntries_[player].active = true;
+        rankingEntries_[player].rank = static_cast<std::uint8_t>(rank);
+    }
+}
+
+bool Game::hasPendingRanking() const noexcept {
+    return std::any_of(rankingEntries_.begin(), rankingEntries_.end(),
+        [](const RankingEntry& entry) { return entry.active && !entry.submitted; });
+}
+
+void Game::submitRanking(std::size_t player) noexcept {
+    auto& entry = rankingEntries_[player];
+    if (!entry.active || entry.submitted) return;
+    RankingRecord record{};
+    record.name = entry.name;
+    record.score = finalScores_[player];
+    record.timeBonus = timeBonuses_[player];
+    record.player = static_cast<std::uint8_t>(player);
+    record.cleared = resultOutcome_ == GameplayOutcome::Clear;
+    auto insertAt = std::size_t{0};
+    while (insertAt < rankingCount_ && rankings_[insertAt].score >= record.score) ++insertAt;
+    const auto newCount = std::min(kRankingLimit, rankingCount_ + 1U);
+    for (auto index = newCount; index > insertAt + 1U; --index) {
+        rankings_[index - 1U] = rankings_[index - 2U];
+    }
+    if (insertAt < kRankingLimit) rankings_[insertAt] = record;
+    rankingCount_ = newCount;
+    entry.submitted = true;
+}
+
+void Game::updateRankingInput(const pixel_twins::Controllers& controllers) noexcept {
+    using pixel_twins::ControllerButton;
+    for (std::size_t player = 0; player < rankingEntries_.size(); ++player) {
+        auto& entry = rankingEntries_[player];
+        if (!entry.active || entry.submitted) continue;
+        const auto& controller = controllers[player];
+        const auto rotate = [&](std::int32_t delta) noexcept {
+            const auto current = std::string_view(kRankingCharacters).find(entry.name[entry.cursor]);
+            const auto index = current == std::string_view::npos ? std::size_t{0} : current;
+            const auto count = static_cast<std::int32_t>(kRankingCharacters.size());
+            const auto next = (static_cast<std::int32_t>(index) + delta + count) % count;
+            entry.name[entry.cursor] = kRankingCharacters[static_cast<std::size_t>(next)];
+        };
+        if (controller.isPressed(ControllerButton::dpadLeft)) rotate(-1);
+        if (controller.isPressed(ControllerButton::dpadRight)) rotate(1);
+        if (controller.isPressed(ControllerButton::choiceLeft)
+            || controller.isPressed(ControllerButton::choiceUp)) {
+            if (entry.cursor > 0) --entry.cursor;
+        }
+        if (controller.isPressed(ControllerButton::choiceRight)
+            || controller.isPressed(ControllerButton::choiceDown)) {
+            if (entry.cursor < 2) ++entry.cursor;
+            else submitRanking(player);
+        }
+    }
 }
 
 void Game::render() noexcept {
@@ -992,16 +1215,14 @@ void Game::render() noexcept {
     } else {
         const auto left = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Left);
         const auto right = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Right);
-        pixel_twins::fillRectangle(left, 0, 0, 160, 120, 0);
-        pixel_twins::fillRectangle(right, 0, 0, 160, 120, 0);
-        const auto text = resultOutcome_ == GameplayOutcome::Down
-            ? std::string_view{"GAME OVER"}
-            : (resultOutcome_ == GameplayOutcome::TimeUp
-                ? std::string_view{"TIME UP"}
-                : (resultOutcome_ == GameplayOutcome::Clear
-                    ? std::string_view{"CONGRATULATIONS!"} : std::string_view{"RESULT"}));
-        drawCenteredText(left, text, 80, 48);
-        drawCenteredText(right, text, 80, 48);
+        drawGameplayPanel(left, worldMap_, gameAssets_, gameplay_.camera(0), gameplay_,
+                          spriteBuckets_, frame_, 0, false);
+        drawGameplayPanel(right, worldMap_, gameAssets_, gameplay_.camera(1), gameplay_,
+                          spriteBuckets_, frame_, 1, false);
+        drawResultPanel(left, gameplay_, resultOutcome_, sceneFrame_, resultContinueTicks_, 0,
+                        timeBonuses_, finalScores_, rankings_, rankingCount_, rankingEntries_);
+        drawResultPanel(right, gameplay_, resultOutcome_, sceneFrame_, resultContinueTicks_, 1,
+                        timeBonuses_, finalScores_, rankings_, rankingCount_, rankingEntries_);
     }
     framebuffer_.flip();
 }

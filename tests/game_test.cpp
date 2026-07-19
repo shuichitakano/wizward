@@ -72,5 +72,35 @@ int main() {
     assert(!game.paused());
     (void)game.tick(idle);
     assert(game.gameplay().elapsedTicks() == pausedTicks + 1U);
+
+    for (std::uint32_t tick = 0; tick < 300U * 60U && game.scene() == Scene::Gameplay; ++tick) {
+        (void)game.tick(idle);
+    }
+    assert(game.scene() == Scene::Result);
+    for (std::size_t player = 0; player < pixel_twins::kControllerCount; ++player) {
+        assert(game.timeBonus(player) == 0U);
+        assert(game.finalScore(player) == game.gameplay().score(player));
+    }
+    game.render();
+    const auto earlyContinue = pressedController(0, ControllerButton::choiceRight);
+    (void)game.processInput(earlyContinue);
+    assert(game.scene() == Scene::Result);
+    for (std::uint16_t tick = 0; tick < 160U; ++tick) (void)game.tick(idle);
+
+    std::size_t submitted = 0;
+    for (std::size_t player = 0; player < pixel_twins::kControllerCount; ++player) {
+        if (!game.rankingEntry(player).active) continue;
+        (void)game.processInput(pressedController(player, ControllerButton::dpadRight));
+        (void)game.processInput(pressedController(player, ControllerButton::choiceRight));
+        (void)game.processInput(pressedController(player, ControllerButton::choiceRight));
+        (void)game.processInput(pressedController(player, ControllerButton::choiceRight));
+        assert(game.rankingEntry(player).submitted);
+        ++submitted;
+    }
+    assert(game.rankingCount() == submitted);
+    for (std::uint16_t tick = 0; tick < 300U && game.scene() == Scene::Result; ++tick) {
+        (void)game.tick(idle);
+    }
+    assert(game.scene() == Scene::Title);
     return 0;
 }

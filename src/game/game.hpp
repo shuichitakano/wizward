@@ -10,6 +10,8 @@
 #include "pixel_twins/platform.hpp"
 #include "pixel_twins/sprite.hpp"
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 
 namespace wizward::game {
@@ -33,6 +35,24 @@ struct UpdateResult {
     bool succeeded = true;
 };
 
+inline constexpr std::size_t kRankingLimit = 20;
+
+struct RankingRecord {
+    std::array<char, 3> name{{'A', 'A', 'A'}};
+    std::uint32_t score = 0;
+    std::uint32_t timeBonus = 0;
+    std::uint8_t player = 0;
+    bool cleared = false;
+};
+
+struct RankingEntry {
+    std::array<char, 3> name{{'A', 'A', 'A'}};
+    std::uint8_t rank = 0;
+    std::uint8_t cursor = 0;
+    bool active = false;
+    bool submitted = false;
+};
+
 class Game {
 public:
     [[nodiscard]] bool initialize(Scene initialScene = Scene::Title) noexcept;
@@ -45,9 +65,23 @@ public:
     [[nodiscard]] Scene scene() const noexcept { return scene_; }
     [[nodiscard]] bool paused() const noexcept { return paused_; }
     [[nodiscard]] const GameplayState& gameplay() const noexcept { return gameplay_; }
+    [[nodiscard]] std::uint32_t timeBonus(std::size_t player) const noexcept {
+        return timeBonuses_[player];
+    }
+    [[nodiscard]] std::uint32_t finalScore(std::size_t player) const noexcept {
+        return finalScores_[player];
+    }
+    [[nodiscard]] const RankingEntry& rankingEntry(std::size_t player) const noexcept {
+        return rankingEntries_[player];
+    }
+    [[nodiscard]] std::size_t rankingCount() const noexcept { return rankingCount_; }
 
 private:
     [[nodiscard]] UpdateResult changeScene(Scene scene, bool playStartSfx) noexcept;
+    void finalizeResult() noexcept;
+    void updateRankingInput(const pixel_twins::Controllers& controllers) noexcept;
+    void submitRanking(std::size_t player) noexcept;
+    [[nodiscard]] bool hasPendingRanking() const noexcept;
 
     assets::GameAssets gameAssets_;
     assets::TitleAssets titleAssets_;
@@ -67,6 +101,12 @@ private:
     std::uint32_t sceneFrame_ = 0;
     std::uint8_t startingPlayer_ = 0;
     bool paused_ = false;
+    std::array<std::uint32_t, pixel_twins::kControllerCount> timeBonuses_{};
+    std::array<std::uint32_t, pixel_twins::kControllerCount> finalScores_{};
+    std::array<RankingRecord, kRankingLimit> rankings_{};
+    std::array<RankingEntry, pixel_twins::kControllerCount> rankingEntries_{};
+    std::size_t rankingCount_ = 0;
+    std::uint16_t resultContinueTicks_ = 0;
     GameplayOutcome resultOutcome_ = GameplayOutcome::Running;
 };
 
