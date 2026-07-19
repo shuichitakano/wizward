@@ -27,7 +27,7 @@ struct BalanceProfile {
 [[nodiscard]] constexpr BalanceProfile balanceProfile(Difficulty difficulty) noexcept {
     return difficulty == Difficulty::Hard
         ? BalanceProfile{30, 100, 100, 100, 100, 100}
-        : BalanceProfile{40, 80, 75, 67, 130, 85};
+        : BalanceProfile{40, 80, 75, 67, 130, 75};
 }
 
 inline constexpr std::int32_t kWorldTileSize = 32;

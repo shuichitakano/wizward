@@ -103,7 +103,7 @@ int main() {
     const auto hardBalance = wizward::game::balanceProfile(wizward::game::Difficulty::Hard);
     assert(easyBalance.startingHp == 40);
     assert(hardBalance.startingHp == 30);
-    assert(wizward::game::xpNeededForLevel(1, wizward::game::Difficulty::Easy) == 13);
+    assert(wizward::game::xpNeededForLevel(1, wizward::game::Difficulty::Easy) == 11);
     gameplay.reset(map, 0, wizward::game::Difficulty::Easy);
     assert(gameplay.player(0).hp == 40);
     assert(gameplay.addEnemy(gameplay.player(0).x, gameplay.player(0).y,
