@@ -10,6 +10,26 @@
 
 namespace wizward::game {
 
+enum class Difficulty : std::uint8_t {
+    Easy,
+    Hard,
+};
+
+struct BalanceProfile {
+    std::int16_t startingHp;
+    std::uint8_t enemyHpPercent;
+    std::uint8_t bossHpPercent;
+    std::uint8_t incomingDamagePercent;
+    std::uint8_t spawnIntervalPercent;
+    std::uint8_t xpNeedPercent;
+};
+
+[[nodiscard]] constexpr BalanceProfile balanceProfile(Difficulty difficulty) noexcept {
+    return difficulty == Difficulty::Hard
+        ? BalanceProfile{30, 100, 100, 100, 100, 100}
+        : BalanceProfile{40, 80, 75, 67, 130, 85};
+}
+
 inline constexpr std::int32_t kWorldTileSize = 32;
 inline constexpr float kPlayerRadius = 5.0F;
 inline constexpr float kPlayerCollisionRadius = 8.0F;
@@ -305,7 +325,8 @@ struct PerkEffectState {
 
 class GameplayState {
 public:
-    void reset(const world::WorldMap& map, std::size_t startingPlayer = 0) noexcept;
+    void reset(const world::WorldMap& map, std::size_t startingPlayer = 0,
+               Difficulty difficulty = Difficulty::Hard) noexcept;
     void tick(const pixel_twins::Controllers& controllers, const world::WorldMap& map) noexcept;
     [[nodiscard]] bool addEnemy(float x, float y, EnemyKind kind = EnemyKind::Imp) noexcept;
     void grantXp(std::size_t playerIndex, std::uint16_t amount) noexcept;
@@ -344,6 +365,8 @@ public:
     [[nodiscard]] std::size_t bulletCount() const noexcept;
     [[nodiscard]] std::uint32_t elapsedTicks() const noexcept { return elapsedTicks_; }
     [[nodiscard]] GameplayOutcome outcome() const noexcept { return outcome_; }
+    [[nodiscard]] Difficulty difficulty() const noexcept { return difficulty_; }
+    [[nodiscard]] std::uint16_t xpNeeded(std::uint8_t level) const noexcept;
     [[nodiscard]] std::uint32_t score(std::size_t playerIndex) const noexcept {
         return scores_[playerIndex];
     }
@@ -396,6 +419,7 @@ private:
     float clearY_ = 0.0F;
     Facing clearFacing_ = Facing::South;
     GameplayOutcome outcome_ = GameplayOutcome::Running;
+    Difficulty difficulty_ = Difficulty::Hard;
     std::array<SfxCue, kMaximumSfxCuesPerTick> sfxCues_{};
     std::size_t sfxCueCount_ = 0;
 
@@ -405,7 +429,8 @@ private:
 
 [[nodiscard]] bool playerPositionIsWalkable(
     const world::WorldMap& map, float x, float y) noexcept;
-[[nodiscard]] std::uint16_t xpNeededForLevel(std::uint8_t level) noexcept;
+[[nodiscard]] std::uint16_t xpNeededForLevel(
+    std::uint8_t level, Difficulty difficulty = Difficulty::Hard) noexcept;
 [[nodiscard]] std::uint8_t directionRow8(float x, float y) noexcept;
 [[nodiscard]] std::uint16_t thunderShockwaveRadius(std::uint16_t ageTicks) noexcept;
 

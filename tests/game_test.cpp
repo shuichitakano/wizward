@@ -36,7 +36,21 @@ int main() {
     using wizward::game::AudioEvent;
     using wizward::game::Scene;
 
+    assert(game.initialize(Scene::Title, 123U, wizward::game::Difficulty::Hard));
+    game.render();
+    const auto& hardTitlePixels = game.framebuffer().displayBuffer();
+    bool hardLabelChangedRightPanel = false;
+    for (std::size_t y = 5; y < 13; ++y) {
+        const auto row = y * pixel_twins::kScreenWidth;
+        for (std::size_t x = 128; x < 160; ++x) {
+            hardLabelChangedRightPanel = hardLabelChangedRightPanel
+                || hardTitlePixels[row + x] != hardTitlePixels[row + pixel_twins::kPanelWidth + x];
+        }
+    }
+    assert(hardLabelChangedRightPanel);
+
     assert(game.initialize());
+    assert(game.difficulty() == wizward::game::Difficulty::Easy);
     const auto initialMapSeed = game.mapSeed();
     assert(game.scene() == Scene::Title);
     game.render();
@@ -60,6 +74,7 @@ int main() {
     assert(startResult.audio == AudioEvent::PlayField);
     assert(startResult.playStartSfx);
     assert(game.scene() == Scene::Gameplay);
+    assert(game.gameplay().player(0).maxHp == 40);
     assert(game.mapSeed() != initialMapSeed);
     assert(!game.gameplay().playerIsManual(0));
     assert(game.gameplay().playerIsManual(1));

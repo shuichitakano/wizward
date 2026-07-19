@@ -140,7 +140,9 @@ int main(int argc, char** argv) {
     const auto once = hasArgument(argc, argv, "--once");
     const auto initialScene = hasArgument(argc, argv, "--gameplay")
         ? wizward::game::Scene::Gameplay : wizward::game::Scene::Title;
-    if (!game.initialize(initialScene, mapSeed(argc, argv))) {
+    const auto difficulty = hasArgument(argc, argv, "--hard")
+        ? wizward::game::Difficulty::Hard : wizward::game::Difficulty::Easy;
+    if (!game.initialize(initialScene, mapSeed(argc, argv), difficulty)) {
         std::fputs("Wizwardアセットまたはマップの初期化に失敗しました\n", stderr);
         return 1;
     }

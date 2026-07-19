@@ -12,11 +12,17 @@ wizward::game::Game game;
 pixel_twins::Controllers controllers;
 pixel_twins::AudioSystem audioSystem;
 
+wizward::game::Difficulty readDifficultyDipSwitch() noexcept {
+    // ボードI/O確定後、HARD用DIPSWの入力をこの境界へ接続する。
+    return wizward::game::Difficulty::Easy;
+}
+
 } // namespace
 
 int main() {
     stdio_init_all();
-    if (!game.initialize(wizward::game::Scene::Title, get_rand_32())) {
+    if (!game.initialize(wizward::game::Scene::Title, get_rand_32(),
+                         readDifficultyDipSwitch())) {
         while (true) tight_loop_contents();
     }
     game.render();

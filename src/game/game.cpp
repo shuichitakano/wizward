@@ -761,11 +761,15 @@ PIXEL_TWINS_SRAM void drawPerkEffectOver(pixel_twins::RenderTarget target,
 
 PIXEL_TWINS_SRAM void drawTitle(pixel_twins::Framebuffer& framebuffer,
                const assets::TitleAssets& title,
-               std::uint32_t frame) noexcept {
+               std::uint32_t frame,
+               Difficulty difficulty) noexcept {
     auto left = pixel_twins::makeRenderTarget(framebuffer.drawBuffer(), pixel_twins::Screen::Left);
     auto right = pixel_twins::makeRenderTarget(framebuffer.drawBuffer(), pixel_twins::Screen::Right);
     title.drawScreen(left);
     title.drawScreen(right);
+    if (difficulty == Difficulty::Hard) {
+        pixel_twins::drawText(right, assets::kWizwardFont, 132, 5, "HARD", 18, 6);
+    }
     if ((frame / 30U) % 2U == 0U) {
         drawCenteredText(left, "PUSH ANY BUTTON", 80, 98);
         drawCenteredText(right, "PUSH ANY BUTTON", 80, 98);
@@ -1142,7 +1146,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     pixel_twins::fillRectangle(target, 49, 4, static_cast<std::uint16_t>(maxHpWidth + 2U), 4, 28);
     if (hpWidth > 0) pixel_twins::fillRectangle(target, 50, 5, hpWidth, 2, 9);
     pixel_twins::fillRectangle(target, 49, 7, 62, 4, 28);
-    const auto xpNeed = xpNeededForLevel(viewedPlayer.level);
+    const auto xpNeed = gameplay.xpNeeded(viewedPlayer.level);
     const auto xpWidth = static_cast<std::uint16_t>(viewedPlayer.xp * 60U / xpNeed);
     if (xpWidth > 0) pixel_twins::fillRectangle(target, 50, 8, xpWidth, 2, 20);
     char scoreBuffer[12]{};
@@ -1184,6 +1188,7 @@ struct ResultRankingRow {
     std::uint32_t score = 0;
     std::uint8_t player = 0;
     bool pending = false;
+    bool hard = false;
 };
 
 PIXEL_TWINS_SRAM void drawResultPanel(
@@ -1223,12 +1228,13 @@ PIXEL_TWINS_SRAM void drawResultPanel(
     std::size_t boardCount = 0;
     for (std::size_t index = 0; index < rankingCount; ++index) {
         board[boardCount++] = {rankings[index].name, rankings[index].score,
-                               rankings[index].player, false};
+                               rankings[index].player, false, rankings[index].hard};
     }
     for (std::size_t player = 0; player < entries.size(); ++player) {
         if (!entries[player].active || entries[player].submitted) continue;
         board[boardCount++] = {entries[player].name, finalScores[player],
-                               static_cast<std::uint8_t>(player), true};
+                               static_cast<std::uint8_t>(player), true,
+                               gameplay.difficulty() == Difficulty::Hard};
     }
     for (std::size_t index = 1; index < boardCount; ++index) {
         const auto row = board[index];
@@ -1253,7 +1259,7 @@ PIXEL_TWINS_SRAM void drawResultPanel(
         char rowText[16]{};
         rowText[0] = static_cast<char>('0' + ((rank + 1U) / 10U) % 10U);
         rowText[1] = static_cast<char>('0' + (rank + 1U) % 10U);
-        rowText[2] = '.';
+        rowText[2] = board[rank].hard ? 'H' : '.';
         rowText[3] = board[rank].name[0];
         rowText[4] = board[rank].name[1];
         rowText[5] = board[rank].name[2];
@@ -1292,14 +1298,16 @@ PIXEL_TWINS_SRAM void drawResultPanel(
 
 } // namespace
 
-bool Game::initialize(Scene initialScene, std::uint32_t mapSeed) noexcept {
+bool Game::initialize(Scene initialScene, std::uint32_t mapSeed,
+                      Difficulty difficulty) noexcept {
     world::MapGenerator mapGenerator;
     mapSeedState_ = mapSeed != 0U ? mapSeed : 1U;
+    difficulty_ = difficulty;
     if (!gameAssets_.initialize() || !titleAssets_.initialize()
         || !mapGenerator.generate(mapSeedState_, gameAssets_.background(), terrainWorkspace_, worldMap_)) {
         return false;
     }
-    gameplay_.reset(worldMap_, startingPlayer_);
+    gameplay_.reset(worldMap_, startingPlayer_, difficulty_);
     scene_ = initialScene;
     paused_ = false;
     return scene_ == Scene::Title ? titleAssets_.applyPalette(framebuffer_)
@@ -1319,7 +1327,7 @@ UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
                                    terrainWorkspace_, worldMap_)) {
             return {AudioEvent::StopBgm, playStartSfx, false};
         }
-        gameplay_.reset(worldMap_, startingPlayer_);
+        gameplay_.reset(worldMap_, startingPlayer_, difficulty_);
         resultOutcome_ = GameplayOutcome::Running;
     }
     const bool paletteApplied = scene_ == Scene::Title
@@ -1482,6 +1490,7 @@ void Game::submitRanking(std::size_t player) noexcept {
     record.timeBonus = timeBonuses_[player];
     record.player = static_cast<std::uint8_t>(player);
     record.cleared = resultOutcome_ == GameplayOutcome::Clear;
+    record.hard = difficulty_ == Difficulty::Hard;
     auto insertAt = std::size_t{0};
     while (insertAt < rankingCount_ && rankings_[insertAt].score >= record.score) ++insertAt;
     const auto newCount = std::min(kRankingLimit, rankingCount_ + 1U);
@@ -1522,7 +1531,7 @@ void Game::updateRankingInput(const pixel_twins::Controllers& controllers) noexc
 
 void Game::render() noexcept {
     if (scene_ == Scene::Title) {
-        drawTitle(framebuffer_, titleAssets_, frame_);
+        drawTitle(framebuffer_, titleAssets_, frame_, difficulty_);
     } else if (scene_ == Scene::Gameplay) {
         const auto left = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Left);
         const auto right = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Right);

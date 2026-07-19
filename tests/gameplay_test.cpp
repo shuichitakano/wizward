@@ -99,6 +99,19 @@ bool hasPerkEffect(const wizward::game::GameplayState& gameplay,
 int main() {
     wizward::world::WorldMap map;
     wizward::game::GameplayState gameplay;
+    const auto easyBalance = wizward::game::balanceProfile(wizward::game::Difficulty::Easy);
+    const auto hardBalance = wizward::game::balanceProfile(wizward::game::Difficulty::Hard);
+    assert(easyBalance.startingHp == 40);
+    assert(hardBalance.startingHp == 30);
+    assert(wizward::game::xpNeededForLevel(1, wizward::game::Difficulty::Easy) == 13);
+    gameplay.reset(map, 0, wizward::game::Difficulty::Easy);
+    assert(gameplay.player(0).hp == 40);
+    assert(gameplay.addEnemy(gameplay.player(0).x, gameplay.player(0).y,
+                             wizward::game::EnemyKind::Golem));
+    assert(gameplay.enemies()[0].hp == 69);
+    gameplay.tick(controllersWith(0, 0), map);
+    assert(gameplay.player(0).hp == 36);
+
     gameplay.reset(map);
 
     const auto initial = gameplay.player(0);
