@@ -6,7 +6,7 @@
 namespace wizward {
 namespace audio {
 
-extern const pixel_twins::SequenceInstrument kBgmInstruments[9];
+extern const pixel_twins::SequenceInstrument kBgmInstruments[12];
 extern const pixel_twins::Sequence kField;
 extern const pixel_twins::Sequence kBoss;
 extern const pixel_twins::Sequence kVictory;
