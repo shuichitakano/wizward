@@ -610,6 +610,17 @@ PIXEL_TWINS_SRAM void drawPerkSpark(pixel_twins::RenderTarget target,
     drawPerkSpriteProgress(target, assets, camera, kWhiteSpark, progress, x, y);
 }
 
+PIXEL_TWINS_SRAM float bombEffectRandom(std::uint32_t seed,
+                                       std::uint8_t fragment,
+                                       std::uint32_t salt) noexcept {
+    auto value = seed ^ (static_cast<std::uint32_t>(fragment) + 1U) * 2246822519U
+        ^ salt * 3266489917U;
+    value ^= value >> 15U;
+    value *= 2246822519U;
+    value ^= value >> 13U;
+    return static_cast<float>(value >> 8U) / static_cast<float>(0x00ffffffU);
+}
+
 template<std::size_t Capacity, std::size_t ExCapacity>
 PIXEL_TWINS_SRAM void queuePerkEffectUnder(
         pixel_twins::SpriteBuckets<Capacity, ExCapacity>& buckets,
@@ -621,6 +632,8 @@ PIXEL_TWINS_SRAM void queuePerkEffectUnder(
         assets::SpriteAssetId::HpUpGroundRing32x165fSheet, 5, 32, 16};
     constexpr PerkSpriteSpec kLevelRing{
         assets::SpriteAssetId::LevelUpGroundRing40x205fSheet, 5, 40, 20};
+    constexpr PerkSpriteSpec kBombGroundWave{
+        assets::SpriteAssetId::BombGroundWave64x326fSheet, 6, 64, 32};
     for (const auto& effect : gameplay.perkEffects()) {
         if (!effect.active || effect.owner >= pixel_twins::kControllerCount) continue;
         const auto& player = gameplay.player(effect.owner);
@@ -635,6 +648,15 @@ PIXEL_TWINS_SRAM void queuePerkEffectUnder(
             queuePerkSpriteWindow(buckets, assets, camera, kLevelRing,
                                   age, 0.0F, 0.36F, player.x, player.y, player.y);
         }
+    }
+    for (std::size_t index = 0; index < pixel_twins::kControllerCount; ++index) {
+        const auto& player = gameplay.player(index);
+        if (player.bombEffectTicks == 0) continue;
+        const auto age = static_cast<float>(34U - player.bombEffectTicks) / 60.0F;
+        queuePerkSpriteWindow(buckets, assets, camera, kBombGroundWave,
+                              age, 0.07F, 0.47F,
+                              player.bombEffectX, player.bombEffectY,
+                              player.bombEffectY);
     }
 }
 
@@ -1071,41 +1093,38 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     for (std::size_t playerIndex = 0; playerIndex < pixel_twins::kControllerCount; ++playerIndex) {
         const auto& player = gameplay.player(playerIndex);
         if (player.bombEffectTicks == 0) continue;
-        const auto age = static_cast<std::uint16_t>(34U - player.bombEffectTicks);
-        const auto centerX = static_cast<std::int16_t>(std::round(player.bombEffectX - camera.x));
-        const auto centerY = static_cast<std::int16_t>(std::round(player.bombEffectY - camera.y));
-        pixel_twins::Sprite sprite{};
-        if (age >= 4U && age < 29U) {
-            const auto waveFrame = static_cast<std::uint32_t>(std::min<std::uint16_t>(
-                5U, static_cast<std::uint16_t>((age - 4U) * 6U / 25U)));
-            if (assets.makeLoopingSprite(assets::SpriteAssetId::BombGroundWave64x326fSheet,
-                                         waveFrame, 0,
-                                         static_cast<std::int16_t>(centerX - 32),
-                                         static_cast<std::int16_t>(centerY - 16), sprite)) {
-                pixel_twins::drawSprite(target, sprite);
-            }
-        }
-        if (age >= 2U && age < 30U) {
-            const auto coreFrame = static_cast<std::uint32_t>(std::min<std::uint16_t>(
-                6U, static_cast<std::uint16_t>((age - 2U) * 7U / 28U)));
-            if (assets.makeLoopingSprite(assets::SpriteAssetId::BombCore48x487fSheet,
-                                         coreFrame, 0,
-                                         static_cast<std::int16_t>(centerX - 24),
-                                         static_cast<std::int16_t>(centerY - 36), sprite)) {
-                pixel_twins::drawSprite(target, sprite);
-            }
-        }
+        constexpr PerkSpriteSpec kBombCore{
+            assets::SpriteAssetId::BombCore48x487fSheet, 7, 48, 48};
+        constexpr PerkSpriteSpec kBombRay{
+            assets::SpriteAssetId::BombRay16x164f8dirSheet, 4, 16, 16};
+        constexpr PerkSpriteSpec kBombFragment{
+            assets::SpriteAssetId::BombFragment8x84fSheet, 4, 8, 8};
+        constexpr float kTau = 6.2831853F;
+        constexpr float kPi = 3.1415927F;
+        const auto age = static_cast<float>(34U - player.bombEffectTicks) / 60.0F;
+        drawPerkSpriteWindow(target, assets, camera, kBombCore,
+                             age, 0.035F, 0.49F,
+                             player.bombEffectX, player.bombEffectY - 12.0F);
         for (std::uint8_t row = 0; row < 8; ++row) {
-            const auto start = static_cast<std::uint16_t>((row % 2U) == 0U ? 0U : 3U);
-            if (age < start || age >= start + 13U) continue;
-            const auto rayFrame = static_cast<std::uint32_t>(std::min<std::uint16_t>(
-                3U, static_cast<std::uint16_t>((age - start) * 4U / 13U)));
-            if (assets.makeLoopingSprite(assets::SpriteAssetId::BombRay16x164f8dirSheet,
-                                         rayFrame, row,
-                                         static_cast<std::int16_t>(centerX - 8),
-                                         static_cast<std::int16_t>(centerY - 20), sprite)) {
-                pixel_twins::drawSprite(target, sprite);
-            }
+            const auto start = row % 2U == 0U ? 0.0F : 0.045F;
+            drawPerkSpriteWindow(target, assets, camera, kBombRay,
+                                 age, start, start + 0.22F,
+                                 player.bombEffectX, player.bombEffectY - 12.0F, row);
+        }
+        for (std::uint8_t fragment = 0; fragment < 12; ++fragment) {
+            const auto delay = 0.08F + static_cast<float>(fragment % 3U) * 0.025F;
+            const auto progress = std::clamp((age - delay) / (0.52F - delay), 0.0F, 1.0F);
+            if (progress <= 0.0F || progress >= 1.0F) continue;
+            const auto angle = static_cast<float>(fragment) / 12.0F * kTau
+                + (bombEffectRandom(player.bombEffectSeed, fragment, 0) - 0.5F) * 0.16F;
+            const auto distance = 70.0F
+                + bombEffectRandom(player.bombEffectSeed, fragment, 1) * 26.0F;
+            const auto travel = smoothStep(progress) * distance;
+            const auto x = player.bombEffectX + std::cos(angle) * travel;
+            const auto y = player.bombEffectY - 10.0F
+                + std::sin(angle) * travel * 0.56F - std::sin(progress * kPi) * 9.0F;
+            drawPerkSpriteProgress(target, assets, camera, kBombFragment,
+                                   progress, x, y, fragment % 3U);
         }
     }
     for (const auto& strike : gameplay.thunderStrikes()) {

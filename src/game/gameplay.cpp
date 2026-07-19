@@ -863,7 +863,8 @@ void processBombs(std::array<PlayerState, pixel_twins::kControllerCount>& player
                   std::array<EnemyState, kMaximumEnemies>& enemies,
                   std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                   std::array<XpGemState, kMaximumXpGems>& xpGems,
-                  std::array<std::uint32_t, pixel_twins::kControllerCount>& scores) noexcept {
+                  std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
+                  std::uint32_t randomState) noexcept {
     constexpr float kRadius = 96.0F;
     for (std::size_t playerIndex = 0; playerIndex < players.size(); ++playerIndex) {
         auto& player = players[playerIndex];
@@ -873,6 +874,8 @@ void processBombs(std::array<PlayerState, pixel_twins::kControllerCount>& player
         player.bombEffectTicks = 34;
         player.bombEffectX = player.x;
         player.bombEffectY = player.y;
+        player.bombEffectSeed = randomState
+            ^ (static_cast<std::uint32_t>(playerIndex) + 1U) * 2246822519U;
         for (auto& enemy : enemies) {
             if (!enemy.active || enemy.bornTicks > 0) continue;
             const auto range = kRadius + enemy.radius;
@@ -1704,7 +1707,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
             player.orbCooldownTicks = 10;
         }
     }
-    processBombs(players_, enemies_, enemyBullets_, xpGems_, scores_);
+    processBombs(players_, enemies_, enemyBullets_, xpGems_, scores_, randomState_);
     updateBullets(bullets_, enemies_, enemyBullets_, xpGems_, scores_, impactEffects_);
     updateWindSlashes(windSlashes_, players_, enemies_, enemyBullets_, xpGems_, scores_,
                       impactEffects_);

@@ -179,6 +179,7 @@ struct PlayerState {
     std::uint16_t bombEffectTicks = 0;
     float bombEffectX = 0.0F;
     float bombEffectY = 0.0F;
+    std::uint32_t bombEffectSeed = 0;
     bool sharePending = false;
     Perk sharePerk = Perk::Light;
 };

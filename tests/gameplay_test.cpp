@@ -299,6 +299,7 @@ int main() {
     }
     assert(bombSelected);
     assert(gameplay.player(0).bombEffectTicks > 0);
+    assert(gameplay.player(0).bombEffectSeed != 0);
     assert(std::any_of(gameplay.enemies().begin(), gameplay.enemies().end(),
         [](const auto& enemy) {
             return enemy.kind == wizward::game::EnemyKind::Golem && enemy.hp <= 54;
