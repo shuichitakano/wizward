@@ -5,36 +5,58 @@
 namespace wizward {
 namespace audio {
 
-const pixel_twins::SfxPreset kUiMove{{&pixel_twins::kStandardWaves.bell, {0.002F, 0.025F, 0.2F, 0.025F}, 0.18F, 0.0F}, 620.0F, 780.0F, 0.025F, 0.025F, 1.0F, 32};
-const pixel_twins::SfxPreset kStart{{&pixel_twins::kStandardWaves.bell, {0.004F, 0.055F, 0.45F, 0.05F}, 0.24F, 0.0F}, 300.0F, 520.0F, 0.08F, 0.08F, 1.0F, 96};
-const pixel_twins::SfxPreset kLightCast{{&pixel_twins::kStandardWaves.bell, {0.001F, 0.165F, 0.29F, 0.005F}, 0.13F, 0.0F}, 2200.0F, 31.5F, 0.36F, 0.02F, 1.0F, 28};
-const pixel_twins::SfxPreset kFireCast{{&pixel_twins::kStandardWaves.bell, {0.001F, 0.248F, 0.06F, 0.005F}, 0.18F, 0.0F}, 582.0F, 30.0F, 0.764F, 0.005F, 1.0F, 30};
-const pixel_twins::SfxPreset kWindCast{{&pixel_twins::kStandardWaves.noise, {0.037F, 0.095F, 0.24F, 0.005F}, 0.21F, 0.0F}, 40.0F, 30.0F, 0.476F, 0.018F, 1.0F, 40};
-const pixel_twins::SfxPreset kThunderCast{{&pixel_twins::kStandardWaves.noise, {0.021F, 0.082F, 0.13F, 0.005F}, 0.47F, 0.0F}, 2400.0F, 30.0F, 0.244F, 0.095F, 1.0F, 72};
-const pixel_twins::SfxPreset kIceCast{{&pixel_twins::kStandardWaves.spark, {0.115F, 0.357F, 0.08F, 0.045F}, 0.14F, 0.0F}, 937.0F, 1155.0F, 0.1F, 0.018F, 1.0F, 34};
-const pixel_twins::SfxPreset kFamiliarCast{{&pixel_twins::kStandardWaves.pulse, {0.002F, 0.025F, 0.22F, 0.035F}, 0.12F, 0.0F}, 720.0F, 980.0F, 0.035F, 0.035F, 1.0F, 26};
-const pixel_twins::SfxPreset kHit{{&pixel_twins::kStandardWaves.noise, {0.001F, 0.03F, 0.23F, 0.015F}, 0.12F, 0.0F}, 352.0F, 37.0F, 0.188F, 0.018F, 1.0F, 20};
-const pixel_twins::SfxPreset kDeflect{{&pixel_twins::kStandardWaves.spark, {0.001F, 0.018F, 0.12F, 0.025F}, 0.13F, 0.0F}, 980.0F, 460.0F, 0.016F, 0.016F, 1.0F, 32};
-const pixel_twins::SfxPreset kKill{{&pixel_twins::kStandardWaves.noise, {0.021F, 0.198F, 0.01F, 0.09F}, 0.27F, 0.0F}, 197.0F, 30.0F, 0.344F, 0.005F, 1.0F, 44};
-const pixel_twins::SfxPreset kPlayerDamage{{&pixel_twins::kStandardWaves.square, {0.001F, 0.06F, 0.2F, 0.045F}, 0.24F, 0.0F}, 180.0F, 75.0F, 0.18F, 0.055F, 1.0F, 88};
-const pixel_twins::SfxPreset kXp{{&pixel_twins::kStandardWaves.sine, {0.033F, 0.166F, 0.01F, 0.005F}, 0.21F, 0.0F}, 388.0F, 1360.0F, 0.12F, 0.005F, 1.0F, 24};
-const pixel_twins::SfxPreset kLevel{{&pixel_twins::kStandardWaves.pulse, {0.022F, 0.085F, 0.81F, 0.465F}, 0.13F, 0.0F}, 40.0F, 912.0F, 0.608F, 0.555F, 1.0F, 104};
-const pixel_twins::SfxPreset kHeal{{&pixel_twins::kStandardWaves.bell, {0.001F, 0.207F, 0.82F, 0.055F}, 0.26F, 0.0F}, 279.0F, 2400.0F, 0.804F, 0.185F, 1.0F, 96};
-const pixel_twins::SfxPreset kHpUp{{&pixel_twins::kStandardWaves.sine, {0.022F, 0.223F, 0.42F, 0.005F}, 0.26F, 0.0F}, 40.0F, 1488.0F, 0.6F, 0.115F, 1.0F, 96};
-const pixel_twins::SfxPreset kBomb{{&pixel_twins::kStandardWaves.pulse, {0.075F, 0.072F, 0.13F, 0.095F}, 0.5F, 0.0F}, 360.0F, 30.0F, 0.492F, 0.115F, 1.0F, 112};
-const pixel_twins::SfxPreset kSealJingle{{&pixel_twins::kStandardWaves.bell, {0.003F, 0.055F, 0.42F, 0.12F}, 0.24F, 0.0F}, 659.0F, 988.0F, 0.12F, 0.075F, 1.0F, 108};
-const pixel_twins::SfxPreset kBossImpact{{&pixel_twins::kStandardWaves.triangle, {0.001F, 0.16F, 0.52F, 0.3F}, 0.95F, 0.0F}, 138.0F, 34.0F, 0.2F, 0.24F, 1.0F, 160};
-const pixel_twins::SfxPreset kBossRock{{&pixel_twins::kStandardWaves.noise, {0.001F, 0.04F, 0.14F, 0.075F}, 0.48F, 0.0F}, 220.0F, 90.0F, 0.08F, 0.03F, 1.0F, 72};
-const pixel_twins::SfxPreset kEnemySpawn{{&pixel_twins::kStandardWaves.spark, {0.002F, 0.06F, 0.26F, 0.1F}, 0.18F, 0.0F}, 280.0F, 1380.0F, 0.2F, 0.08F, 1.0F, 36};
-const pixel_twins::SfxPreset kEnemyShoot{{&pixel_twins::kStandardWaves.pulse, {0.002F, 0.026F, 0.18F, 0.03F}, 0.13F, 0.0F}, 300.0F, 180.0F, 0.06F, 0.03F, 1.0F, 30};
-const pixel_twins::SfxPreset kBossShoot{{&pixel_twins::kStandardWaves.saw, {0.002F, 0.055F, 0.22F, 0.05F}, 0.24F, 0.0F}, 150.0F, 80.0F, 0.12F, 0.08F, 1.0F, 76};
-const pixel_twins::SfxPreset kBossGather{{&pixel_twins::kStandardWaves.noise, {0.025F, 0.14F, 0.55F, 0.22F}, 0.2F, 0.0F}, 90.0F, 620.0F, 0.54F, 0.34F, 1.0F, 92};
-const pixel_twins::SfxPreset kBossDeathImpact{{&pixel_twins::kStandardWaves.triangle, {0.001F, 0.2F, 0.58F, 0.52F}, 1.18F, 0.0F}, 126.0F, 30.0F, 0.3F, 0.38F, 1.0F, 192};
-const pixel_twins::SfxPreset kBossDeathBlast{{&pixel_twins::kStandardWaves.noise, {0.001F, 0.19F, 0.3F, 0.32F}, 0.88F, 0.0F}, 420.0F, 48.0F, 0.24F, 0.14F, 1.0F, 184};
-const pixel_twins::SfxPreset kClear{{&pixel_twins::kStandardWaves.bell, {0.01F, 0.16F, 0.45F, 0.18F}, 0.32F, 0.0F}, 220.0F, 1320.0F, 0.28F, 0.28F, 1.0F, 144};
-const pixel_twins::SfxPreset kDown{{&pixel_twins::kStandardWaves.saw, {0.002F, 0.08F, 0.2F, 0.12F}, 0.24F, 0.0F}, 260.0F, 58.0F, 0.18F, 0.08F, 1.0F, 120};
-const pixel_twins::SfxPreset kRevive{{&pixel_twins::kStandardWaves.bell, {0.006F, 0.12F, 0.58F, 0.12F}, 0.22F, 0.0F}, 310.0F, 1320.0F, 0.22F, 0.18F, 1.0F, 116};
-const pixel_twins::SfxPreset kGameOver{{&pixel_twins::kStandardWaves.saw, {0.02F, 0.24F, 0.5F, 0.36F}, 0.3F, 0.0F}, 180.0F, 42.0F, 0.62F, 0.34F, 1.0F, 180};
+const pixel_twins::SfxPreset kUiMove{{&pixel_twins::kStandardWaves.bell, {0.002F, 0.025F, 0.2F, 0.025F}, 0.18F, 0.0F}, 620.0F, 780.0F, 0.025F, 0.025F, 1.0F, 32, {}};
+const pixel_twins::SfxPreset kStart{{&pixel_twins::kStandardWaves.bell, {0.004F, 0.055F, 0.45F, 0.05F}, 0.24F, 0.0F}, 300.0F, 520.0F, 0.08F, 0.08F, 1.0F, 96, {}};
+namespace { constexpr float kLightCastPitchCurve[]{2387.7733403795473F, 30.000000000000004F, 258.85869733428376F, 74.89878224192277F, 678.1654245134775F, 52.79690522045451F, 31.130325929252493F, 40.48585240458129F, 87.9181510716202F, 75.2491641459126F, 39.65315440999429F, 33.71573153912699F, 30.000000000000004F, 30.000000000000004F, 30.000000000000004F, 31.474884692028997F}; }
+const pixel_twins::SfxPreset kLightCast{{&pixel_twins::kStandardWaves.bell, {0.001F, 0.165F, 0.29F, 0.005F}, 0.13F, 0.0F}, 2200.0F, 31.474884692028997F, 0.36F, 0.02F, 1.0F, 28, {kLightCastPitchCurve, 16}};
+namespace { constexpr float kFireCastPitchCurve[]{582.3362159606831F, 30.000000000000004F, 228.59275335095896F, 56.49106154686079F, 276.14281020391525F, 71.51493371887999F, 120.14098945505641F, 40.86193143741722F, 81.44846291391268F, 33.22938881749785F, 50.60284509382835F, 33.22938881749785F, 34.7863730846983F, 36.78372823530185F, 38.10919448198418F, 30.000000000000004F}; }
+const pixel_twins::SfxPreset kFireCast{{&pixel_twins::kStandardWaves.bell, {0.001F, 0.248F, 0.06F, 0.005F}, 0.18F, 0.0F}, 582.3362159606831F, 30.000000000000004F, 0.764F, 0.005F, 1.0F, 30, {kFireCastPitchCurve, 16}};
+namespace { const pixel_twins::WaveTable kWindCastWave{{-15499, 21266, 22314, -20283, 21593, 22183, -3211, -15073, 23166, -11698, -27033, 25722, -22314, 22576, 23068, 22314, -9175, 590, -21495, 5964, -20152, 6029, -6160, -18022, 11174, -8061, -9208, 8126, -20447, 3998, -13926, -18120}}; }
+namespace { constexpr float kWindCastPitchCurve[]{30.000000000000004F, 56.96061331023771F, 30.000000000000004F, 2400.0F, 30.000000000000004F, 237.1637910745335F, 71.9191169376623F, 1386.3587512796046F, 64.22454132221807F, 90.94994165831264F, 37.496687426619864F, 49.06268902475034F, 36.851813612570716F, 72.41480504403089F, 30.000000000000004F, 30.000000000000004F}; }
+const pixel_twins::SfxPreset kWindCast{{&kWindCastWave, {0.037F, 0.095F, 0.24F, 0.005F}, 0.2132F, 0.0F}, 40.0F, 30.000000000000004F, 0.476F, 0.018F, 1.0F, 40, {kWindCastPitchCurve, 16}};
+namespace { const pixel_twins::WaveTable kThunderCastWave{{1442, -27197, 16842, -13860, 12746, -9994, -12255, 24641, 15859, 20021, -3604, -11567, 26312, -26345, -11894, 29163, 12025, -27459, 10682, 1540, -22576, -25165, -28606, 27426, 7569, -28999, -26640, -2916, -4063, -721, -23953, -26214}}; }
+namespace { constexpr float kThunderCastPitchCurve[]{30.000000000000004F, 36.61245254232621F, 30.000000000000004F, 81.04066458578859F, 46.68547923842942F, 2400.0F, 30.000000000000004F, 549.3107950738565F, 54.7958120076954F, 325.5453361725425F, 58.27980034965233F, 177.7616408452335F, 43.13589889725934F, 30.000000000000004F, 74.26827690844475F, 30.000000000000004F}; }
+const pixel_twins::SfxPreset kThunderCast{{&kThunderCastWave, {0.021F, 0.082F, 0.13F, 0.005F}, 0.4706F, 0.0F}, 40.0F, 30.000000000000004F, 0.244F, 0.095F, 1.0F, 72, {kThunderCastPitchCurve, 16}};
+namespace { const pixel_twins::WaveTable kIceCastWave{{29818, 12517, 4129, -4030, 25263, 16384, 30801, -6684, 5931, 26148, 22216, -1737, -3703, 2294, 7766, 14549, -29818, -12517, -4129, 4030, -25263, -16384, -30801, 6684, -5931, -26148, -22216, 1737, 3703, -2294, -7766, -14549}}; }
+namespace { constexpr float kIceCastPitchCurve[]{936.8941740197693F, 949.0173210302796F, 1009.1793135840475F, 1294.2172643554266F, 1606.6972890801715F, 363.5862892042824F, 576.2149729324848F, 569.7063810086689F, 569.7063810086689F, 569.7063810086689F, 569.7063810086689F, 861.9332243068695F, 1215.1351927997187F, 274.42168554850764F, 472.22987629819914F, 1154.9359585732295F}; }
+const pixel_twins::SfxPreset kIceCast{{&kIceCastWave, {0.115F, 0.357F, 0.08F, 0.045F}, 0.14F, 0.0F}, 936.8941740197693F, 1154.9359585732295F, 0.1F, 0.018F, 1.0F, 34, {kIceCastPitchCurve, 16}};
+const pixel_twins::SfxPreset kFamiliarCast{{&pixel_twins::kStandardWaves.pulse, {0.002F, 0.025F, 0.22F, 0.035F}, 0.12F, 0.0F}, 720.0F, 980.0F, 0.035F, 0.035F, 1.0F, 26, {}};
+namespace { const pixel_twins::WaveTable kHitWave{{-26246, -17104, -4620, -22413, 28114, -24674, 492, -25919, 6455, -12714, 21659, -2228, 2752, -10453, 17104, -19464, 28900, 17727, -13893, 28540, -19333, -2916, 7962, 18939, -5833, -28245, -4718, -17760, 4850, 9240, 7471, 22970}}; }
+namespace { constexpr float kHitPitchCurve[]{352.4890788695088F, 35.55129123288909F, 2400.0F, 81.80066625367967F, 1412.7320895231321F, 192.98606573404103F, 42.48373275350235F, 69.24676589121198F, 117.58710748285893F, 37.36813237291644F, 53.5224840780493F, 53.5224840780493F, 66.33404800757484F, 59.9243192256633F, 47.2479514770563F, 37.292524558378254F}; }
+const pixel_twins::SfxPreset kHit{{&kHitWave, {0.001F, 0.03F, 0.23F, 0.015F}, 0.12F, 0.0F}, 352.4890788695088F, 37.292524558378254F, 0.188F, 0.018F, 1.0F, 20, {kHitPitchCurve, 16}};
+const pixel_twins::SfxPreset kDeflect{{&pixel_twins::kStandardWaves.spark, {0.001F, 0.018F, 0.12F, 0.025F}, 0.13F, 0.0F}, 980.0F, 460.0F, 0.016F, 0.016F, 1.0F, 32, {}};
+namespace { const pixel_twins::WaveTable kKillWave{{4358, -1507, -14090, -15237, 11960, -2261, 16384, -9502, 27623, -13631, -4587, 3113, -5341, -24051, -13795, -7930, 4161, 7471, -17465, 15269, -7307, -27754, -23658, 27655, 17563, 25394, -11665, -19627, -21233, -22413, 7635, -14417}}; }
+namespace { constexpr float kKillPitchCurve[]{196.98373523169786F, 30.000000000000004F, 49.69317025843478F, 293.10607521210653F, 59.12757193922359F, 2207.781454861517F, 304.4979709790618F, 93.81326620656432F, 44.75721158407469F, 30.000000000000004F, 33.334898085799125F, 43.13589889725934F, 43.13589889725934F, 43.13589889725934F, 43.13589889725934F, 30.000000000000004F}; }
+const pixel_twins::SfxPreset kKill{{&kKillWave, {0.021F, 0.198F, 0.01F, 0.09F}, 0.2709F, 0.0F}, 196.98373523169786F, 30.000000000000004F, 0.344F, 0.005F, 1.0F, 44, {kKillPitchCurve, 16}};
+const pixel_twins::SfxPreset kPlayerDamage{{&pixel_twins::kStandardWaves.square, {0.001F, 0.06F, 0.2F, 0.045F}, 0.24F, 0.0F}, 180.0F, 75.0F, 0.055F, 0.055F, 1.0F, 88, {}};
+namespace { const pixel_twins::WaveTable kXpWave{{0, 6390, 12550, 18218, 23166, 27229, 30277, 32144, 32767, 32144, 30277, 27229, 23166, 18218, 12550, 6390, 0, -6390, -12550, -18218, -23166, -27229, -30277, -32144, -32767, -32144, -30277, -27229, -23166, -18218, -12550, -6390}}; }
+namespace { constexpr float kXpPitchCurve[]{387.9997554769121F, 331.6507076257113F, 1769.0274768276206F, 69.69334272370187F, 93.23676312127004F, 1078.1862561288533F, 1103.515158301379F, 1129.4390905826804F, 1155.9720315032107F, 1183.1282879790133F, 1210.9225030262014F, 1239.3696636566692F, 1268.4851089592887F, 1298.2845383709498F, 1328.7840201419085F, 1360.0F}; }
+const pixel_twins::SfxPreset kXp{{&kXpWave, {0.033F, 0.166F, 0.01F, 0.005F}, 0.21F, 0.0F}, 387.9997554769121F, 30.0F, 0.02F, 0.005F, 1.0F, 24, {kXpPitchCurve, 16}};
+namespace { const pixel_twins::WaveTable kLevelWave{{31129, 31129, 31129, 31129, 31129, 31129, 31129, 31129, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022, -18022}}; }
+namespace { constexpr float kLevelPitchCurve[]{30.000000000000004F, 45.34034979090505F, 76.11554817848395F, 228.71356411520006F, 68.22986778039797F, 227.1079904389498F, 78.30471191093814F, 275.68117251159543F, 100.55424346895872F, 326.23408189179764F, 135.82035900879376F, 408.2595867770227F, 178.0436297245707F, 543.7281880895396F, 244.99677131518976F, 911.9854785845437F}; }
+const pixel_twins::SfxPreset kLevel{{&kLevelWave, {0.022F, 0.085F, 0.81F, 0.465F}, 0.126F, 0.0F}, 40.0F, 911.9854785845437F, 0.608F, 0.555F, 1.0F, 104, {kLevelPitchCurve, 16}};
+namespace { const pixel_twins::WaveTable kHealWave{{0, 9339, 16973, 21692, 23166, 22019, 19562, 17301, 16384, 17301, 19562, 22019, 23166, 21692, 16973, 9339, 0, -9339, -16973, -21692, -23166, -22019, -19562, -17301, -16384, -17301, -19562, -22019, -23166, -21692, -16973, -9339}}; }
+namespace { constexpr float kHealPitchCurve[]{278.95347881233687F, 35.429405848677135F, 524.7244933156671F, 189.38054920400253F, 727.343391265756F, 301.58922721710445F, 874.6254270557516F, 400.0739815627137F, 1021.2480919203011F, 507.8139513433311F, 1133.7745306789448F, 632.0341892874446F, 1613.2188113836742F, 802.5237001906985F, 1329.2145069531282F, 2400.0F}; }
+const pixel_twins::SfxPreset kHeal{{&kHealWave, {0.001F, 0.207F, 0.82F, 0.055F}, 0.26F, 0.0F}, 278.95347881233687F, 2400.0F, 0.804F, 0.185F, 1.0F, 96, {kHealPitchCurve, 16}};
+namespace { const pixel_twins::WaveTable kHpUpWave{{0, 6390, 12550, 18218, 23166, 27229, 30277, 32144, 32767, 32144, 30277, 27229, 23166, 18218, 12550, 6390, 0, -6390, -12550, -18218, -23166, -27229, -30277, -32144, -32767, -32144, -30277, -27229, -23166, -18218, -12550, -6390}}; }
+namespace { constexpr float kHpUpPitchCurve[]{30.000000000000004F, 209.23165920995976F, 265.0637600841623F, 212.18181969840256F, 79.56279499128641F, 465.5820214229799F, 645.5908064907882F, 499.300281446582F, 164.34738135378774F, 646.7857721924721F, 1093.281478252854F, 733.1307619766482F, 211.34267343082843F, 743.5333574641822F, 1477.7549151168823F, 1488.0710781581429F}; }
+const pixel_twins::SfxPreset kHpUp{{&kHpUpWave, {0.022F, 0.223F, 0.42F, 0.005F}, 0.26F, 0.0F}, 40.0F, 1488.0710781581429F, 0.6F, 0.115F, 1.0F, 96, {kHpUpPitchCurve, 16}};
+namespace { const pixel_twins::WaveTable kBombWave{{31129, 31129, 31129, 31129, -8257, 31129, 31129, 31129, -18022, -18022, -18022, 28966, 8519, -18022, -18022, -18022, -18022, -18022, -18022, 9371, -18022, -18022, -18022, -18022, -18022, -18022, -18022, 28212, -18022, -18022, -18022, -18022}}; }
+namespace { constexpr float kBombPitchCurve[]{30.000000000000004F, 360.71612094759996F, 109.6656420781633F, 30.000000000000004F, 996.7263924587324F, 65.05558881693261F, 318.51288478151264F, 148.1011971980563F, 608.4420663719353F, 308.6282744141742F, 240.04230592219088F, 133.09716064451646F, 107.36279774539837F, 60.989051178519205F, 38.13605101369202F, 30.000000000000004F}; }
+const pixel_twins::SfxPreset kBomb{{&kBombWave, {0.075F, 0.072F, 0.13F, 0.095F}, 0.5F, 0.0F}, 40.0F, 30.000000000000004F, 0.492F, 0.115F, 1.0F, 112, {kBombPitchCurve, 16}};
+const pixel_twins::SfxPreset kSealJingle{{&pixel_twins::kStandardWaves.bell, {0.003F, 0.055F, 0.42F, 0.12F}, 0.24F, 0.0F}, 659.0F, 659.0F, 0.075F, 0.075F, 1.0F, 108, {}};
+const pixel_twins::SfxPreset kBossImpact{{&pixel_twins::kStandardWaves.triangle, {0.001F, 0.16F, 0.52F, 0.3F}, 0.95F, 0.0F}, 138.0F, 34.0F, 0.2F, 0.24F, 1.0F, 160, {}};
+const pixel_twins::SfxPreset kBossRock{{&pixel_twins::kStandardWaves.noise, {0.001F, 0.04F, 0.14F, 0.075F}, 0.48F, 0.0F}, 220.0F, 90.0F, 0.08F, 0.03F, 1.0F, 72, {}};
+const pixel_twins::SfxPreset kEnemySpawn{{&pixel_twins::kStandardWaves.spark, {0.002F, 0.06F, 0.26F, 0.1F}, 0.18F, 0.0F}, 280.0F, 1380.0F, 0.2F, 0.08F, 1.0F, 36, {}};
+const pixel_twins::SfxPreset kEnemyShoot{{&pixel_twins::kStandardWaves.pulse, {0.002F, 0.026F, 0.18F, 0.03F}, 0.13F, 0.0F}, 300.0F, 180.0F, 0.03F, 0.03F, 1.0F, 30, {}};
+const pixel_twins::SfxPreset kBossShoot{{&pixel_twins::kStandardWaves.saw, {0.002F, 0.055F, 0.22F, 0.05F}, 0.24F, 0.0F}, 150.0F, 80.0F, 0.08F, 0.08F, 1.0F, 76, {}};
+const pixel_twins::SfxPreset kBossGather{{&pixel_twins::kStandardWaves.noise, {0.025F, 0.14F, 0.55F, 0.22F}, 0.2F, 0.0F}, 90.0F, 620.0F, 0.54F, 0.34F, 1.0F, 92, {}};
+const pixel_twins::SfxPreset kBossDeathImpact{{&pixel_twins::kStandardWaves.triangle, {0.001F, 0.2F, 0.58F, 0.52F}, 1.18F, 0.0F}, 126.0F, 30.0F, 0.3F, 0.38F, 1.0F, 192, {}};
+const pixel_twins::SfxPreset kBossDeathBlast{{&pixel_twins::kStandardWaves.noise, {0.001F, 0.19F, 0.3F, 0.32F}, 0.88F, 0.0F}, 420.0F, 48.0F, 0.24F, 0.14F, 1.0F, 184, {}};
+const pixel_twins::SfxPreset kClear{{&pixel_twins::kStandardWaves.bell, {0.01F, 0.16F, 0.45F, 0.18F}, 0.32F, 0.0F}, 220.0F, 1320.0F, 0.28F, 0.28F, 1.0F, 144, {}};
+const pixel_twins::SfxPreset kDown{{&pixel_twins::kStandardWaves.saw, {0.002F, 0.08F, 0.2F, 0.12F}, 0.24F, 0.0F}, 260.0F, 58.0F, 0.18F, 0.08F, 1.0F, 120, {}};
+const pixel_twins::SfxPreset kRevive{{&pixel_twins::kStandardWaves.bell, {0.006F, 0.12F, 0.58F, 0.12F}, 0.22F, 0.0F}, 310.0F, 1320.0F, 0.22F, 0.18F, 1.0F, 116, {}};
+const pixel_twins::SfxPreset kGameOver{{&pixel_twins::kStandardWaves.saw, {0.02F, 0.24F, 0.5F, 0.36F}, 0.3F, 0.0F}, 180.0F, 42.0F, 0.62F, 0.34F, 1.0F, 180, {}};
 
 } // namespace audio
 } // namespace wizward

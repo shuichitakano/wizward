@@ -87,6 +87,7 @@ bool applyUpdate(const wizward::game::UpdateResult& result,
         auto request = pixel_twins::makeSfxRequest(sfxPreset(cue.id), cue.pan);
         request.voice.frequency *= cue.pitchScale;
         request.voice.endFrequency *= cue.pitchScale;
+        request.voice.pitchCurveScale *= cue.pitchScale;
         request.voice.velocity *= cue.volumeScale;
         (void)audio.playSfx(request);
     }

@@ -647,7 +647,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                 static_cast<std::uint16_t>((16U - enemy.deathTicks) * 3U / 16U)))
             : enemy.attackAnimationTicks > 0
             ? static_cast<std::uint32_t>((20U - enemy.attackAnimationTicks) / 5U)
-            : frame / 8U;
+            : enemy.moving || enemy.kind == EnemyKind::Boss ? frame / 8U : 0U;
         if (enemy.active && enemy.bornTicks > 0) {
             const auto progress = std::clamp(1.0F - static_cast<float>(enemy.bornTicks) / 23.0F,
                                              0.0F, 1.0F);

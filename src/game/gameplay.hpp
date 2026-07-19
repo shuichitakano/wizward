@@ -201,6 +201,7 @@ struct EnemyState {
     std::uint8_t volleyIndex = 0;
     EnemyKind kind = EnemyKind::Imp;
     Facing facing = Facing::South;
+    bool moving = false;
     bool active = false;
 };
 

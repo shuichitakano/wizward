@@ -498,13 +498,13 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
         if (enemy.slowTicks > 0) --enemy.slowTicks;
         if (enemy.attackCooldownTicks > 0) --enemy.attackCooldownTicks;
         if (enemy.attackAnimationTicks > 0) --enemy.attackAnimationTicks;
+        const auto beforeX = enemy.x;
+        const auto beforeY = enemy.y;
         auto* target = nearestLivingPlayer(players, enemy.x, enemy.y);
         auto dx = target->x - enemy.x;
         auto dy = target->y - enemy.y;
         const auto targetDistance = std::sqrt(dx * dx + dy * dy);
         normalize(dx, dy);
-        enemy.facing = facingFor(dx, dy);
-
         if (enemy.kind == EnemyKind::Boss) {
             moveActor(enemy, dx * speed, dy * speed, map);
             if (enemy.attackCooldownTicks == 0) {
@@ -557,6 +557,11 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
         } else {
             moveActor(enemy, dx * speed, dy * speed, map);
         }
+
+        const auto movedX = enemy.x - beforeX;
+        const auto movedY = enemy.y - beforeY;
+        enemy.moving = std::sqrt(movedX * movedX + movedY * movedY) > 0.01F;
+        if (enemy.moving) enemy.facing = facingFor(movedX, movedY);
 
         for (auto& player : players) {
             if (player.hp <= 0 || player.invulnerabilityTicks != 0) continue;
