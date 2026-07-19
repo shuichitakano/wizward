@@ -188,6 +188,41 @@ void normalize(float& x, float& y) noexcept {
     y /= length;
 }
 
+std::uint16_t impactLifetimeTicks(ImpactEffectType type) noexcept {
+    switch (type) {
+    case ImpactEffectType::Light:
+    case ImpactEffectType::Wind: return 11;
+    case ImpactEffectType::Orb:
+    case ImpactEffectType::Familiar: return 12;
+    case ImpactEffectType::Ice: return 21;
+    case ImpactEffectType::CastSpark:
+    case ImpactEffectType::Fire:
+    case ImpactEffectType::Generic: return 13;
+    }
+    return 13;
+}
+
+void spawnImpact(std::array<ImpactEffectState, kMaximumImpactEffects>& effects,
+                 ImpactEffectType type, float x, float y) noexcept {
+    auto slot = std::find_if(effects.begin(), effects.end(),
+        [](const ImpactEffectState& effect) { return !effect.active; });
+    if (slot == effects.end()) {
+        slot = std::max_element(effects.begin(), effects.end(),
+            [](const ImpactEffectState& lhs, const ImpactEffectState& rhs) {
+                return lhs.ageTicks < rhs.ageTicks;
+            });
+    }
+    *slot = {x, y, 0, impactLifetimeTicks(type), type, true};
+}
+
+void updateImpacts(std::array<ImpactEffectState, kMaximumImpactEffects>& effects) noexcept {
+    for (auto& effect : effects) {
+        if (!effect.active) continue;
+        ++effect.ageTicks;
+        if (effect.ageTicks >= effect.lifetimeTicks) effect.active = false;
+    }
+}
+
 float moveAiPlayerSmart(PlayerState& player, float targetX, float targetY,
                         const world::WorldMap& map, float stepScale) noexcept {
     auto directionX = targetX - player.x;
@@ -588,7 +623,8 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
 bool fireLight(PlayerState& player,
                std::uint8_t owner,
                std::array<EnemyState, kMaximumEnemies>& enemies,
-               std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets) noexcept {
+               std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
+               std::array<ImpactEffectState, kMaximumImpactEffects>& impacts) noexcept {
     auto* target = nearestEnemy(enemies, player.x, player.y, kLightSeekRange);
     if (target == nullptr) return false;
     auto dx = target->x - player.x;
@@ -603,6 +639,8 @@ bool fireLight(PlayerState& player,
         fired = spawnBullet(bullets, player, owner, PlayerAttack::Light, angle,
                             stats.damage, stats.speed, kLightLifetimeTicks, 2.0F) || fired;
     }
+    if (fired) spawnImpact(impacts, ImpactEffectType::CastSpark,
+                           player.x + dx * 10.0F, player.y + dy * 10.0F - 10.0F);
     return fired;
 }
 
@@ -613,7 +651,8 @@ bool fireSpread(PlayerState& player,
                 float spread,
                 std::uint16_t lifetimeTicks,
                 float radius,
-                std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets) noexcept {
+                std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
+                std::array<ImpactEffectState, kMaximumImpactEffects>& impacts) noexcept {
     const auto baseAngle = facingAngle(player.facing);
     bool fired = false;
     for (std::uint8_t index = 0; index < stats.count; ++index) {
@@ -622,6 +661,9 @@ bool fireSpread(PlayerState& player,
         fired = spawnBullet(bullets, player, owner, type, baseAngle + offset,
                             stats.damage, stats.speed, lifetimeTicks, radius) || fired;
     }
+    if (fired) spawnImpact(impacts, ImpactEffectType::CastSpark,
+                           player.x + std::cos(baseAngle) * 10.0F,
+                           player.y + std::sin(baseAngle) * 10.0F - 10.0F);
     return fired;
 }
 
@@ -676,7 +718,8 @@ void damageOrbs(PlayerState& player, std::uint8_t owner,
                 std::array<EnemyState, kMaximumEnemies>& enemies,
                 std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                 std::array<XpGemState, kMaximumXpGems>& xpGems,
-                std::array<std::uint32_t, pixel_twins::kControllerCount>& scores) noexcept {
+                std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
+                std::array<ImpactEffectState, kMaximumImpactEffects>& impacts) noexcept {
     const auto stats = attackStats(player.orbLevel, 1, 4, 22.0F, 2, 4.0F);
     for (std::uint8_t orbIndex = 0; orbIndex < stats.count; ++orbIndex) {
         const auto angle = player.orbAngle + static_cast<float>(orbIndex) * kTau / stats.count;
@@ -692,6 +735,7 @@ void damageOrbs(PlayerState& player, std::uint8_t owner,
             const auto range = enemy.radius + 4.0F;
             if (squaredDistance(x, y, enemy.x, enemy.y) >= range * range) continue;
             enemy.hp = static_cast<std::int16_t>(enemy.hp - stats.damage);
+            spawnImpact(impacts, ImpactEffectType::Orb, enemy.x, enemy.y);
             if (enemy.hp <= 0) killEnemy(enemy, owner, xpGems, scores);
         }
     }
@@ -811,7 +855,8 @@ void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets
                    std::array<EnemyState, kMaximumEnemies>& enemies,
                    std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                    std::array<XpGemState, kMaximumXpGems>& xpGems,
-                   std::array<std::uint32_t, pixel_twins::kControllerCount>& scores) noexcept {
+                   std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
+                   std::array<ImpactEffectState, kMaximumImpactEffects>& impacts) noexcept {
     for (auto& bullet : bullets) {
         if (!bullet.active) continue;
         ++bullet.ageTicks;
@@ -848,6 +893,11 @@ void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets
             if (squaredDistance(bullet.x, bullet.y, enemy.x, enemy.y) < hitRange * hitRange) {
                 enemy.hp = static_cast<std::int16_t>(enemy.hp - bullet.damage);
                 if (bullet.type == PlayerAttack::Ice) enemy.slowTicks = std::max<std::uint16_t>(enemy.slowTicks, 102);
+                auto impactType = ImpactEffectType::Light;
+                if (bullet.type == PlayerAttack::Fire) impactType = ImpactEffectType::Fire;
+                else if (bullet.type == PlayerAttack::Ice) impactType = ImpactEffectType::Ice;
+                else if (bullet.type == PlayerAttack::Familiar) impactType = ImpactEffectType::Familiar;
+                spawnImpact(impacts, impactType, bullet.x, bullet.y - 10.0F);
                 if (enemy.hp <= 0) {
                     killEnemy(enemy, bullet.owner, xpGems, scores);
                 }
@@ -863,7 +913,8 @@ void updateWindSlashes(std::array<WindSlashState, kMaximumWindSlashes>& slashes,
                        std::array<EnemyState, kMaximumEnemies>& enemies,
                        std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                        std::array<XpGemState, kMaximumXpGems>& xpGems,
-                       std::array<std::uint32_t, pixel_twins::kControllerCount>& scores) noexcept {
+                       std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
+                       std::array<ImpactEffectState, kMaximumImpactEffects>& impacts) noexcept {
     for (auto& slash : slashes) {
         if (!slash.active) continue;
         ++slash.ageTicks;
@@ -890,6 +941,7 @@ void updateWindSlashes(std::array<WindSlashState, kMaximumWindSlashes>& slashes,
             if (distanceSquared < inner * inner || distanceSquared > outer * outer) continue;
             enemy.hp = static_cast<std::int16_t>(enemy.hp - slash.damage);
             slash.hitCooldownTicks[enemyIndex] = 7;
+            spawnImpact(impacts, ImpactEffectType::Wind, enemy.x, enemy.y);
             if (enemy.hp <= 0) killEnemy(enemy, slash.owner, xpGems, scores);
         }
     }
@@ -1358,6 +1410,7 @@ void GameplayState::reset(const world::WorldMap&, std::size_t startingPlayer) no
     xpGems_.fill({});
     windSlashes_.fill({});
     thunderStrikes_.fill({});
+    impactEffects_.fill({});
     enemyBullets_.fill({});
     randomState_ = 0x57495aU;
     spawnCooldownTicks_ = 1;
@@ -1387,6 +1440,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
                          const world::WorldMap& map) noexcept {
     sfxCueCount_ = 0;
     if (outcome_ != GameplayOutcome::Running) return;
+    updateImpacts(impactEffects_);
     if (clearSequenceTicks_ > 0) {
         ++clearSequenceTicks_;
         constexpr std::array<std::uint16_t, 7> kGatherTicks{{22, 42, 60, 77, 92, 106, 119}};
@@ -1544,13 +1598,14 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
             updateFamiliars(player, static_cast<std::uint8_t>(index), enemies_, bullets_);
         }
         if (player.hp > 0 && player.lightCooldownTicks == 0
-            && fireLight(player, static_cast<std::uint8_t>(index), enemies_, bullets_)) {
+            && fireLight(player, static_cast<std::uint8_t>(index), enemies_, bullets_,
+                         impactEffects_)) {
             player.lightCooldownTicks = cooldownTicks(0.52F, 0.035F, player.lightLevel, 0.18F);
         }
         if (player.hp > 0 && player.fireLevel > 0 && player.fireCooldownTicks == 0) {
             const auto stats = attackStats(player.fireLevel, 1, 14, kFireSpeedPerTick, 5, 28.0F / 60.0F);
             if (fireSpread(player, static_cast<std::uint8_t>(index), PlayerAttack::Fire,
-                           stats, 0.16F, 54, 3.0F, bullets_)) {
+                           stats, 0.16F, 54, 3.0F, bullets_, impactEffects_)) {
                 player.fireCooldownTicks = cooldownTicks(0.72F, 0.04F, player.fireLevel, 0.24F);
             }
         }
@@ -1576,13 +1631,15 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
             if (fired) player.iceCooldownTicks = cooldownTicks(1.25F, 0.05F, player.iceLevel, 0.55F);
         }
         if (player.hp > 0 && player.orbLevel > 0 && player.orbCooldownTicks == 0) {
-            damageOrbs(player, static_cast<std::uint8_t>(index), enemies_, enemyBullets_, xpGems_, scores_);
+            damageOrbs(player, static_cast<std::uint8_t>(index), enemies_, enemyBullets_,
+                       xpGems_, scores_, impactEffects_);
             player.orbCooldownTicks = 10;
         }
     }
     processBombs(players_, enemies_, enemyBullets_, xpGems_, scores_);
-    updateBullets(bullets_, enemies_, enemyBullets_, xpGems_, scores_);
-    updateWindSlashes(windSlashes_, players_, enemies_, enemyBullets_, xpGems_, scores_);
+    updateBullets(bullets_, enemies_, enemyBullets_, xpGems_, scores_, impactEffects_);
+    updateWindSlashes(windSlashes_, players_, enemies_, enemyBullets_, xpGems_, scores_,
+                      impactEffects_);
     updateThunderStrikes(thunderStrikes_);
     updateEnemyBullets(enemyBullets_, players_);
     updateXpGems(xpGems_, players_, randomState_);
@@ -1602,6 +1659,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         xpGems_.fill({});
         windSlashes_.fill({});
         thunderStrikes_.fill({});
+        impactEffects_.fill({});
         enemyBullets_.fill({});
         for (auto& player : players_) {
             if (player.hp <= 0) {
@@ -1657,6 +1715,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
             && enemy.kind != EnemyKind::Boss) {
             killPlayed = true;
             hitPlayed = true;
+            spawnImpact(impactEffects_, ImpactEffectType::Generic, enemy.x, enemy.y);
         }
         if (enemyActiveBefore[index] && enemy.active && enemy.hp < enemyHpBefore[index]) hitPlayed = true;
         if (enemy.kind == EnemyKind::Bat && enemyDashBefore[index] == 0 && enemy.dashTicks > 0) {

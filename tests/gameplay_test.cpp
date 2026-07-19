@@ -136,7 +136,27 @@ int main() {
     gameplay.tick(idle, map);
     assert(gameplay.bulletCount() > 0);
     assert(hasSfx(gameplay, wizward::game::SfxId::LightCast));
-    for (int frame = 0; frame < 120; ++frame) gameplay.tick(idle, map);
+    assert(std::any_of(gameplay.impactEffects().begin(), gameplay.impactEffects().end(),
+        [](const auto& effect) {
+            return effect.active && effect.type == wizward::game::ImpactEffectType::CastSpark;
+        }));
+    bool sawLightImpact = false;
+    bool sawGenericImpact = false;
+    for (int frame = 0; frame < 120; ++frame) {
+        gameplay.tick(idle, map);
+        sawLightImpact = sawLightImpact || std::any_of(
+            gameplay.impactEffects().begin(), gameplay.impactEffects().end(),
+            [](const auto& effect) {
+                return effect.active && effect.type == wizward::game::ImpactEffectType::Light;
+            });
+        sawGenericImpact = sawGenericImpact || std::any_of(
+            gameplay.impactEffects().begin(), gameplay.impactEffects().end(),
+            [](const auto& effect) {
+                return effect.active && effect.type == wizward::game::ImpactEffectType::Generic;
+            });
+    }
+    assert(sawLightImpact);
+    assert(sawGenericImpact);
     assert(gameplay.score(0) + gameplay.score(1) > 0);
 
     gameplay.reset(map);

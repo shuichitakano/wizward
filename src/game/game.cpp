@@ -159,11 +159,15 @@ PIXEL_TWINS_SRAM void drawTimer(pixel_twins::RenderTarget target,
     const auto remain = elapsedSeconds < kGameSeconds ? kGameSeconds - elapsedSeconds : 0U;
     const auto elapsedMinute = elapsedSeconds / 60U;
     const auto sinceMinute = elapsedSeconds - elapsedMinute * 60U;
-    if ((elapsedSeconds < 4U || (elapsedMinute > 0U && elapsedMinute < 5U && sinceMinute < 4U))
-        && (elapsedTicks / 15U) % 2U == 0U) {
-        char text[] = "5 MIN LEFT";
-        text[0] = static_cast<char>('0' + (remain + 59U) / 60U);
-        drawCenteredText(target, text, 80, 24);
+    const auto minuteNotice = elapsedSeconds < 4U
+        || (elapsedMinute > 0U && elapsedMinute < 5U && sinceMinute <= 4U);
+    if (minuteNotice) {
+        if ((elapsedTicks / 15U) % 2U == 0U) {
+            char text[] = "5 MIN LEFT";
+            text[0] = static_cast<char>('0' + (remain + 59U) / 60U);
+            drawCenteredText(target, text, 80, 24);
+        }
+        return;
     } else if (remain <= 60U && elapsedSeconds >= 4U) {
         char text[] = "0:00";
         text[2] = static_cast<char>('0' + (remain / 10U) % 10U);
@@ -184,6 +188,7 @@ PIXEL_TWINS_SRAM void drawMiniMap(pixel_twins::RenderTarget target,
         for (std::uint16_t mx = 0; mx < kSize; ++mx) {
             const auto tx = static_cast<std::uint16_t>(mx * world::kMapColumns / kSize);
             const auto ty = static_cast<std::uint16_t>(my * world::kMapRows / kSize);
+            if (map.isWater(tx, ty)) continue;
             pixel_twins::fillRectangle(target,
                 static_cast<std::int16_t>(kX + mx), static_cast<std::int16_t>(kY + my), 1, 1,
                 map.collides(tx, ty) ? 29 : 30);
@@ -542,8 +547,6 @@ PIXEL_TWINS_SRAM void drawTitle(pixel_twins::Framebuffer& framebuffer,
     auto right = pixel_twins::makeRenderTarget(framebuffer.drawBuffer(), pixel_twins::Screen::Right);
     title.drawScreen(left);
     title.drawScreen(right);
-    pixel_twins::Sprite logo{};
-    if (title.makeLogo(28, 18, logo)) pixel_twins::drawSprite(right, logo);
     if ((frame / 30U) % 2U == 0U) {
         drawCenteredText(left, "PUSH ANY BUTTON", 80, 98);
         drawCenteredText(right, "PUSH ANY BUTTON", 80, 98);
@@ -586,6 +589,49 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                    static_cast<std::int16_t>(bullet.x - camera.x - halfSize),
                    static_cast<std::int16_t>(bullet.y - camera.y - 10.0F - halfSize),
                    bullet.y - camera.y, directionRow);
+    }
+    for (const auto& effect : gameplay.impactEffects()) {
+        if (!effect.active || effect.lifetimeTicks == 0) continue;
+        auto asset = assets::SpriteAssetId::ImpactBurst1616x163fSheet;
+        std::uint8_t frameCount = 3;
+        std::int16_t halfSize = 8;
+        switch (effect.type) {
+        case ImpactEffectType::CastSpark:
+            asset = assets::SpriteAssetId::CastSpark1212x123fSheet;
+            halfSize = 6;
+            break;
+        case ImpactEffectType::Light:
+            asset = assets::SpriteAssetId::LightImpact1212x123fSheet;
+            halfSize = 6;
+            break;
+        case ImpactEffectType::Fire:
+            asset = assets::SpriteAssetId::FireImpact1616x163fSheet;
+            break;
+        case ImpactEffectType::Ice:
+            asset = assets::SpriteAssetId::IceImpact1616x165fSheet;
+            frameCount = 5;
+            break;
+        case ImpactEffectType::Familiar:
+            asset = assets::SpriteAssetId::FamiliarImpact1212x123fSheet;
+            halfSize = 6;
+            break;
+        case ImpactEffectType::Orb:
+            asset = assets::SpriteAssetId::OrbImpact1212x123fSheet;
+            halfSize = 6;
+            break;
+        case ImpactEffectType::Wind:
+            asset = assets::SpriteAssetId::WindImpact1616x163fSheet;
+            break;
+        case ImpactEffectType::Generic:
+            break;
+        }
+        const auto animationFrame = static_cast<std::uint32_t>(std::min<std::uint16_t>(
+            static_cast<std::uint16_t>(frameCount - 1U),
+            static_cast<std::uint16_t>(effect.ageTicks * frameCount / effect.lifetimeTicks)));
+        queueAsset(spriteBuckets, assets, asset, animationFrame,
+                   static_cast<std::int16_t>(effect.x - camera.x - halfSize),
+                   static_cast<std::int16_t>(effect.y - camera.y - halfSize),
+                   effect.y - camera.y);
     }
     for (const auto& gem : gameplay.xpGems()) {
         if (!gem.active) continue;
@@ -986,16 +1032,28 @@ PIXEL_TWINS_SRAM void drawResultPanel(
     for (std::size_t rowIndex = 0; rowIndex < rowCount; ++rowIndex) {
         const auto rank = startRank + rowIndex;
         const auto y = static_cast<std::int16_t>(32 + rowIndex * 10U);
-        char rankText[] = "01.";
-        rankText[0] = static_cast<char>('0' + ((rank + 1U) / 10U) % 10U);
-        rankText[1] = static_cast<char>('0' + (rank + 1U) % 10U);
+        char rowText[16]{};
+        rowText[0] = static_cast<char>('0' + ((rank + 1U) / 10U) % 10U);
+        rowText[1] = static_cast<char>('0' + (rank + 1U) % 10U);
+        rowText[2] = '.';
+        rowText[3] = board[rank].name[0];
+        rowText[4] = board[rank].name[1];
+        rowText[5] = board[rank].name[2];
+        rowText[6] = ' ';
+        char rankScore[12]{};
+        auto scoreValue = board[rank].score;
+        const auto abbreviated = scoreValue >= 100000U;
+        if (abbreviated) scoreValue /= 1000U;
+        const auto score = formatUnsigned(scoreValue, rankScore);
+        for (std::size_t index = 0; index < score.size(); ++index) {
+            rowText[7U + index] = score[index];
+        }
+        auto rowLength = 7U + score.size();
+        if (abbreviated) rowText[rowLength++] = 'K';
         const auto color = static_cast<std::uint8_t>(
             rank == focusRank && entries[viewer].active ? 15 : 18);
-        pixel_twins::drawText(target, assets::kWizwardFont, 84, y, rankText, color, 6);
-        pixel_twins::drawText(target, assets::kWizwardFont, 102, y,
-                              std::string_view(board[rank].name.data(), 3), color, 6);
-        char rankScore[12]{};
-        drawRightAlignedText(target, formatUnsigned(board[rank].score, rankScore), 158, y, 5);
+        pixel_twins::drawText(target, assets::kWizwardFont, 84, y,
+                              std::string_view(rowText, rowLength), color, 6);
     }
     const auto& entry = entries[viewer];
     if (entry.active && !entry.submitted) {

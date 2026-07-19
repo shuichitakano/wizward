@@ -435,6 +435,11 @@ std::uint8_t WorldMap::tile(std::uint16_t x, std::uint16_t y) const noexcept {
     return tiles[static_cast<std::size_t>(y) * kMapColumns + x];
 }
 
+bool WorldMap::isWater(std::uint16_t x, std::uint16_t y) const noexcept {
+    const auto tileValue = tile(x, y);
+    return patternCollisionShapes[tileValue & kTileIndexMask] == kCollisionShapeWater;
+}
+
 bool WorldMap::collides(std::uint16_t x, std::uint16_t y) const noexcept {
     return (tile(x, y) & kCollisionBit) != 0;
 }

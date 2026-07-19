@@ -38,6 +38,14 @@ int main() {
 
     assert(game.initialize());
     assert(game.scene() == Scene::Title);
+    game.render();
+    const auto& titlePixels = game.framebuffer().displayBuffer();
+    for (std::size_t y = 0; y < pixel_twins::kScreenHeight; ++y) {
+        const auto row = y * pixel_twins::kScreenWidth;
+        for (std::size_t x = 0; x < pixel_twins::kPanelWidth; ++x) {
+            assert(titlePixels[row + x] == titlePixels[row + pixel_twins::kPanelWidth + x]);
+        }
+    }
     const auto idle = idleControllers();
     for (std::uint16_t frame = 0; frame < 240; ++frame) {
         const auto result = game.tick(idle);

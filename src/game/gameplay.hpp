@@ -18,6 +18,7 @@ inline constexpr std::size_t kMaximumPlayerBullets = 128;
 inline constexpr std::size_t kMaximumXpGems = 256;
 inline constexpr std::size_t kMaximumWindSlashes = 8;
 inline constexpr std::size_t kMaximumThunderStrikes = 16;
+inline constexpr std::size_t kMaximumImpactEffects = 64;
 inline constexpr std::size_t kMaximumEnemyBullets = 128;
 inline constexpr std::size_t kMaximumFamiliarsPerPlayer = 3;
 inline constexpr std::size_t kMaximumSfxCuesPerTick = 16;
@@ -109,6 +110,17 @@ enum class EnemyBulletType : std::uint8_t {
     Arrow,
     Magic,
     BossFire,
+};
+
+enum class ImpactEffectType : std::uint8_t {
+    CastSpark,
+    Light,
+    Fire,
+    Ice,
+    Familiar,
+    Orb,
+    Wind,
+    Generic,
 };
 
 enum class GameplayOutcome : std::uint8_t {
@@ -264,6 +276,15 @@ struct XpGemState {
     bool active = false;
 };
 
+struct ImpactEffectState {
+    float x = 0.0F;
+    float y = 0.0F;
+    std::uint16_t ageTicks = 0;
+    std::uint16_t lifetimeTicks = 0;
+    ImpactEffectType type = ImpactEffectType::Generic;
+    bool active = false;
+};
+
 class GameplayState {
 public:
     void reset(const world::WorldMap& map, std::size_t startingPlayer = 0) noexcept;
@@ -291,6 +312,9 @@ public:
     }
     [[nodiscard]] const std::array<ThunderStrikeState, kMaximumThunderStrikes>& thunderStrikes() const noexcept {
         return thunderStrikes_;
+    }
+    [[nodiscard]] const std::array<ImpactEffectState, kMaximumImpactEffects>& impactEffects() const noexcept {
+        return impactEffects_;
     }
     [[nodiscard]] const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets() const noexcept {
         return enemyBullets_;
@@ -331,6 +355,7 @@ private:
     std::array<XpGemState, kMaximumXpGems> xpGems_{};
     std::array<WindSlashState, kMaximumWindSlashes> windSlashes_{};
     std::array<ThunderStrikeState, kMaximumThunderStrikes> thunderStrikes_{};
+    std::array<ImpactEffectState, kMaximumImpactEffects> impactEffects_{};
     std::array<EnemyBulletState, kMaximumEnemyBullets> enemyBullets_{};
     std::uint32_t randomState_ = 1;
     std::uint16_t spawnCooldownTicks_ = 0;

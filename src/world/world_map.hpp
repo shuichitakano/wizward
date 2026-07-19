@@ -49,6 +49,7 @@ struct WorldMap {
     std::uint32_t seed = 0;
 
     [[nodiscard]] std::uint8_t tile(std::uint16_t x, std::uint16_t y) const noexcept;
+    [[nodiscard]] bool isWater(std::uint16_t x, std::uint16_t y) const noexcept;
     [[nodiscard]] bool collides(std::uint16_t x, std::uint16_t y) const noexcept;
     [[nodiscard]] bool terrainPointIsWalkable(float x, float y) const noexcept;
     [[nodiscard]] bool circleIsWalkable(float x, float y, float radius) const noexcept;

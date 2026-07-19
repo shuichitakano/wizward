@@ -47,6 +47,20 @@ int main() {
     assert(background.height == wizward::world::kMapRows);
     assert(background.tilemap == first.tiles.data());
     assert(background.tileIndexMask == wizward::world::kTileIndexMask);
+    bool foundWater = false;
+    bool foundLand = false;
+    for (std::uint16_t y = 0; y < wizward::world::kMapRows; ++y) {
+        for (std::uint16_t x = 0; x < wizward::world::kMapColumns; ++x) {
+            if (first.isWater(x, y)) {
+                foundWater = true;
+                assert(first.collides(x, y));
+            } else {
+                foundLand = true;
+            }
+        }
+    }
+    assert(foundWater);
+    assert(foundLand);
     pixel_twins::Framebuffer framebuffer;
     auto target = pixel_twins::makeRenderTarget(framebuffer.drawBuffer(), pixel_twins::Screen::Left);
     first.draw(target, assets.background(), 0, 0);
