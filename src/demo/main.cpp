@@ -9,6 +9,7 @@
 #include "pixel_twins/sdl_presenter.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -94,6 +95,18 @@ bool applyUpdate(const wizward::game::UpdateResult& result,
     return true;
 }
 
+void updateBgmVoiceTitle(pixel_twins::sdl::Presenter& presenter, std::uint8_t muteMask) noexcept {
+    std::array<char, 128> title{};
+    auto offset = std::snprintf(title.data(), title.size(), "Wizward BGM");
+    for (unsigned voice = 0; voice < pixel_twins::kBgmVoiceCount; ++voice) {
+        if (offset < 0 || static_cast<std::size_t>(offset) >= title.size()) break;
+        offset += std::snprintf(title.data() + offset, title.size() - static_cast<std::size_t>(offset),
+                                "  F%u:%s", voice + 1U,
+                                (muteMask & (1U << voice)) != 0U ? "MUTE" : "ON");
+    }
+    presenter.setTitle(title.data());
+}
+
 // RP2350版と同様に、大きなゲーム状態をスタックへ置かない。
 wizward::game::Game game;
 
@@ -115,10 +128,20 @@ int main(int argc, char** argv) {
     if (initialScene == wizward::game::Scene::Gameplay
         && !audioPlayer.playBgm(wizward::audio::kField)) return 1;
     pixel_twins::Controllers controllers;
+    std::uint8_t bgmVoiceMuteMask = 0;
+    updateBgmVoiceTitle(presenter, bgmVoiceMuteMask);
     auto previousTime = std::chrono::steady_clock::now();
     auto accumulatedTime = std::chrono::steady_clock::duration::zero();
     std::uint32_t presentedFrames = 0;
     while (presenter.processEvents(&controllerInput)) {
+        const auto voiceToggles = controllerInput.takeBgmVoiceToggleMask();
+        if (voiceToggles != 0U) {
+            bgmVoiceMuteMask = static_cast<std::uint8_t>(bgmVoiceMuteMask ^ voiceToggles);
+            if (!audioPlayer.setBgmVoiceMuteMask(bgmVoiceMuteMask)) return 1;
+            updateBgmVoiceTitle(presenter, bgmVoiceMuteMask);
+            std::fprintf(stderr, "BGM voice mute mask: 0x%02x\n",
+                         static_cast<unsigned>(bgmVoiceMuteMask));
+        }
         const auto frameStart = std::chrono::steady_clock::now();
         const auto currentTime = std::chrono::steady_clock::now();
         const auto maximumFrameTime = std::chrono::duration_cast<
