@@ -1130,8 +1130,10 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
         const auto anchorX = downed ? (index == 0 ? 14.0F : 16.0F)
                                          : (index == 0 ? 12.0F : 14.0F);
         constexpr float kPlayerAnchorY = 30.0F;
-        const auto screenX = static_cast<std::int16_t>(player.x - camera.x - anchorX);
-        const auto screenY = static_cast<std::int16_t>(player.y - camera.y - kPlayerAnchorY);
+        const auto screenX = static_cast<std::int16_t>(
+            std::round(player.x - camera.x - anchorX));
+        const auto screenY = static_cast<std::int16_t>(
+            std::round(player.y - camera.y - kPlayerAnchorY));
         const auto directionRow = static_cast<std::uint8_t>(player.facing);
         const auto asset = index == 0
             ? (downed ? assets::SpriteAssetId::GirlMageDowned28x321fSheet
