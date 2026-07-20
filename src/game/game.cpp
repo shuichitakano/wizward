@@ -204,9 +204,9 @@ PIXEL_TWINS_SRAM void drawMiniMap(pixel_twins::RenderTarget target,
         const auto y = static_cast<std::int16_t>(kY + seal.y * kSize / world::kMapRows);
         pixel_twins::fillCircle(target, x, y, 1, gameplay.seal(index).active ? 255 : 220);
     }
-    // 重なった場合も1Pの色と輪郭が隠れないよう、2Pから先に描く。
+    // 重なった場合も、この画面を見ているプレイヤーの色と輪郭を前面に出す。
     for (std::size_t order = 0; order < pixel_twins::kControllerCount; ++order) {
-        const auto index = pixel_twins::kControllerCount - 1U - order;
+        const auto index = (viewer + 1U + order) % pixel_twins::kControllerCount;
         const auto& player = gameplay.player(index);
         const auto x = static_cast<std::int16_t>(kX + player.x * kSize
             / static_cast<float>(world::kMapColumns * kWorldTileSize));
