@@ -37,6 +37,7 @@ constexpr float kMapPixelWidth = static_cast<float>(world::kMapColumns * kWorldT
 constexpr float kMapPixelHeight = static_cast<float>(world::kMapRows * kWorldTileSize);
 constexpr float kWorldCenter = 50.5F * static_cast<float>(kWorldTileSize);
 constexpr float kTau = 6.2831853F;
+constexpr float kEnemyRecycleRange = 320.0F;
 
 struct AttackStats {
     std::uint8_t count;
@@ -1475,6 +1476,39 @@ bool spawnEnemyNear(std::array<EnemyState, kMaximumEnemies>& enemies,
     return false;
 }
 
+void recycleDistantEnemiesForSpawn(
+    std::array<EnemyState, kMaximumEnemies>& enemies,
+    const std::array<PlayerState, pixel_twins::kControllerCount>& players,
+    std::uint8_t requestedCount) noexcept {
+    const auto activeCount = static_cast<std::size_t>(std::count_if(
+        enemies.begin(), enemies.end(),
+        [](const EnemyState& enemy) { return enemy.active; }));
+    auto needed = activeCount + requestedCount > kMaximumEnemies
+        ? activeCount + requestedCount - kMaximumEnemies
+        : 0U;
+    while (needed > 0U) {
+        EnemyState* candidate = nullptr;
+        auto candidateDistanceSquared = kEnemyRecycleRange * kEnemyRecycleRange;
+        for (auto& enemy : enemies) {
+            if (!enemy.active || enemy.kind == EnemyKind::Boss) continue;
+            auto closestDistanceSquared = std::numeric_limits<float>::max();
+            for (const auto& player : players) {
+                if (player.hp <= 0) continue;
+                closestDistanceSquared = std::min(
+                    closestDistanceSquared,
+                    squaredDistance(enemy.x, enemy.y, player.x, player.y));
+            }
+            if (closestDistanceSquared > candidateDistanceSquared) {
+                candidate = &enemy;
+                candidateDistanceSquared = closestDistanceSquared;
+            }
+        }
+        if (candidate == nullptr) return;
+        *candidate = {};
+        --needed;
+    }
+}
+
 void spawnSwarm(std::array<EnemyState, kMaximumEnemies>& enemies,
                 std::array<PlayerState, pixel_twins::kControllerCount>& players,
                 const world::WorldMap& map, std::uint32_t elapsedTicks,
@@ -1527,7 +1561,7 @@ void GameplayState::pushSfx(SfxId id, float pan,
     sfxCues_[sfxCueCount_++] = {id, pan, pitchScale, volumeScale};
 }
 
-void GameplayState::reset(const world::WorldMap&, std::size_t startingPlayer,
+void GameplayState::reset(const world::WorldMap& map, std::size_t startingPlayer,
                           Difficulty difficulty) noexcept {
     players_[0] = {kWorldCenter - 28.0F, kWorldCenter, Facing::East};
     players_[1] = {kWorldCenter + 28.0F, kWorldCenter, Facing::West};
@@ -1545,7 +1579,8 @@ void GameplayState::reset(const world::WorldMap&, std::size_t startingPlayer,
     impactEffects_.fill({});
     perkEffects_.fill({});
     enemyBullets_.fill({});
-    randomState_ = 0x57495aU;
+    const auto gameplaySeed = map.seed ^ 0x57495aU;
+    randomState_ = gameplaySeed != 0U ? gameplaySeed : 0x57495aU;
     spawnCooldownTicks_ = 1;
     swarmCooldownTicks_ = static_cast<std::uint16_t>(
         28U * 60U * balance.spawnIntervalPercent / 100U);
@@ -1718,6 +1753,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
     }
     if (spawnCooldownTicks_ == 0) {
         const auto requestedCount = static_cast<std::uint8_t>(2U + elapsedTicks_ / (45U * 60U));
+        recycleDistantEnemiesForSpawn(enemies_, players_, requestedCount);
         const auto focusIndex = randomUnit(randomState_) < 0.5F ? 0U : 1U;
         const auto& focus = players_[players_[focusIndex].hp > 0 ? focusIndex : 1U - focusIndex];
         for (std::uint8_t index = 0; index < requestedCount; ++index) {

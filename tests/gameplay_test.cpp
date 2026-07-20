@@ -127,6 +127,34 @@ int main() {
     assert(std::abs((gameplay.camera(0).x + 80.0F) - gameplay.player(0).x) < 0.01F);
     assert(std::abs((gameplay.camera(0).y + 60.0F) - (gameplay.player(0).y - 16.0F)) < 0.01F);
 
+    wizward::world::WorldMap alternateSeedMap;
+    alternateSeedMap.seed = 0x12345678U;
+    gameplay.reset(alternateSeedMap);
+    gameplay.tick(controllersWith(0, 0), alternateSeedMap);
+    const auto firstSeedSpawn = std::find_if(gameplay.enemies().begin(), gameplay.enemies().end(),
+        [](const auto& enemy) { return enemy.active && enemy.bornTicks > 0; });
+    assert(firstSeedSpawn != gameplay.enemies().end());
+    const auto firstSeedSpawnX = firstSeedSpawn->x;
+    const auto firstSeedSpawnY = firstSeedSpawn->y;
+    alternateSeedMap.seed = 0x87654321U;
+    gameplay.reset(alternateSeedMap);
+    gameplay.tick(controllersWith(0, 0), alternateSeedMap);
+    const auto secondSeedSpawn = std::find_if(gameplay.enemies().begin(), gameplay.enemies().end(),
+        [](const auto& enemy) { return enemy.active && enemy.bornTicks > 0; });
+    assert(secondSeedSpawn != gameplay.enemies().end());
+    assert(firstSeedSpawnX != secondSeedSpawn->x || firstSeedSpawnY != secondSeedSpawn->y);
+
+    gameplay.reset(map);
+    for (std::size_t index = 0; index < wizward::game::kMaximumEnemies; ++index) {
+        assert(gameplay.addEnemy(gameplay.player(0).x + 400.0F,
+                                 gameplay.player(0).y + static_cast<float>(index % 3U),
+                                 wizward::game::EnemyKind::Imp));
+    }
+    gameplay.tick(controllersWith(0, 0), map);
+    assert(gameplay.enemyCount() == wizward::game::kMaximumEnemies);
+    assert(std::count_if(gameplay.enemies().begin(), gameplay.enemies().end(),
+        [](const auto& enemy) { return enemy.active && enemy.bornTicks > 0; }) == 2);
+
     const auto stopped = controllersWith(1000, -1000);
     gameplay.tick(stopped, map);
     assert(!gameplay.player(0).moving);
