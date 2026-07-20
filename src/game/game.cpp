@@ -632,8 +632,6 @@ PIXEL_TWINS_SRAM void queuePerkEffectUnder(
         assets::SpriteAssetId::HpUpGroundRing32x165fSheet, 5, 32, 16};
     constexpr PerkSpriteSpec kLevelRing{
         assets::SpriteAssetId::LevelUpGroundRing40x205fSheet, 5, 40, 20};
-    constexpr PerkSpriteSpec kBombGroundWave{
-        assets::SpriteAssetId::BombGroundWave64x326fSheet, 6, 64, 32};
     for (const auto& effect : gameplay.perkEffects()) {
         if (!effect.active || effect.owner >= pixel_twins::kControllerCount) continue;
         const auto& player = gameplay.player(effect.owner);
@@ -648,15 +646,6 @@ PIXEL_TWINS_SRAM void queuePerkEffectUnder(
             queuePerkSpriteWindow(buckets, assets, camera, kLevelRing,
                                   age, 0.0F, 0.36F, player.x, player.y, player.y);
         }
-    }
-    for (std::size_t index = 0; index < pixel_twins::kControllerCount; ++index) {
-        const auto& player = gameplay.player(index);
-        if (player.bombEffectTicks == 0) continue;
-        const auto age = static_cast<float>(34U - player.bombEffectTicks) / 60.0F;
-        queuePerkSpriteWindow(buckets, assets, camera, kBombGroundWave,
-                              age, 0.07F, 0.47F,
-                              player.bombEffectX, player.bombEffectY,
-                              player.bombEffectY);
     }
 }
 
@@ -1098,9 +1087,9 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
         const auto& player = gameplay.player(playerIndex);
         if (player.bombEffectTicks == 0) continue;
         constexpr PerkSpriteSpec kBombCore{
-            assets::SpriteAssetId::BombCore48x487fSheet, 7, 48, 48};
+            assets::SpriteAssetId::BombCoreWave64x487fSheet, 7, 64, 48};
         constexpr PerkSpriteSpec kBombRay{
-            assets::SpriteAssetId::BombRay16x164f8dirSheet, 4, 16, 16};
+            assets::SpriteAssetId::BombRay16x161f8dirSheet, 1, 16, 16};
         constexpr PerkSpriteSpec kBombFragment{
             assets::SpriteAssetId::BombFragment8x84fSheet, 4, 8, 8};
         constexpr float kTau = 6.2831853F;
@@ -1111,9 +1100,14 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                              player.bombEffectX, player.bombEffectY - 12.0F);
         for (std::uint8_t row = 0; row < 8; ++row) {
             const auto start = row % 2U == 0U ? 0.0F : 0.045F;
-            drawPerkSpriteWindow(target, assets, camera, kBombRay,
-                                 age, start, start + 0.22F,
-                                 player.bombEffectX, player.bombEffectY - 12.0F, row);
+            const auto progress = std::clamp((age - start) / 0.42F, 0.0F, 1.0F);
+            if (progress <= 0.0F || progress >= 1.0F) continue;
+            const auto angle = static_cast<float>(row) * kPi / 4.0F;
+            const auto travel = smoothStep(progress) * 96.0F;
+            const auto x = player.bombEffectX + std::cos(angle) * travel;
+            const auto y = player.bombEffectY - 12.0F + std::sin(angle) * travel;
+            drawPerkSpriteProgress(target, assets, camera, kBombRay,
+                                   progress, x, y, row);
         }
         for (std::uint8_t fragment = 0; fragment < 12; ++fragment) {
             const auto delay = 0.08F + static_cast<float>(fragment % 3U) * 0.025F;

@@ -30,6 +30,12 @@ int main() {
     assert(sprite.p != nullptr && sprite.sw > 0 && sprite.sh > 0);
     assert(assets.animationFrameCount(
         wizward::assets::SpriteAssetId::BossBlueFireball1616x163fSheet) == 3);
+    assert(assets.animationFrameCount(
+        wizward::assets::SpriteAssetId::PlazaRecallCircle32) == 1);
+    assert(assets.animationFrameCount(
+        wizward::assets::SpriteAssetId::BombCoreWave64x487fSheet) == 7);
+    assert(assets.animationFrameCount(
+        wizward::assets::SpriteAssetId::BombRay16x161f8dirSheet) == 1);
     assert(assets.makeLoopingSprite(
         wizward::assets::SpriteAssetId::BossBlueFireball1616x163fSheet,
         4,

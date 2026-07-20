@@ -23,7 +23,10 @@ def main() -> int:
     args = parser.parse_args()
     project = Path(__file__).resolve().parents[1]
     root = project.parent
-    converter = root / "pixel-twins" / "tools" / "asset_converter"
+    pixel_twins = project / "external" / "pixel-twins"
+    if not (pixel_twins / "tools" / "asset_converter").is_dir():
+        pixel_twins = root / "pixel-twins"
+    converter = pixel_twins / "tools" / "asset_converter"
     if not args.skip_collect:
         _run([sys.executable, "tools/collect_selected_assets.py"], project)
     gameplay = project / "assets" / "converted" / "gameplay"

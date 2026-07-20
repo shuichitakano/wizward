@@ -1747,6 +1747,19 @@
       "adopted_from": "assets/map_tiles_selected/objects_baked/shrub_grass_0.png"
     },
     {
+      "id": "map_tiles_selected__overlays__plaza_recall_circle_32",
+      "kind": "sprite",
+      "pack_kind": "sprite",
+      "frame": {
+        "width": 32,
+        "height": 32
+      },
+      "source": "../source/gameplay/map_tiles_selected/overlays/plaza_recall_circle_32.png",
+      "alpha_threshold": 0,
+      "palette_weight": 4,
+      "adopted_from": "assets/map_tiles_selected/overlays/plaza_recall_circle_32.png"
+    },
+    {
       "id": "map_tiles_selected__terrain__dirt_0",
       "kind": "background",
       "pack_kind": "background",
@@ -1987,17 +2000,17 @@
       "adopted_from": "assets/map_tiles_selected/terrain/water_3.png"
     },
     {
-      "id": "perk_effects_selected__downscaled__bomb_core_48x48_7f_sheet",
+      "id": "perk_effects_selected__downscaled__bomb_core_wave_64x48_7f_sheet",
       "kind": "sprite",
       "pack_kind": "sprite",
       "frame": {
-        "width": 48,
+        "width": 64,
         "height": 48
       },
-      "source": "../source/gameplay/perk_effects_selected/downscaled/bomb_core_48x48_7f_sheet.png",
+      "source": "../source/gameplay/perk_effects_selected/downscaled/bomb_core_wave_64x48_7f_sheet.png",
       "alpha_threshold": 0,
       "palette_weight": 4,
-      "adopted_from": "assets/perk_effects_selected/downscaled/bomb_core_48x48_7f_sheet.png"
+      "adopted_from": "assets/perk_effects_selected/downscaled/bomb_core_wave_64x48_7f_sheet.png"
     },
     {
       "id": "perk_effects_selected__downscaled__bomb_fragment_8x8_4f_sheet",
@@ -2013,30 +2026,17 @@
       "adopted_from": "assets/perk_effects_selected/downscaled/bomb_fragment_8x8_4f_sheet.png"
     },
     {
-      "id": "perk_effects_selected__downscaled__bomb_ground_wave_64x32_6f_sheet",
-      "kind": "sprite",
-      "pack_kind": "sprite",
-      "frame": {
-        "width": 64,
-        "height": 32
-      },
-      "source": "../source/gameplay/perk_effects_selected/downscaled/bomb_ground_wave_64x32_6f_sheet.png",
-      "alpha_threshold": 0,
-      "palette_weight": 4,
-      "adopted_from": "assets/perk_effects_selected/downscaled/bomb_ground_wave_64x32_6f_sheet.png"
-    },
-    {
-      "id": "perk_effects_selected__downscaled__bomb_ray_16x16_4f_8dir_sheet",
+      "id": "perk_effects_selected__downscaled__bomb_ray_16x16_1f_8dir_sheet",
       "kind": "sprite",
       "pack_kind": "sprite",
       "frame": {
         "width": 16,
         "height": 16
       },
-      "source": "../source/gameplay/perk_effects_selected/downscaled/bomb_ray_16x16_4f_8dir_sheet.png",
+      "source": "../source/gameplay/perk_effects_selected/downscaled/bomb_ray_16x16_1f_8dir_sheet.png",
       "alpha_threshold": 0,
       "palette_weight": 4,
-      "adopted_from": "assets/perk_effects_selected/downscaled/bomb_ray_16x16_4f_8dir_sheet.png"
+      "adopted_from": "assets/perk_effects_selected/downscaled/bomb_ray_16x16_1f_8dir_sheet.png"
     },
     {
       "id": "perk_effects_selected__downscaled__common_rising_mote_6x8_4f_sheet",

@@ -157,6 +157,8 @@ def _asset_id(relative: str) -> str:
 def _asset_layout(
     relative: Path, set_name: str
 ) -> Tuple[str, str, Optional[Dict[str, int]]]:
+    if relative.parts[:2] == ("map_tiles_selected", "overlays"):
+        return "sprite", "sprite", {"width": 32, "height": 32}
     if relative.parts[0] == "map_tiles_selected" or relative.name == "title_screen_160x120.png":
         return "background", "background", None
     if relative.parts[0] == "fonts_selected":
