@@ -13,6 +13,14 @@ SDL、Pico SDK、USB、PIO、DMAの型は`Game`に含めません。BGM開始と
 `AudioEvent`として接続層へ返します。これにより、macOS版はSDL音声ストリームのロック下で、
 RP2350版は割り込みとの排他方式の確定後に同じイベントを処理できます。
 
+## BGMドラム音源
+
+BGMのSnare、Hat、Percussionは、8声のBGM波形メモリ音源とは別の15-bit最大長LFSRノイズ
+1声を共有します。LFSRは48kHzの各出力サンプルで1回更新し、ハイパスフィルターは使用しません。
+同時発音時の優先度はSnare、Percussion、Hatの順です。Snareは同じ専用チャンネル内で
+180Hzから105Hzへ50msで下降する三角波を加算し、65msで消音します。最大構成は
+8 BGM波形声 + 1 BGMノイズ声 + 8 SFX波形声です。
+
 ## ビルド
 
 ```sh
