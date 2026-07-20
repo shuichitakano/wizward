@@ -43,6 +43,18 @@ int main() {
         20,
         30,
         sprite));
+    pixel_twins::Sprite p1Gem{};
+    pixel_twins::Sprite p2Gem{};
+    assert(assets.makeXpGemSprite(0, 0, 0, p1Gem));
+    assert(assets.makeXpGemSprite(1, 0, 0, p2Gem));
+    assert(p1Gem.sw == 8 && p1Gem.sh == 8);
+    bool gemColorsDiffer = false;
+    for (std::size_t pixel = 0; pixel < 64; ++pixel) {
+        assert((p1Gem.p[pixel] == pixel_twins::kTransparentColor)
+               == (p2Gem.p[pixel] == pixel_twins::kTransparentColor));
+        gemColorsDiffer = gemColorsDiffer || p1Gem.p[pixel] != p2Gem.p[pixel];
+    }
+    assert(gemColorsDiffer);
 
     wizward::assets::TitleAssets title;
     assert(title.initialize());

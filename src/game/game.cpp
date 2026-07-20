@@ -195,6 +195,9 @@ PIXEL_TWINS_SRAM void drawMiniMap(pixel_twins::RenderTarget target,
         }
     }
     pixel_twins::drawRectangle(target, kX, kY, kSize, kSize, 32);
+    pixel_twins::fillRectangle(target,
+        static_cast<std::int16_t>(kX + 50U * kSize / world::kMapColumns),
+        static_cast<std::int16_t>(kY + 50U * kSize / world::kMapRows), 2, 2, 220);
     for (std::size_t index = 0; index < map.seals.size(); ++index) {
         const auto& seal = map.seals[index];
         const auto x = static_cast<std::int16_t>(kX + seal.x * kSize / world::kMapColumns);
@@ -208,6 +211,36 @@ PIXEL_TWINS_SRAM void drawMiniMap(pixel_twins::RenderTarget target,
         const auto y = static_cast<std::int16_t>(kY + player.y * kSize
             / static_cast<float>(world::kMapRows * kWorldTileSize));
         pixel_twins::fillCircle(target, x, y, index == viewer ? 2 : 1, index == 0 ? 19 : 20);
+    }
+}
+
+PIXEL_TWINS_SRAM void drawXpRecallCircle(pixel_twins::RenderTarget target,
+                         const assets::GameAssets& assets,
+                         const CameraState& camera,
+                         const GameplayState& gameplay) noexcept {
+    constexpr float kCenter = 50.5F * static_cast<float>(kWorldTileSize);
+    pixel_twins::Sprite circle{};
+    if (assets.makeSprite(assets::SpriteAssetId::PlazaRecallCircle32, 0, 0,
+                          static_cast<std::int16_t>(std::round(kCenter - camera.x - 16.0F)),
+                          static_cast<std::int16_t>(std::round(kCenter - camera.y - 16.0F)),
+                          circle)) {
+        pixel_twins::drawSprite(target, circle);
+    }
+    constexpr float kTau = 6.2831853F;
+    for (std::size_t playerIndex = 0; playerIndex < pixel_twins::kControllerCount; ++playerIndex) {
+        const auto ticks = gameplay.player(playerIndex).xpRecallEffectTicks;
+        if (ticks == 0) continue;
+        const auto progress = 1.0F - static_cast<float>(ticks) / 42.0F;
+        const auto radius = 5.0F + progress * 18.0F;
+        for (std::uint8_t particle = 0; particle < 8; ++particle) {
+            const auto angle = static_cast<float>(particle) * kTau / 8.0F;
+            pixel_twins::fillRectangle(target,
+                static_cast<std::int16_t>(std::round(kCenter - camera.x
+                    + std::cos(angle) * radius)),
+                static_cast<std::int16_t>(std::round(kCenter - camera.y
+                    + std::sin(angle) * radius * 0.55F)),
+                2, 2, playerIndex == 0 ? 19 : 20);
+        }
     }
 }
 
@@ -777,6 +810,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        bool showHud = true) noexcept {
     map.draw(target, assets.background(), static_cast<std::int32_t>(camera.x),
              static_cast<std::int32_t>(camera.y));
+    drawXpRecallCircle(target, assets, camera, gameplay);
     drawActiveSeals(target, map, gameplay, camera);
     drawBossIntroShadow(target, gameplay, camera);
     spriteBuckets.reset();
@@ -847,9 +881,16 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     }
     for (const auto& gem : gameplay.xpGems()) {
         if (!gem.active) continue;
-        queueAsset(spriteBuckets, assets, assets::SpriteAssetId::XpGem88x81fSheet, 0,
-                   static_cast<std::int16_t>(gem.x - camera.x - 4.0F),
-                   static_cast<std::int16_t>(gem.y - camera.y - 4.0F), gem.y - camera.y);
+        const auto gemX = static_cast<std::int16_t>(gem.x - camera.x - 4.0F);
+        const auto gemY = static_cast<std::int16_t>(gem.y - camera.y - 4.0F);
+        constexpr float kSortMargin = 60.0F;
+        const auto bucket = static_cast<std::uint16_t>(std::clamp(
+            static_cast<std::int32_t>(gem.y - camera.y + kSortMargin), 0,
+            static_cast<std::int32_t>(pixel_twins::kBucketCount - 1U)));
+        pixel_twins::Sprite sprite{};
+        if (assets.makeXpGemSprite(gem.owner, gemX, gemY, sprite)) {
+            (void)spriteBuckets.addSprite(bucket, sprite);
+        }
     }
     for (const auto& enemy : gameplay.enemies()) {
         if ((!enemy.active && enemy.deathTicks == 0) || enemy.spawnDelayTicks > 0) continue;

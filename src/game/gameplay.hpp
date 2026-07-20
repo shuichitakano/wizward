@@ -200,6 +200,8 @@ struct PlayerState {
     float bombEffectX = 0.0F;
     float bombEffectY = 0.0F;
     std::uint32_t bombEffectSeed = 0;
+    std::uint8_t xpRecallEffectTicks = 0;
+    bool xpRecallInside = false;
     bool sharePending = false;
     Perk sharePerk = Perk::Light;
 };
@@ -295,6 +297,8 @@ struct XpGemState {
     float y = 0.0F;
     std::uint16_t ageTicks = 0;
     std::uint8_t value = 0;
+    std::uint8_t owner = 0;
+    std::uint8_t recallPlayer = 0xff;
     bool active = false;
 };
 

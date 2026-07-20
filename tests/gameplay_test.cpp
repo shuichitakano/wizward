@@ -302,7 +302,7 @@ int main() {
         for (std::size_t index = 0; index < choices.size(); ++index) {
             if (choices[index] != wizward::game::Perk::Bomb) continue;
             const auto bombPlayer = gameplay.player(0);
-            assert(gameplay.addEnemy(bombPlayer.x + 50.0F, bombPlayer.y,
+            assert(gameplay.addEnemy(bombPlayer.x - 90.0F, bombPlayer.y,
                                      wizward::game::EnemyKind::Golem));
             gameplay.tick(controllersWith(0, 0, choiceButton(index)), map);
             bombSelected = true;
@@ -313,10 +313,18 @@ int main() {
     assert(bombSelected);
     assert(gameplay.player(0).bombEffectTicks > 0);
     assert(gameplay.player(0).bombEffectSeed != 0);
-    assert(std::any_of(gameplay.enemies().begin(), gameplay.enemies().end(),
+    assert(std::none_of(gameplay.enemies().begin(), gameplay.enemies().end(),
         [](const auto& enemy) {
-            return enemy.kind == wizward::game::EnemyKind::Golem && enemy.hp <= 54;
+            return enemy.active && enemy.kind == wizward::game::EnemyKind::Golem;
         }));
+    const auto ownedGem = std::find_if(gameplay.xpGems().begin(), gameplay.xpGems().end(),
+        [](const auto& gem) { return gem.active && gem.owner == 0; });
+    assert(ownedGem != gameplay.xpGems().end());
+    for (int tick = 0; tick < 12; ++tick) gameplay.tick(controllersWith(32767, 0), map);
+    assert(gameplay.player(0).xpRecallInside);
+    assert(gameplay.player(0).xpRecallEffectTicks > 0);
+    assert(std::any_of(gameplay.xpGems().begin(), gameplay.xpGems().end(),
+        [](const auto& gem) { return gem.active && gem.owner == 0 && gem.recallPlayer == 0; }));
 
     gameplay.reset(map);
     for (int level = 0; level < 4; ++level) {

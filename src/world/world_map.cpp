@@ -80,7 +80,7 @@ float edgeNoise(std::int32_t x, std::int32_t y, std::uint32_t salt,
 }
 
 MapPoint rotatePoint(MapPoint point, float angle, float radiusScale) noexcept {
-    constexpr MapPoint kCenter{50.0F, 50.0F};
+    constexpr MapPoint kCenter{50.5F, 50.5F};
     const auto dx = (point.x - kCenter.x) * radiusScale;
     const auto dy = (point.y - kCenter.y) * radiusScale;
     const auto cosine = std::cos(angle);
@@ -169,7 +169,7 @@ bool transitionNeighbor(const TerrainWorkspace& workspace,
     for (const auto& sample : kSamples) {
         const auto other = terrainAt(workspace, x + sample[0], y + sample[1]);
         BoundaryId ignored{};
-        if (other != own && boundaryFor(own, other, ignored)) {
+        if (value(other) > value(own) && boundaryFor(own, other, ignored)) {
             scores[value(other)] = static_cast<std::uint8_t>(scores[value(other)] + sample[2]);
         }
     }
@@ -196,16 +196,10 @@ TerrainId cornerTerrain(const TerrainWorkspace& workspace,
         terrainAt(workspace, cornerX, cornerY),
         terrainAt(workspace, cornerX - 1, cornerY),
     }};
-    std::uint8_t upperVotes = 0;
-    std::uint8_t lowerVotes = 0;
     for (const auto sample : samples) {
-        upperVotes = static_cast<std::uint8_t>(upperVotes + (sample == upper));
-        lowerVotes = static_cast<std::uint8_t>(lowerVotes + (sample == lower));
+        if (sample == upper) return upper;
     }
-    if (upperVotes == lowerVotes) {
-        return value(samples[2]) >= value(upper) ? upper : lower;
-    }
-    return upperVotes > lowerVotes ? upper : lower;
+    return lower;
 }
 
 bool basePattern(const TerrainWorkspace& workspace,
@@ -220,6 +214,10 @@ bool basePattern(const TerrainWorkspace& workspace,
     if (transitionNeighbor(workspace, x, y, own, other) && boundaryFor(own, other, boundary)) {
         const auto lower = value(own) < value(other) ? own : other;
         const auto upper = lower == own ? other : own;
+        if (own != lower) {
+            const auto variant = static_cast<std::uint8_t>(tileHash(x, y, value(own), seed) % 4U);
+            return assets.terrainPattern(value(own), variant, pattern);
+        }
         std::uint8_t mask = 0;
         const std::array<std::array<std::int8_t, 2>, 4> corners{{
             {{0, 0}}, {{1, 0}}, {{1, 1}}, {{0, 1}},
@@ -233,8 +231,7 @@ bool basePattern(const TerrainWorkspace& workspace,
                 mask = static_cast<std::uint8_t>(mask | (1U << index));
             }
         }
-        const auto ownMask = own == upper ? 15U : 0U;
-        if (mask != ownMask) {
+        if (mask != 0U) {
             return assets.boundaryPattern(value(boundary), mask, pattern);
         }
     }
@@ -257,15 +254,19 @@ bool putObject(WorldMap& map,
     return true;
 }
 
-bool plainGrass(const TerrainWorkspace& terrain, std::uint16_t x, std::uint16_t y) noexcept {
-    if (terrain.get(x, y) != TerrainId::Grass || x == 0 || y == 0
+bool plainTerrain(const TerrainWorkspace& terrain, std::uint16_t x, std::uint16_t y,
+                  TerrainId expected) noexcept {
+    if (x == 0 || y == 0
         || x + 1 >= kMapColumns || y + 1 >= kMapRows) {
         return false;
     }
-    return terrain.get(x - 1, y) == TerrainId::Grass
-        && terrain.get(x + 1, y) == TerrainId::Grass
-        && terrain.get(x, y - 1) == TerrainId::Grass
-        && terrain.get(x, y + 1) == TerrainId::Grass;
+    for (std::int32_t oy = -1; oy <= 1; ++oy) {
+        for (std::int32_t ox = -1; ox <= 1; ++ox) {
+            if (terrain.get(static_cast<std::uint16_t>(x + ox),
+                            static_cast<std::uint16_t>(y + oy)) != expected) return false;
+        }
+    }
+    return true;
 }
 
 bool transitionFill(TerrainId a, TerrainId b, TerrainId& fill) noexcept {
@@ -361,6 +362,64 @@ void smoothTerrain(TerrainWorkspace& terrain,
     normalizeTerrain(terrain, scratch);
 }
 
+void resolveTerrainJunctions(
+    TerrainWorkspace& terrain,
+    std::array<std::uint8_t, kMapTileCount>& scratch) noexcept {
+    for (std::uint8_t pass = 0; pass < 8; ++pass) {
+        scratch.fill(0xffU);
+        bool changed = false;
+        for (std::uint16_t cornerY = 1; cornerY < kMapRows; ++cornerY) {
+            for (std::uint16_t cornerX = 1; cornerX < kMapColumns; ++cornerX) {
+                const std::array<std::array<std::uint16_t, 2>, 4> cells{{
+                    {{static_cast<std::uint16_t>(cornerX - 1U), static_cast<std::uint16_t>(cornerY - 1U)}},
+                    {{cornerX, static_cast<std::uint16_t>(cornerY - 1U)}},
+                    {{cornerX, cornerY}},
+                    {{static_cast<std::uint16_t>(cornerX - 1U), cornerY}},
+                }};
+                std::array<std::uint8_t, 6> counts{};
+                std::uint8_t distinct = 0;
+                for (const auto& cell : cells) {
+                    const auto terrainValue = value(terrain.get(cell[0], cell[1]));
+                    if (counts[terrainValue]++ == 0U) ++distinct;
+                }
+                if (distinct <= 2U) continue;
+                std::array<std::uint8_t, 6> values{};
+                std::uint8_t valueCount = 0;
+                for (std::uint8_t terrainValue = 0; terrainValue < counts.size(); ++terrainValue) {
+                    if (counts[terrainValue] > 0U) values[valueCount++] = terrainValue;
+                }
+                const auto middle = values[valueCount / 2U];
+                std::size_t targetIndex = cells.size();
+                std::uint8_t targetCount = 0xffU;
+                std::uint8_t targetDistance = 0;
+                for (std::size_t cellIndex = 0; cellIndex < cells.size(); ++cellIndex) {
+                    const auto terrainValue = value(terrain.get(cells[cellIndex][0], cells[cellIndex][1]));
+                    if (terrainValue == middle) continue;
+                    const auto distance = static_cast<std::uint8_t>(std::abs(
+                        static_cast<int>(terrainValue) - static_cast<int>(middle)));
+                    if (counts[terrainValue] < targetCount
+                        || (counts[terrainValue] == targetCount && distance > targetDistance)) {
+                        targetIndex = cellIndex;
+                        targetCount = counts[terrainValue];
+                        targetDistance = distance;
+                    }
+                }
+                if (targetIndex == cells.size()) continue;
+                const auto& target = cells[targetIndex];
+                scratch[static_cast<std::size_t>(target[1]) * kMapColumns + target[0]] = middle;
+                changed = true;
+            }
+        }
+        if (!changed) return;
+        for (std::uint16_t y = 0; y < kMapRows; ++y) {
+            for (std::uint16_t x = 0; x < kMapColumns; ++x) {
+                const auto update = scratch[static_cast<std::size_t>(y) * kMapColumns + x];
+                if (update != 0xffU) terrain.set(x, y, static_cast<TerrainId>(update));
+            }
+        }
+    }
+}
+
 bool nearBakedObject(const WorldMap& map, std::int32_t x, std::int32_t y,
                      std::int32_t radius,
                      const std::array<bool, 128>& objectPatterns) noexcept {
@@ -388,7 +447,7 @@ bool placeSparseObjects(WorldMap& map, const TerrainWorkspace& terrain,
         bool found = false;
         for (std::uint16_t y = 2; y + 2 < kMapRows; ++y) {
             for (std::uint16_t x = 2; x + 2 < kMapColumns; ++x) {
-                if (!plainGrass(terrain, x, y)
+                if (!plainTerrain(terrain, x, y, TerrainId::Grass)
                     || nearBakedObject(map, x, y, minimumDistance, objectPatterns)) continue;
                 const auto score = tileHash(x, y, salt, map.seed);
                 if (!found || score < bestScore) {
@@ -565,7 +624,7 @@ bool MapGenerator::generate(
         result.patternCollisionShapes[pattern] = kCollisionShapeDecoration;
     }
 
-    constexpr MapPoint kCenter{50.0F, 50.0F};
+    constexpr MapPoint kCenter{50.5F, 50.5F};
     constexpr std::array<MapPoint, 3> kBaseSeals{{
         {16.875F, 22.5F}, {82.5F, 25.3125F}, {49.375F, 82.5F},
     }};
@@ -703,6 +762,10 @@ bool MapGenerator::generate(
             from = to;
         }
     }
+    smoothTerrain(workspace, result.tiles);
+    resolveTerrainJunctions(workspace, result.tiles);
+    normalizeTerrain(workspace, result.tiles);
+    resolveTerrainJunctions(workspace, result.tiles);
 
     for (std::uint16_t y = 0; y < kMapRows; ++y) {
         for (std::uint16_t x = 0; x < kMapColumns; ++x) {
@@ -734,7 +797,7 @@ bool MapGenerator::generate(
     for (const auto offset : kPedestals) {
         const auto x = static_cast<std::uint16_t>(50 + offset[0]);
         const auto y = static_cast<std::uint16_t>(50 + offset[1]);
-        if (workspace.get(x, y) != TerrainId::Plaza) continue;
+        if (!plainTerrain(workspace, x, y, TerrainId::Plaza)) continue;
         if (!putObject(result,
                        x, y,
                        BakedObjectId::PlazaPedestal,

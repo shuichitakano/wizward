@@ -8,6 +8,7 @@
 #include "pixel_twins/framebuffer.hpp"
 #include "pixel_twins/sprite_asset.hpp"
 
+#include <array>
 #include <cstdint>
 
 namespace wizward::assets {
@@ -34,10 +35,15 @@ public:
                                          std::int16_t logicalX,
                                          std::int16_t logicalY,
                                          pixel_twins::Sprite& result) const noexcept;
+    [[nodiscard]] bool makeXpGemSprite(std::uint8_t owner,
+                                       std::int16_t logicalX,
+                                       std::int16_t logicalY,
+                                       pixel_twins::Sprite& result) const noexcept;
 
 private:
     pixel_twins::BackgroundAssetPackView background_;
     pixel_twins::SpriteAssetPackView sprites_;
+    std::array<std::array<std::uint8_t, 64>, 2> xpGemPatterns_{};
 };
 
 } // namespace wizward::assets

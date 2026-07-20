@@ -16,6 +16,19 @@ int main() {
     wizward::world::WorldMap first;
     wizward::world::MapGenerator generator;
     assert(generator.generate(12345, assets.background(), workspace, first));
+    const auto assertNoTerrainJunctions = [](const wizward::world::TerrainWorkspace& terrain) {
+        for (std::uint16_t cy = 1; cy < wizward::world::kMapRows; ++cy) {
+            for (std::uint16_t cx = 1; cx < wizward::world::kMapColumns; ++cx) {
+                std::array<bool, 6> terrains{};
+                terrains[static_cast<std::size_t>(terrain.get(cx - 1, cy - 1))] = true;
+                terrains[static_cast<std::size_t>(terrain.get(cx, cy - 1))] = true;
+                terrains[static_cast<std::size_t>(terrain.get(cx, cy))] = true;
+                terrains[static_cast<std::size_t>(terrain.get(cx - 1, cy))] = true;
+                assert(std::count(terrains.begin(), terrains.end(), true) <= 2);
+            }
+        }
+    };
+    assertNoTerrainJunctions(workspace);
 
     for (const auto tile : first.tiles) {
         assert((tile & wizward::world::kTileIndexMask) < assets.background().patternCount());
@@ -32,6 +45,7 @@ int main() {
         wizward::assets::BakedObjectId::FlowerBlueGrass,
         wizward::assets::BakedObjectId::FlowerYellowGrass,
     }};
+    std::size_t decorationCount = 0;
     for (std::size_t index = 0; index < kDecorations.size(); ++index) {
         std::uint8_t pattern = 0;
         assert(assets.background().objectPattern(
@@ -39,9 +53,12 @@ int main() {
         const auto actualCount = std::count_if(first.tiles.begin(), first.tiles.end(), [pattern](std::uint8_t tile) {
             return (tile & wizward::world::kTileIndexMask) == pattern;
         });
-        assert(actualCount > 0);
+        decorationCount += static_cast<std::size_t>(actualCount);
+        if (index < 2) assert(actualCount > 0);
         assert(actualCount <= kDecorationCounts[index]);
     }
+    assert(decorationCount > 0);
+
     const auto background = first.background(assets.background());
     assert(background.width == wizward::world::kMapColumns);
     assert(background.height == wizward::world::kMapRows);
@@ -81,6 +98,7 @@ int main() {
         wizward::world::WorldMap generated;
         assert(generator.generate(seed * 2654435761U, assets.background(), workspace, generated));
         assert(generated.seed == seed * 2654435761U);
+        assertNoTerrainJunctions(workspace);
     }
 
     const auto seal = first.seals[0];

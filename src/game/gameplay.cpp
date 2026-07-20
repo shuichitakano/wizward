@@ -20,6 +20,8 @@ constexpr float kLightHomingRange = 95.0F;
 constexpr float kXpPullRange = 52.0F;
 constexpr float kXpCollectRange = 9.0F;
 constexpr float kXpPullSpeedPerTick = 2.0F;
+constexpr float kXpRecallRadius = 18.0F;
+constexpr float kXpRecallSpeedPerTick = 8.0F;
 constexpr std::int16_t kAxisDeadzone = 4096;
 constexpr std::int16_t kLightDamage = 6;
 constexpr std::int16_t kContactDamage = 3;
@@ -33,6 +35,7 @@ std::int16_t scaledValue(std::int16_t value, std::uint8_t percent) noexcept {
 constexpr float kCameraVerticalOffset = 16.0F;
 constexpr float kMapPixelWidth = static_cast<float>(world::kMapColumns * kWorldTileSize);
 constexpr float kMapPixelHeight = static_cast<float>(world::kMapRows * kWorldTileSize);
+constexpr float kWorldCenter = 50.5F * static_cast<float>(kWorldTileSize);
 constexpr float kTau = 6.2831853F;
 
 struct AttackStats {
@@ -480,7 +483,7 @@ void killEnemy(EnemyState& enemy,
                     return lhs.ageTicks < rhs.ageTicks;
                 });
         }
-        *gem = {enemy.x, enemy.y, 0, enemy.xpValue, true};
+        *gem = {enemy.x, enemy.y, 0, enemy.xpValue, owner, 0xff, true};
         constexpr std::array<std::uint16_t, 7> kScores{{10, 15, 45, 100, 30, 25, 60}};
         if (owner < scores.size()) scores[owner] += kScores[static_cast<std::size_t>(enemy.kind)];
     }
@@ -889,13 +892,14 @@ void processBombs(std::array<PlayerState, pixel_twins::kControllerCount>& player
             if (!enemy.active || enemy.bornTicks > 0) continue;
             const auto range = kRadius + enemy.radius;
             if (squaredDistance(player.x, player.y, enemy.x, enemy.y) > range * range) continue;
-            enemy.hp = static_cast<std::int16_t>(enemy.hp - 32);
+            enemy.hp = static_cast<std::int16_t>(enemy.hp - 300);
             if (enemy.hp <= 0) {
                 killEnemy(enemy, static_cast<std::uint8_t>(playerIndex), xpGems, scores);
             }
         }
         for (auto& bullet : enemyBullets) {
-            if (!bullet.active || bullet.type != EnemyBulletType::Arrow) continue;
+            if (!bullet.active || (bullet.type != EnemyBulletType::Arrow
+                && bullet.type != EnemyBulletType::Magic)) continue;
             const auto range = kRadius + bullet.radius;
             if (squaredDistance(player.x, player.y, bullet.x, bullet.y) <= range * range) {
                 bullet.active = false;
@@ -1326,8 +1330,8 @@ bool spawnBoss(std::array<EnemyState, kMaximumEnemies>& enemies,
     auto slot = std::find_if(enemies.begin(), enemies.end(),
         [](const EnemyState& enemy) { return !enemy.active && enemy.deathTicks == 0; });
     if (slot == enemies.end()) slot = std::prev(enemies.end());
-    *slot = makeEnemyState(EnemyKind::Boss, kMapPixelWidth * 0.5F,
-                           kMapPixelHeight * 0.5F, elapsedTicks, randomState, false, balance);
+    *slot = makeEnemyState(EnemyKind::Boss, kWorldCenter,
+                           kWorldCenter, elapsedTicks, randomState, false, balance);
     return true;
 }
 
@@ -1352,6 +1356,32 @@ void updatePerkChoice(PlayerState& player, const pixel_twins::ControllerState& c
     beginPerkChoice(player, randomState);
 }
 
+bool updateXpRecallCircle(std::array<XpGemState, kMaximumXpGems>& xpGems,
+                          std::array<PlayerState, pixel_twins::kControllerCount>& players) noexcept {
+    auto recalled = false;
+    for (std::size_t playerIndex = 0; playerIndex < players.size(); ++playerIndex) {
+        auto& player = players[playerIndex];
+        if (player.xpRecallEffectTicks > 0) --player.xpRecallEffectTicks;
+        const auto inside = player.hp > 0
+            && squaredDistance(player.x, player.y, kWorldCenter, kWorldCenter)
+                <= kXpRecallRadius * kXpRecallRadius;
+        if (inside && !player.xpRecallInside) {
+            auto count = std::size_t{0};
+            for (auto& gem : xpGems) {
+                if (!gem.active || gem.owner != playerIndex) continue;
+                gem.recallPlayer = static_cast<std::uint8_t>(playerIndex);
+                ++count;
+            }
+            if (count > 0) {
+                player.xpRecallEffectTicks = 42;
+                recalled = true;
+            }
+        }
+        player.xpRecallInside = inside;
+    }
+    return recalled;
+}
+
 void updateXpGems(std::array<XpGemState, kMaximumXpGems>& xpGems,
                   std::array<PlayerState, pixel_twins::kControllerCount>& players,
                   std::uint32_t& randomState,
@@ -1360,28 +1390,40 @@ void updateXpGems(std::array<XpGemState, kMaximumXpGems>& xpGems,
     for (auto& gem : xpGems) {
         if (!gem.active) continue;
         if (gem.ageTicks < std::numeric_limits<std::uint16_t>::max()) ++gem.ageTicks;
-        PlayerState* nearest = nullptr;
-        auto nearestSquared = kXpPullRange * kXpPullRange;
-        for (auto& player : players) {
-            if (player.hp <= 0) continue;
-            const auto candidate = squaredDistance(gem.x, gem.y, player.x, player.y);
-            if (candidate <= nearestSquared) {
-                nearestSquared = candidate;
-                nearest = &player;
+        PlayerState* target = nullptr;
+        auto targetSquared = std::numeric_limits<float>::max();
+        const auto recalled = gem.recallPlayer < players.size()
+            ? &players[gem.recallPlayer] : nullptr;
+        if (recalled != nullptr && recalled->hp > 0) {
+            target = recalled;
+            targetSquared = squaredDistance(gem.x, gem.y, target->x, target->y);
+        } else {
+            gem.recallPlayer = 0xff;
+            targetSquared = kXpPullRange * kXpPullRange;
+            for (auto& player : players) {
+                if (player.hp <= 0) continue;
+                const auto candidate = squaredDistance(gem.x, gem.y, player.x, player.y);
+                if (candidate <= targetSquared) {
+                    targetSquared = candidate;
+                    target = &player;
+                }
             }
         }
-        if (nearest == nullptr) continue;
-        if (nearestSquared < kXpCollectRange * kXpCollectRange) {
-            const auto owner = static_cast<std::uint8_t>(nearest - players.data());
-            gainXp(*nearest, owner, gem.value, randomState, perkEffects, difficulty);
+        if (target == nullptr) continue;
+        if (targetSquared < kXpCollectRange * kXpCollectRange) {
+            const auto owner = static_cast<std::uint8_t>(target - players.data());
+            gainXp(*target, owner, gem.value, randomState, perkEffects, difficulty);
             gem.active = false;
             continue;
         }
-        auto dx = nearest->x - gem.x;
-        auto dy = nearest->y - gem.y;
+        auto dx = target->x - gem.x;
+        auto dy = target->y - gem.y;
         normalize(dx, dy);
-        gem.x += dx * kXpPullSpeedPerTick;
-        gem.y += dy * kXpPullSpeedPerTick;
+        const auto speed = recalled != nullptr && recalled->hp > 0
+            ? kXpRecallSpeedPerTick : kXpPullSpeedPerTick;
+        const auto step = std::min(std::sqrt(targetSquared), speed);
+        gem.x += dx * step;
+        gem.y += dy * step;
     }
 }
 
@@ -1487,9 +1529,8 @@ void GameplayState::pushSfx(SfxId id, float pan,
 
 void GameplayState::reset(const world::WorldMap&, std::size_t startingPlayer,
                           Difficulty difficulty) noexcept {
-    constexpr float kCenter = 50.5F * static_cast<float>(kWorldTileSize);
-    players_[0] = {kCenter - 28.0F, kCenter, Facing::East};
-    players_[1] = {kCenter + 28.0F, kCenter, Facing::West};
+    players_[0] = {kWorldCenter - 28.0F, kWorldCenter, Facing::East};
+    players_[1] = {kWorldCenter + 28.0F, kWorldCenter, Facing::West};
     difficulty_ = difficulty;
     const auto balance = balanceProfile(difficulty_);
     for (auto& player : players_) {
@@ -1741,6 +1782,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
                       impactEffects_);
     updateThunderStrikes(thunderStrikes_);
     updateEnemyBullets(enemyBullets_, players_, balance);
+    const auto xpRecallStarted = updateXpRecallCircle(xpGems_, players_);
     updateXpGems(xpGems_, players_, randomState_, perkEffects_, difficulty_);
     outcome_ = updateRevives(players_);
     for (auto& enemy : enemies_) {
@@ -1750,8 +1792,8 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         const auto defeated = std::find_if(enemies_.begin(), enemies_.end(), [](const EnemyState& enemy) {
             return enemy.kind == EnemyKind::Boss;
         });
-        clearX_ = defeated != enemies_.end() ? defeated->x : kMapPixelWidth * 0.5F;
-        clearY_ = defeated != enemies_.end() ? defeated->y : kMapPixelHeight * 0.5F;
+        clearX_ = defeated != enemies_.end() ? defeated->x : kWorldCenter;
+        clearY_ = defeated != enemies_.end() ? defeated->y : kWorldCenter;
         clearFacing_ = defeated != enemies_.end() ? defeated->facing : Facing::South;
         enemies_.fill({});
         bullets_.fill({});
@@ -1847,7 +1889,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
     for (std::size_t index = 0; index < xpGems_.size(); ++index) {
         xpCollected = xpCollected || (xpGemBefore[index] && !xpGems_[index].active);
     }
-    if (xpCollected) pushSfx(SfxId::Xp);
+    if (xpCollected || xpRecallStarted) pushSfx(SfxId::Xp);
     if (activeSealCount_ > sealCountBefore) pushSfx(SfxId::SealJingle);
     for (const auto& seal : seals_) {
         if (!seal.active || elapsedTicks_ < seal.activatedAtTicks) continue;
