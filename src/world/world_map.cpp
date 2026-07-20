@@ -614,6 +614,9 @@ bool MapGenerator::generate(
         if (!assets.boundaryPattern(value(BoundaryId::WaterToSand), mask, pattern)) return false;
         result.patternCollisionShapes[pattern] = static_cast<std::uint8_t>(kCollisionShapeCoastBase | mask);
     }
+    std::uint8_t fullLandCoastPattern = 0;
+    if (!assets.boundaryPattern(value(BoundaryId::WaterToSand), 15,
+                                fullLandCoastPattern)) return false;
     constexpr std::array<BakedObjectId, 5> kCollisionObjects{{
         BakedObjectId::RockGrass, BakedObjectId::ShrubGrass, BakedObjectId::PlazaPedestal,
         BakedObjectId::SealInactivePlaza, BakedObjectId::SealActivePlaza,
@@ -773,7 +776,10 @@ bool MapGenerator::generate(
             if (!basePattern(workspace, x, y, seed, assets, pattern)) {
                 return false;
             }
-            const auto collision = workspace.get(x, y) == TerrainId::Water;
+            // mask 15 は全面砂と同じパターンへ重複圧縮される。元セルが水でも
+            // 見た目どおり全面歩行可能なので、水衝突ビットを残さない。
+            const auto collision = workspace.get(x, y) == TerrainId::Water
+                && pattern != fullLandCoastPattern;
             result.tiles[static_cast<std::size_t>(y) * kMapColumns + x] =
                 static_cast<std::uint8_t>(pattern | (collision ? kCollisionBit : 0U));
         }

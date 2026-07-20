@@ -78,6 +78,14 @@ int main() {
     }
     assert(foundWater);
     assert(foundLand);
+    std::uint8_t fullLandCoastPattern = 0;
+    assert(assets.background().boundaryPattern(
+        static_cast<std::uint8_t>(wizward::assets::BoundaryId::WaterToSand), 15,
+        fullLandCoastPattern));
+    assert(std::none_of(first.tiles.begin(), first.tiles.end(), [fullLandCoastPattern](std::uint8_t tile) {
+        return (tile & wizward::world::kTileIndexMask) == fullLandCoastPattern
+            && (tile & wizward::world::kCollisionBit) != 0U;
+    }));
     pixel_twins::Framebuffer framebuffer;
     auto target = pixel_twins::makeRenderTarget(framebuffer.drawBuffer(), pixel_twins::Screen::Left);
     first.draw(target, assets.background(), 0, 0);
@@ -99,6 +107,11 @@ int main() {
         assert(generator.generate(seed * 2654435761U, assets.background(), workspace, generated));
         assert(generated.seed == seed * 2654435761U);
         assertNoTerrainJunctions(workspace);
+        assert(std::none_of(generated.tiles.begin(), generated.tiles.end(),
+            [fullLandCoastPattern](std::uint8_t tile) {
+                return (tile & wizward::world::kTileIndexMask) == fullLandCoastPattern
+                    && (tile & wizward::world::kCollisionBit) != 0U;
+            }));
     }
 
     const auto seal = first.seals[0];
