@@ -51,6 +51,9 @@ int main() {
 
     assert(game.initialize());
     assert(game.difficulty() == wizward::game::Difficulty::Easy);
+    assert(game.setDifficulty(wizward::game::Difficulty::Hard));
+    assert(game.difficulty() == wizward::game::Difficulty::Hard);
+    assert(game.setDifficulty(wizward::game::Difficulty::Easy));
     const auto initialMapSeed = game.mapSeed();
     assert(game.scene() == Scene::Title);
     game.render();
@@ -74,6 +77,8 @@ int main() {
     assert(startResult.audio == AudioEvent::PlayField);
     assert(startResult.playStartSfx);
     assert(game.scene() == Scene::Gameplay);
+    assert(!game.setDifficulty(wizward::game::Difficulty::Hard));
+    assert(game.difficulty() == wizward::game::Difficulty::Easy);
     assert(game.gameplay().player(0).maxHp == 40);
     assert(game.mapSeed() != initialMapSeed);
     assert(!game.gameplay().playerIsManual(0));

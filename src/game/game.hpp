@@ -73,6 +73,11 @@ public:
     [[nodiscard]] bool paused() const noexcept { return paused_; }
     [[nodiscard]] std::uint32_t mapSeed() const noexcept { return worldMap_.seed; }
     [[nodiscard]] Difficulty difficulty() const noexcept { return difficulty_; }
+    [[nodiscard]] bool setDifficulty(Difficulty difficulty) noexcept {
+        if (scene_ != Scene::Title) return false;
+        difficulty_ = difficulty;
+        return true;
+    }
     [[nodiscard]] const GameplayState& gameplay() const noexcept { return gameplay_; }
     [[nodiscard]] std::uint32_t timeBonus(std::size_t player) const noexcept {
         return timeBonuses_[player];

@@ -9,7 +9,6 @@
 #include "pixel_twins/sdl_presenter.hpp"
 
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -116,19 +115,11 @@ bool applyUpdate(const wizward::game::UpdateResult& result,
     return true;
 }
 
-void updateBgmTrackTitle(pixel_twins::sdl::Presenter& presenter, std::uint8_t muteMask) noexcept {
-    constexpr std::array<const char*, 7> kTrackNames{{
-        "BASS", "DRUMS", "PERC", "SYNTH", "LEAD", "DELAY", "KEYS",
-    }};
-    std::array<char, 128> title{};
-    auto offset = std::snprintf(title.data(), title.size(), "Wizward BGM");
-    for (std::size_t track = 0; track < kTrackNames.size(); ++track) {
-        if (offset < 0 || static_cast<std::size_t>(offset) >= title.size()) break;
-        offset += std::snprintf(title.data() + offset, title.size() - static_cast<std::size_t>(offset),
-                                "  F%zu:%s=%s", track + 1U, kTrackNames[track],
-                                (muteMask & (1U << track)) != 0U ? "MUTE" : "ON");
-    }
-    presenter.setTitle(title.data());
+void updateDifficultyTitle(pixel_twins::sdl::Presenter& presenter,
+                           wizward::game::Difficulty difficulty) noexcept {
+    presenter.setTitle(difficulty == wizward::game::Difficulty::Hard
+        ? "Wizward  [HARD]  F1:NORMAL F2:HARD"
+        : "Wizward  [NORMAL]  F1:NORMAL F2:HARD");
 }
 
 // RP2350版と同様に、大きなゲーム状態をスタックへ置かない。
@@ -154,19 +145,16 @@ int main(int argc, char** argv) {
     if (initialScene == wizward::game::Scene::Gameplay
         && !audioPlayer.playBgm(wizward::audio::kField)) return 1;
     pixel_twins::Controllers controllers;
-    std::uint8_t bgmTrackMuteMask = 0;
-    updateBgmTrackTitle(presenter, bgmTrackMuteMask);
+    updateDifficultyTitle(presenter, game.difficulty());
     auto previousTime = std::chrono::steady_clock::now();
     auto accumulatedTime = std::chrono::steady_clock::duration::zero();
     std::uint32_t presentedFrames = 0;
     while (presenter.processEvents(&controllerInput)) {
-        const auto trackToggles = controllerInput.takeBgmTrackToggleMask();
-        if (trackToggles != 0U) {
-            bgmTrackMuteMask = static_cast<std::uint8_t>(bgmTrackMuteMask ^ trackToggles);
-            if (!audioPlayer.setBgmTrackMuteMask(bgmTrackMuteMask)) return 1;
-            updateBgmTrackTitle(presenter, bgmTrackMuteMask);
-            std::fprintf(stderr, "BGM track mute mask: 0x%02x\n",
-                         static_cast<unsigned>(bgmTrackMuteMask));
+        const auto functionKey = controllerInput.takeFunctionKeyPress();
+        if (functionKey == 1U || functionKey == 2U) {
+            const auto selected = functionKey == 1U
+                ? wizward::game::Difficulty::Easy : wizward::game::Difficulty::Hard;
+            if (game.setDifficulty(selected)) updateDifficultyTitle(presenter, selected);
         }
         const auto frameStart = std::chrono::steady_clock::now();
         const auto currentTime = std::chrono::steady_clock::now();

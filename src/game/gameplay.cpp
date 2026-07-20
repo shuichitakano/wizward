@@ -38,6 +38,10 @@ constexpr float kMapPixelHeight = static_cast<float>(world::kMapRows * kWorldTil
 constexpr float kWorldCenter = 50.5F * static_cast<float>(kWorldTileSize);
 constexpr float kTau = 6.2831853F;
 constexpr float kEnemyRecycleRange = 320.0F;
+constexpr float kEnemySpawnMinimumRange = 88.0F;
+constexpr float kEnemySpawnMaximumRange = 220.0F;
+constexpr float kEnemySwarmMinimumRange = 120.0F;
+constexpr float kEnemySwarmMaximumRange = 200.0F;
 
 struct AttackStats {
     std::uint8_t count;
@@ -1464,7 +1468,8 @@ bool spawnEnemyNear(std::array<EnemyState, kMaximumEnemies>& enemies,
     if (slot == enemies.end()) return false;
     for (std::uint8_t attempt = 0; attempt < 40; ++attempt) {
         const auto angle = randomUnit(randomState) * kTau;
-        const auto range = 88.0F + randomUnit(randomState) * 132.0F;
+        const auto range = kEnemySpawnMinimumRange
+            + randomUnit(randomState) * (kEnemySpawnMaximumRange - kEnemySpawnMinimumRange);
         const auto x = std::clamp(focus.x + std::cos(angle) * range, 20.0F, kMapPixelWidth - 20.0F);
         const auto y = std::clamp(focus.y + std::sin(angle) * range, 20.0F, kMapPixelHeight - 20.0F);
         if (boss != nullptr && squaredDistance(x, y, boss->x, boss->y) < 60.0F * 60.0F) continue;
@@ -1525,7 +1530,8 @@ void spawnSwarm(std::array<EnemyState, kMaximumEnemies>& enemies,
     const auto count = kind == EnemyKind::Golem ? 2U : (kind == EnemyKind::Skeleton ? 3U
         : (kind == EnemyKind::Bat || kind == EnemyKind::Wisp ? 6U : 8U));
     const auto baseAngle = randomUnit(randomState) * kTau;
-    const auto range = 120.0F + randomUnit(randomState) * 80.0F;
+    const auto range = kEnemySwarmMinimumRange
+        + randomUnit(randomState) * (kEnemySwarmMaximumRange - kEnemySwarmMinimumRange);
     for (std::uint8_t index = 0; index < count; ++index) {
         const auto centeredIndex = static_cast<float>(index)
             - static_cast<float>(count - 1U) * 0.5F;

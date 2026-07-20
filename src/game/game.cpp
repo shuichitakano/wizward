@@ -562,10 +562,28 @@ PIXEL_TWINS_SRAM void queueScaledAsset(
                 std::int16_t y,
                 std::uint8_t width,
                 std::uint8_t height,
+                std::uint8_t logicalWidth,
+                std::uint8_t logicalHeight,
                 float screenFootY) noexcept {
     pixel_twins::Sprite source{};
     if (!assets.makeLoopingSprite(id, frame, directionRow, x, y, source)) return;
-    pixel_twins::SpriteEx sprite{x, y, width, height, source.sw, source.sh, source.p};
+    const auto trimX = static_cast<std::int16_t>(source.dx - x);
+    const auto trimY = static_cast<std::int16_t>(source.dy - y);
+    const auto scaledLeft = static_cast<std::int16_t>(std::round(
+        static_cast<float>(trimX) * width / logicalWidth));
+    const auto scaledTop = static_cast<std::int16_t>(std::round(
+        static_cast<float>(trimY) * height / logicalHeight));
+    const auto scaledRight = static_cast<std::int16_t>(std::round(
+        static_cast<float>(trimX + source.sw) * width / logicalWidth));
+    const auto scaledBottom = static_cast<std::int16_t>(std::round(
+        static_cast<float>(trimY + source.sh) * height / logicalHeight));
+    if (scaledRight <= scaledLeft || scaledBottom <= scaledTop) return;
+    pixel_twins::SpriteEx sprite{
+        static_cast<std::int16_t>(x + scaledLeft),
+        static_cast<std::int16_t>(y + scaledTop),
+        static_cast<std::uint8_t>(scaledRight - scaledLeft),
+        static_cast<std::uint8_t>(scaledBottom - scaledTop),
+        source.sw, source.sh, source.p};
     constexpr float kSortMargin = 60.0F;
     const auto bucket = static_cast<std::uint16_t>(std::clamp(
         static_cast<std::int32_t>(screenFootY + kSortMargin), 0,
@@ -955,7 +973,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
             const auto shadowWidth = static_cast<std::uint16_t>(std::max(2.0F, std::round(2.0F + progress * 8.0F)));
             pixel_twins::fillRectangle(target,
                 static_cast<std::int16_t>(footX - static_cast<std::int16_t>(shadowWidth / 2U)),
-                footY, shadowWidth, 2, 1);
+                footY, shadowWidth, 2, 27);
             const auto smooth = [](float value) noexcept {
                 const auto t = std::clamp(value, 0.0F, 1.0F);
                 return t * t * (3.0F - 2.0F * t);
@@ -968,7 +986,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                                             static_cast<std::uint16_t>(lineHeight), 17);
                 pixel_twins::fillRectangle(target, footX,
                                             static_cast<std::int16_t>(footY - lineHeight - 2), 1,
-                                            static_cast<std::uint16_t>(lineHeight + 3), 18);
+                                            static_cast<std::uint16_t>(lineHeight + 3), 13);
                 continue;
             }
             float scaleX = 1.0F;
@@ -994,7 +1012,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                 fourDirectionRow(enemy.facing),
                 static_cast<std::int16_t>(std::round(enemy.x - camera.x - anchorX * scaleX)),
                 static_cast<std::int16_t>(std::round(drawEnemyY - camera.y - anchorY * scaleY)),
-                width, height, drawEnemyY - camera.y);
+                width, height, spriteWidth, spriteHeight, drawEnemyY - camera.y);
             continue;
         }
         queueAsset(spriteBuckets, assets, asset, animationFrame,
