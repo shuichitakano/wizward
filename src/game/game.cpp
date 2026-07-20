@@ -822,12 +822,15 @@ template<std::size_t Capacity, std::size_t ExCapacity>
 PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        const world::WorldMap& map,
                        const assets::GameAssets& assets,
-                       const CameraState& camera,
+                       const CameraState& cameraState,
                        const GameplayState& gameplay,
                        pixel_twins::SpriteBuckets<Capacity, ExCapacity>& spriteBuckets,
                        std::uint32_t frame,
                        std::size_t viewer,
                        bool showHud = true) noexcept {
+    // The prototype rounds the camera once before drawing the world and every overlay.
+    // Keep that shared pixel origin so fixed world details cannot drift by one pixel.
+    const CameraState camera{std::round(cameraState.x), std::round(cameraState.y)};
     map.draw(target, assets.background(), static_cast<std::int32_t>(camera.x),
              static_cast<std::int32_t>(camera.y));
     drawXpRecallCircle(target, assets, camera, gameplay);
