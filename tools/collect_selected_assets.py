@@ -14,40 +14,42 @@ from typing import Dict, Iterable, List, Optional, Tuple
 IMAGE_REFERENCE_RE = re.compile(r'assets/[A-Za-z0-9_./-]+\.png')
 FRAME_RE = re.compile(r"(\d+)x(\d+)_\d+f")
 
-FRAME_RESERVED = [
-    (2, "effect fire", "#ff7b32"),
-    (3, "effect wind", "#79f05b"),
-    (4, "effect thunder", "#ffe35a"),
-    (5, "effect ice", "#8de9ff"),
-    (6, "effect orb", "#9b7cff"),
-    (7, "effect familiar", "#ff8bd1"),
-    (8, "effect speed", "#39e6d0"),
-    (9, "effect hp", "#ff4c6d"),
-    (10, "effect heal", "#57f287"),
-    (11, "effect gold", "#ffcf5a"),
-    (12, "effect energy blue", "#5ec8ff"),
-    (13, "effect energy pale", "#e8fbff"),
-    (14, "effect damage", "#ff3d5a"),
-    (15, "effect highlight", "#ffd96a"),
-    (16, "effect success", "#70ff9b"),
-    (17, "effect magic", "#b88cff"),
+UI_RESERVED = [
+    (2, "font_body", "#f1ead8"),
+    (3, "player_1", "#ff7648"),
+    (4, "player_2", "#69a8ff"),
+    (5, "hp_gauge", "#ff4c6d"),
+    (6, "highlight", "#ffd96a"),
+    (7, "ranking_title", "#8fd7ff"),
+    (8, "gauge_dark", "#141716"),
+    (9, "minimap_collision", "#425245"),
+    (10, "minimap_field", "#315344"),
+    (11, "minimap_border", "#9e9864"),
+    (12, "minimap_landmark", "#665533"),
+    (13, "boss_gauge_empty", "#5f5f5a"),
 ]
 
-UI_RESERVED = [
-    (18, "font body default", "#f1ead8"),
-    (19, "player 1 marker", "#ff7648"),
-    (20, "player 2 marker", "#69a8ff"),
-    (21, "ranking title", "#8fd7ff"),
-    (22, "result down", "#ff8b7a"),
-    (23, "result time up", "#ffb86b"),
-    (24, "seal cyan", "#61dff2"),
-    (25, "seal deep cyan", "#286b8d"),
-    (26, "seal pale cyan", "#dffcff"),
-    (27, "panel dark", "#111816"),
-    (28, "gauge dark", "#141716"),
-    (29, "collision map", "#425245"),
-    (30, "minimap field", "#315344"),
-    (31, "ui beige outline", "#f4d8a6"),
+# 固定インデックスを消費せず、減色標本へ加えて生成後に最近傍色を解決する演出色。
+EFFECT_TARGETS = [
+    ("thunder", "#ffe35a"),
+    ("energy_blue", "#5ec8ff"),
+    ("energy_pale", "#e8fbff"),
+    ("magic", "#b88cff"),
+    ("seal_cyan", "#61dff2"),
+    ("seal_deep_cyan", "#286b8d"),
+    ("seal_pale_cyan", "#dffcff"),
+    ("seal_trail_dark", "#664b42"),
+    ("seal_trail_bright", "#a7e6f0"),
+    ("effect_warm", "#785648"),
+    ("spawn_shadow", "#111816"),
+    ("boss_shadow_landed", "#572b22"),
+    ("boss_shadow_airborne", "#635849"),
+    ("boss_impact", "#c7b283"),
+    ("clear_energy_dark", "#7e2a34"),
+    ("clear_rock_light", "#b19b76"),
+    ("clear_rock_black", "#1e1d26"),
+    ("clear_rock_mid", "#776b58"),
+    ("clear_rock_base", "#37342c"),
 ]
 
 BG_TERRAINS = ["water", "sand", "grass", "dirt", "road", "plaza"]
@@ -205,12 +207,12 @@ def _copy_and_describe(
 
 
 def _converter_manifest(name: str, assets: List[Dict[str, object]], gameplay: bool) -> Dict[str, object]:
-    reserved = FRAME_RESERVED + UI_RESERVED if gameplay else []
+    reserved = UI_RESERVED if gameplay else [UI_RESERVED[0]]
     return {
         "version": 1,
         "name": name,
         "palette": {
-            "asset_range": [32, 254] if gameplay else [2, 254],
+            "asset_range": [14, 254] if gameplay else [3, 254],
             "sample_pixels": 1_000_000,
             "max_pixels_per_asset": 4096,
             "quantizer": "fast_octree" if gameplay else "median_cut",
@@ -218,6 +220,10 @@ def _converter_manifest(name: str, assets: List[Dict[str, object]], gameplay: bo
                 {"index": index, "name": label, "color": color}
                 for index, label, color in reserved
             ],
+            "targets": [
+                {"name": name, "color": color, "weight": 256}
+                for name, color in EFFECT_TARGETS
+            ] if gameplay else [],
         },
         "assets": assets,
     }

@@ -36,6 +36,10 @@ def main() -> int:
         "-o", str(gameplay), "--clean",
     ], converter)
     _run([
+        sys.executable, "tools/generate_palette_indices.py", str(gameplay / "report.json"),
+        str(gameplay / "palette_indices.hpp"),
+    ], project)
+    _run([
         "uv", "run", "pixel-twins-assets", str(project / "assets/manifests/title.json"),
         "-o", str(title), "--clean",
     ], converter)

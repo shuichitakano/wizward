@@ -1,5 +1,6 @@
 #include "game/game.hpp"
 
+#include "palette_indices.hpp"
 #include "assets/wizward_font.hpp"
 
 #include "pixel_twins/font.hpp"
@@ -85,7 +86,8 @@ PIXEL_TWINS_SRAM void drawPerkChoices(pixel_twins::RenderTarget target,
         }
     }
     for (std::uint8_t index = 1; index < player.pendingPerkChoices; ++index) {
-        pixel_twins::fillRectangle(target, static_cast<std::int16_t>(116 + index * 3U), 113, 1, 1, 15);
+        pixel_twins::fillRectangle(target, static_cast<std::int16_t>(116 + index * 3U), 113, 1, 1,
+                                   assets::palette::kHighlight);
     }
 }
 
@@ -138,7 +140,8 @@ PIXEL_TWINS_SRAM void drawRightAlignedText(pixel_twins::RenderTarget target,
     const auto width = static_cast<std::int16_t>(
         text.empty() ? 0 : (text.size() - 1U) * static_cast<std::size_t>(stride) + 8U);
     pixel_twins::drawText(target, assets::kWizwardFont,
-                          static_cast<std::int16_t>(right - width), y, text, 18, stride);
+                          static_cast<std::int16_t>(right - width), y, text,
+                          assets::palette::kFontBody, stride);
 }
 
 PIXEL_TWINS_SRAM void drawCenteredText(pixel_twins::RenderTarget target,
@@ -149,7 +152,8 @@ PIXEL_TWINS_SRAM void drawCenteredText(pixel_twins::RenderTarget target,
     const auto width = static_cast<std::int16_t>(
         text.empty() ? 0 : (text.size() - 1U) * static_cast<std::size_t>(stride) + 8U);
     pixel_twins::drawText(target, assets::kWizwardFont,
-                          static_cast<std::int16_t>(center - width / 2), y, text, 18, stride);
+                          static_cast<std::int16_t>(center - width / 2), y, text,
+                          assets::palette::kFontBody, stride);
 }
 
 PIXEL_TWINS_SRAM void drawTimer(pixel_twins::RenderTarget target,
@@ -191,18 +195,22 @@ PIXEL_TWINS_SRAM void drawMiniMap(pixel_twins::RenderTarget target,
             if (map.isWater(tx, ty)) continue;
             pixel_twins::fillRectangle(target,
                 static_cast<std::int16_t>(kX + mx), static_cast<std::int16_t>(kY + my), 1, 1,
-                map.collides(tx, ty) ? 29 : 30);
+                map.collides(tx, ty) ? assets::palette::kMinimapCollision
+                                     : assets::palette::kMinimapField);
         }
     }
-    pixel_twins::drawRectangle(target, kX, kY, kSize, kSize, 32);
+    pixel_twins::drawRectangle(target, kX, kY, kSize, kSize,
+                               assets::palette::kMinimapBorder);
     pixel_twins::fillRectangle(target,
         static_cast<std::int16_t>(kX + 50U * kSize / world::kMapColumns),
-        static_cast<std::int16_t>(kY + 50U * kSize / world::kMapRows), 2, 2, 220);
+        static_cast<std::int16_t>(kY + 50U * kSize / world::kMapRows), 2, 2,
+        assets::palette::kMinimapLandmark);
     for (std::size_t index = 0; index < map.seals.size(); ++index) {
         const auto& seal = map.seals[index];
         const auto x = static_cast<std::int16_t>(kX + seal.x * kSize / world::kMapColumns);
         const auto y = static_cast<std::int16_t>(kY + seal.y * kSize / world::kMapRows);
-        pixel_twins::fillCircle(target, x, y, 1, gameplay.seal(index).active ? 255 : 220);
+        pixel_twins::fillCircle(target, x, y, 1,
+            gameplay.seal(index).active ? 255 : assets::palette::kMinimapLandmark);
     }
     // 重なった場合も、この画面を見ているプレイヤーの色と輪郭を前面に出す。
     for (std::size_t order = 0; order < pixel_twins::kControllerCount; ++order) {
@@ -212,7 +220,8 @@ PIXEL_TWINS_SRAM void drawMiniMap(pixel_twins::RenderTarget target,
             / static_cast<float>(world::kMapColumns * kWorldTileSize));
         const auto y = static_cast<std::int16_t>(kY + player.y * kSize
             / static_cast<float>(world::kMapRows * kWorldTileSize));
-        pixel_twins::fillCircle(target, x, y, index == viewer ? 2 : 1, index == 0 ? 19 : 20);
+        pixel_twins::fillCircle(target, x, y, index == viewer ? 2 : 1,
+            index == 0 ? assets::palette::kPlayer1 : assets::palette::kPlayer2);
     }
 }
 
@@ -241,7 +250,8 @@ PIXEL_TWINS_SRAM void drawXpRecallCircle(pixel_twins::RenderTarget target,
                     + std::cos(angle) * radius)),
                 static_cast<std::int16_t>(std::round(kCenter - camera.y
                     + std::sin(angle) * radius * 0.55F)),
-                2, 2, playerIndex == 0 ? 19 : 20);
+                2, 2, playerIndex == 0 ? assets::palette::kPlayer1
+                                       : assets::palette::kPlayer2);
         }
     }
 }
@@ -265,9 +275,15 @@ PIXEL_TWINS_SRAM void drawActiveSeals(pixel_twins::RenderTarget target,
         {5.0F, 4.0F, 0.66F, 10.0F, 9.0F, 4.2F, 10.0F},
         {3.0F, 5.0F, 0.55F, 13.0F, 8.0F, 5.4F, 12.0F},
     }};
-    constexpr std::array<std::uint8_t, 3> kRisingColors{{25, 24, 26}};
-    constexpr std::array<std::uint8_t, 3> kTrailColors{{177, 25, 55}};
-    constexpr std::array<std::uint8_t, 4> kHeadColors{{26, 24, 148, 255}};
+    constexpr std::array<std::uint8_t, 3> kRisingColors{{
+        assets::palette::kSealDeepCyan, assets::palette::kSealCyan,
+        assets::palette::kSealPaleCyan}};
+    constexpr std::array<std::uint8_t, 3> kTrailColors{{
+        assets::palette::kSealTrailDark, assets::palette::kSealDeepCyan,
+        assets::palette::kSealTrailBright}};
+    constexpr std::array<std::uint8_t, 4> kHeadColors{{
+        assets::palette::kSealPaleCyan, assets::palette::kSealCyan,
+        assets::palette::kEffectWarm, 255}};
     const auto elapsed = static_cast<float>(gameplay.elapsedTicks()) / 60.0F;
     for (std::size_t sealIndex = 0; sealIndex < map.seals.size(); ++sealIndex) {
         const auto& state = gameplay.seal(sealIndex);
@@ -286,10 +302,10 @@ PIXEL_TWINS_SRAM void drawActiveSeals(pixel_twins::RenderTarget target,
             const auto height = static_cast<std::uint16_t>(std::max(2.0F, std::round(38.0F * rise * fade)));
             pixel_twins::fillRectangle(target, static_cast<std::int16_t>(x - 1),
                 static_cast<std::int16_t>(y - static_cast<std::int16_t>(height)), 3,
-                static_cast<std::uint16_t>(height + 3U), 25);
+                static_cast<std::uint16_t>(height + 3U), assets::palette::kSealDeepCyan);
             pixel_twins::fillRectangle(target, x,
                 static_cast<std::int16_t>(y - static_cast<std::int16_t>(height) - 2), 1,
-                static_cast<std::uint16_t>(height + 4U), 26);
+                static_cast<std::uint16_t>(height + 4U), assets::palette::kSealPaleCyan);
             const auto burst = smoothStep((age - 0.08F) / 0.42F);
             for (std::uint8_t ray = 0; ray < 8; ++ray) {
                 const auto angle = static_cast<float>(ray) * 3.1415927F / 4.0F + 3.1415927F / 8.0F;
@@ -297,7 +313,8 @@ PIXEL_TWINS_SRAM void drawActiveSeals(pixel_twins::RenderTarget target,
                 pixel_twins::fillRectangle(target,
                     static_cast<std::int16_t>(std::round(static_cast<float>(x) + std::cos(angle) * radius)),
                     static_cast<std::int16_t>(std::round(static_cast<float>(y) + std::sin(angle) * radius * 0.5F)),
-                    2, 1, (ray & 1U) != 0U ? 24 : 148);
+                    2, 1, (ray & 1U) != 0U ? assets::palette::kSealCyan
+                                            : assets::palette::kEffectWarm);
             }
         }
         if (formation <= 0.0F) continue;
@@ -316,7 +333,8 @@ PIXEL_TWINS_SRAM void drawActiveSeals(pixel_twins::RenderTarget target,
                 beam == 0 ? 2 : 1, height, kRisingColors[beam]);
             if (beam == 2 && height >= 4) {
                 pixel_twins::fillRectangle(target, beamX,
-                    static_cast<std::int16_t>(beamY - static_cast<std::int16_t>(height)), 1, 2, 148);
+                    static_cast<std::int16_t>(beamY - static_cast<std::int16_t>(height)), 1, 2,
+                    assets::palette::kEffectWarm);
             }
         }
         for (std::size_t motionIndex = 0; motionIndex < kMotions.size(); ++motionIndex) {
@@ -364,7 +382,8 @@ PIXEL_TWINS_SRAM void drawBossIntroShadow(pixel_twins::RenderTarget target,
     pixel_twins::fillEllipse(target, x, y,
         static_cast<std::uint16_t>(std::round(4.0F + growth * 15.0F)),
         static_cast<std::uint16_t>(std::round(2.0F + growth * 3.0F)),
-        elapsedTicks >= 75U ? 118 : 130);
+        elapsedTicks >= 75U ? assets::palette::kBossShadowLanded
+                            : assets::palette::kBossShadowAirborne);
 }
 
 PIXEL_TWINS_SRAM void drawBossIntroOverlay(pixel_twins::RenderTarget target,
@@ -380,7 +399,8 @@ PIXEL_TWINS_SRAM void drawBossIntroOverlay(pixel_twins::RenderTarget target,
     if (impactTicks < 30U) {
         const auto progress = smoothStep(static_cast<float>(impactTicks) / 30.0F);
         const auto radius = 10.0F + progress * 58.0F;
-        const auto color = static_cast<std::uint8_t>(impactTicks < 11U ? 148U : 201U);
+        const auto color = impactTicks < 11U ? assets::palette::kEffectWarm
+                                             : assets::palette::kBossImpact;
         pixel_twins::drawEllipse(target, x, y,
             static_cast<std::uint16_t>(std::round(radius)),
             static_cast<std::uint16_t>(std::max(3.0F, std::round(radius * 0.24F))), color);
@@ -397,7 +417,7 @@ PIXEL_TWINS_SRAM void drawBossIntroOverlay(pixel_twins::RenderTarget target,
         }
     }
     if (impactTicks < 6U && (impactTicks / 2U) % 2U == 0U) {
-        pixel_twins::fillRectangle(target, 0, 0, 160, 120, 148);
+        pixel_twins::fillRectangle(target, 0, 0, 160, 120, assets::palette::kEffectWarm);
     }
 }
 
@@ -443,7 +463,8 @@ PIXEL_TWINS_SRAM void drawClearSequence(pixel_twins::RenderTarget target,
             const auto targetOuter = 96.0F + unit(index * 17U + 4U) * 172.0F;
             const auto grow = smoothStep((static_cast<float>(ticks) - start) / 51.0F);
             const auto outer = inner + (targetOuter - inner) * grow;
-            const auto color = unit(index * 17U + 5U) < 0.62F ? 13 : 148;
+            const auto color = unit(index * 17U + 5U) < 0.62F
+                ? assets::palette::kEnergyPale : assets::palette::kEffectWarm;
             pixel_twins::drawLine(target,
                 static_cast<std::int16_t>(std::round(centerX + std::cos(angle) * outer)),
                 static_cast<std::int16_t>(std::round(centerY + std::sin(angle) * outer)),
@@ -462,13 +483,16 @@ PIXEL_TWINS_SRAM void drawClearSequence(pixel_twins::RenderTarget target,
                     static_cast<std::int16_t>(std::round(centerX)),
                     static_cast<std::int16_t>(std::round(centerY)),
                     static_cast<std::uint16_t>(std::round(radius)),
-                    (ring & 1U) != 0U ? 12 : 13);
+                    (ring & 1U) != 0U ? assets::palette::kEnergyBlue
+                                      : assets::palette::kEnergyPale);
             }
         }
         return;
     }
     const auto age = static_cast<float>(ticks - 141U) / 60.0F;
-    constexpr std::array<std::uint8_t, 4> kEnergyColors{{12, 13, 241, 148}};
+    constexpr std::array<std::uint8_t, 4> kEnergyColors{{
+        assets::palette::kEnergyBlue, assets::palette::kEnergyPale,
+        assets::palette::kClearEnergyDark, assets::palette::kEffectWarm}};
     for (std::uint16_t index = 0; index < 112; ++index) {
         const auto lifetime = 1.15F + unit(index * 29U + 7U) * 1.05F;
         if (age > lifetime) continue;
@@ -482,7 +506,9 @@ PIXEL_TWINS_SRAM void drawClearSequence(pixel_twins::RenderTarget target,
             static_cast<std::int16_t>(std::round(y)), size, size,
             kEnergyColors[index % kEnergyColors.size()]);
     }
-    constexpr std::array<std::uint8_t, 4> kRockColors{{152, 33, 125, 130}};
+    constexpr std::array<std::uint8_t, 4> kRockColors{{
+        assets::palette::kClearRockLight, assets::palette::kClearRockBlack,
+        assets::palette::kClearRockMid, assets::palette::kBossShadowAirborne}};
     for (std::uint16_t index = 0; index < 72; ++index) {
         const auto lifetime = 1.45F + unit(index * 31U + 11U) * 1.1F;
         if (age > lifetime) continue;
@@ -497,14 +523,16 @@ PIXEL_TWINS_SRAM void drawClearSequence(pixel_twins::RenderTarget target,
             + gravity * age * age * 0.5F;
         const auto size = static_cast<std::uint16_t>(4U + hash(index * 31U + 18U) % 5U);
         pixel_twins::fillRectangle(target, static_cast<std::int16_t>(std::round(x)),
-            static_cast<std::int16_t>(std::round(y)), size, size, (index % 3U) == 0U ? 118 : 124);
+            static_cast<std::int16_t>(std::round(y)), size, size,
+            (index % 3U) == 0U ? assets::palette::kBossShadowLanded
+                               : assets::palette::kClearRockBase);
         pixel_twins::fillRectangle(target, static_cast<std::int16_t>(std::round(x + 1.0F)),
             static_cast<std::int16_t>(std::round(y)), std::max<std::uint16_t>(1, size - 2U),
             std::max<std::uint16_t>(1, size - 2U), kRockColors[index % kRockColors.size()]);
     }
     if (ticks < 155U) {
         pixel_twins::fillRectangle(target, 0, 0, 160, 120,
-            ((ticks - 141U) / 3U) % 2U == 0U ? 255 : 148);
+            ((ticks - 141U) / 3U) % 2U == 0U ? 255 : assets::palette::kEffectWarm);
     }
 }
 
@@ -532,7 +560,7 @@ PIXEL_TWINS_SRAM void drawOffscreenPartnerArrow(pixel_twins::RenderTarget target
         static_cast<std::int16_t>(std::round(y + dx * 4.0F - dy * 3.0F)),
         static_cast<std::int16_t>(std::round(x + dy * 4.0F - dx * 3.0F)),
         static_cast<std::int16_t>(std::round(y - dx * 4.0F - dy * 3.0F)),
-        viewer == 0 ? 20 : 19);
+        viewer == 0 ? assets::palette::kPlayer2 : assets::palette::kPlayer1);
 }
 
 template<std::size_t Capacity, std::size_t ExCapacity>
@@ -810,7 +838,8 @@ PIXEL_TWINS_SRAM void drawTitle(pixel_twins::Framebuffer& framebuffer,
     title.drawScreen(left);
     title.drawScreen(right);
     if (difficulty == Difficulty::Hard) {
-        pixel_twins::drawText(right, assets::kWizwardFont, 132, 5, "HARD", 18, 6);
+        pixel_twins::drawText(right, assets::kWizwardFont, 132, 5, "HARD",
+                              assets::palette::kFontBody, 6);
     }
     if ((frame / 30U) % 2U == 0U) {
         drawCenteredText(left, "PUSH ANY BUTTON", 80, 98);
@@ -978,7 +1007,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
             const auto shadowWidth = static_cast<std::uint16_t>(std::max(2.0F, std::round(2.0F + progress * 8.0F)));
             pixel_twins::fillRectangle(target,
                 static_cast<std::int16_t>(footX - static_cast<std::int16_t>(shadowWidth / 2U)),
-                footY, shadowWidth, 2, 27);
+                footY, shadowWidth, 2, assets::palette::kSpawnShadow);
             const auto smooth = [](float value) noexcept {
                 const auto t = std::clamp(value, 0.0F, 1.0F);
                 return t * t * (3.0F - 2.0F * t);
@@ -988,10 +1017,12 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                     8.0F + static_cast<float>(spriteHeight) * smooth(progress / 0.18F)));
                 pixel_twins::fillRectangle(target, static_cast<std::int16_t>(footX - 1),
                                             static_cast<std::int16_t>(footY - lineHeight), 3,
-                                            static_cast<std::uint16_t>(lineHeight), 17);
+                                            static_cast<std::uint16_t>(lineHeight),
+                                            assets::palette::kMagic);
                 pixel_twins::fillRectangle(target, footX,
                                             static_cast<std::int16_t>(footY - lineHeight - 2), 1,
-                                            static_cast<std::uint16_t>(lineHeight + 3), 13);
+                                            static_cast<std::uint16_t>(lineHeight + 3),
+                                            assets::palette::kEnergyPale);
                 continue;
             }
             float scaleX = 1.0F;
@@ -1196,19 +1227,24 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
         pixel_twins::drawCircle(target,
             static_cast<std::int16_t>(std::round(strike.x - camera.x)),
             static_cast<std::int16_t>(std::round(strike.y - camera.y)),
-            thunderShockwaveRadius(strike.ageTicks), 4);
+            thunderShockwaveRadius(strike.ageTicks), assets::palette::kThunder);
     }
     if (!showHud) return;
     const auto& viewedPlayer = gameplay.player(viewer);
     const auto maxHpWidth = static_cast<std::uint16_t>(std::clamp<std::int16_t>(viewedPlayer.maxHp, 1, 60));
     const auto hpWidth = static_cast<std::uint16_t>(
         std::clamp<std::int16_t>(viewedPlayer.hp, 0, static_cast<std::int16_t>(maxHpWidth)));
-    pixel_twins::fillRectangle(target, 49, 4, static_cast<std::uint16_t>(maxHpWidth + 2U), 4, 28);
-    if (hpWidth > 0) pixel_twins::fillRectangle(target, 50, 5, hpWidth, 2, 9);
-    pixel_twins::fillRectangle(target, 49, 7, 62, 4, 28);
+    pixel_twins::fillRectangle(target, 49, 4, static_cast<std::uint16_t>(maxHpWidth + 2U), 4,
+                               assets::palette::kGaugeDark);
+    if (hpWidth > 0) {
+        pixel_twins::fillRectangle(target, 50, 5, hpWidth, 2, assets::palette::kHpGauge);
+    }
+    pixel_twins::fillRectangle(target, 49, 7, 62, 4, assets::palette::kGaugeDark);
     const auto xpNeed = gameplay.xpNeeded(viewedPlayer.level);
     const auto xpWidth = static_cast<std::uint16_t>(viewedPlayer.xp * 60U / xpNeed);
-    if (xpWidth > 0) pixel_twins::fillRectangle(target, 50, 8, xpWidth, 2, 20);
+    if (xpWidth > 0) {
+        pixel_twins::fillRectangle(target, 50, 8, xpWidth, 2, assets::palette::kPlayer2);
+    }
     char scoreBuffer[12]{};
     drawRightAlignedText(target, formatUnsigned(gameplay.score(viewer), scoreBuffer), 155, 5);
     drawTimer(target, gameplay.elapsedTicks());
@@ -1216,12 +1252,17 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
         constexpr std::int16_t kBossBarX = 42;
         constexpr std::int16_t kBossBarY = 14;
         constexpr std::uint16_t kBossBarWidth = 78;
-        pixel_twins::fillRectangle(target, kBossBarX, kBossBarY, kBossBarWidth, 6, 28);
-        pixel_twins::fillRectangle(target, kBossBarX + 1, kBossBarY + 1, kBossBarWidth - 2U, 4, 34);
+        pixel_twins::fillRectangle(target, kBossBarX, kBossBarY, kBossBarWidth, 6,
+                                   assets::palette::kGaugeDark);
+        pixel_twins::fillRectangle(target, kBossBarX + 1, kBossBarY + 1,
+                                   kBossBarWidth - 2U, 4, assets::palette::kBossGaugeEmpty);
         const auto fill = static_cast<std::uint16_t>(std::clamp<std::int32_t>(
             static_cast<std::int32_t>(kBossBarWidth - 2U) * boss->hp / std::max<std::int16_t>(1, boss->maxHp),
             0, kBossBarWidth - 2U));
-        if (fill > 0) pixel_twins::fillRectangle(target, kBossBarX + 1, kBossBarY + 1, fill, 4, 15);
+        if (fill > 0) {
+            pixel_twins::fillRectangle(target, kBossBarX + 1, kBossBarY + 1, fill, 4,
+                                       assets::palette::kHighlight);
+        }
     }
     if (gameplay.sealNoticeTicks() > 0) {
         char sealText[] = "SEAL 0/3";
@@ -1272,16 +1313,21 @@ PIXEL_TWINS_SRAM void drawResultPanel(
     char playerText[] = "P1 RESULT";
     playerText[1] = static_cast<char>('1' + viewer);
     pixel_twins::drawText(target, assets::kWizwardFont, 5, 20, playerText,
-                          viewer == 0 ? 19 : 20, 6);
-    pixel_twins::drawText(target, assets::kWizwardFont, 5, 32, "SCORE", 18, 6);
-    pixel_twins::drawText(target, assets::kWizwardFont, 5, 44, "TIME", 18, 6);
-    pixel_twins::drawText(target, assets::kWizwardFont, 5, 56, "TOTAL", 18, 6);
+                          viewer == 0 ? assets::palette::kPlayer1
+                                      : assets::palette::kPlayer2, 6);
+    pixel_twins::drawText(target, assets::kWizwardFont, 5, 32, "SCORE",
+                          assets::palette::kFontBody, 6);
+    pixel_twins::drawText(target, assets::kWizwardFont, 5, 44, "TIME",
+                          assets::palette::kFontBody, 6);
+    pixel_twins::drawText(target, assets::kWizwardFont, 5, 56, "TOTAL",
+                          assets::palette::kFontBody, 6);
     char scoreText[12]{};
     char bonusText[12]{};
     char totalText[12]{};
     drawRightAlignedText(target, formatUnsigned(gameplay.score(viewer), scoreText), 78, 32);
     drawRightAlignedText(target, formatUnsigned(timeBonuses[viewer], bonusText), 78, 44);
-    pixel_twins::drawText(target, assets::kWizwardFont, 42, 44, "+", 18, 6);
+    pixel_twins::drawText(target, assets::kWizwardFont, 42, 44, "+",
+                          assets::palette::kFontBody, 6);
     drawRightAlignedText(target, formatUnsigned(finalScores[viewer], totalText), 78, 56);
 
     std::array<ResultRankingRow, kRankingLimit + pixel_twins::kControllerCount> board{};
@@ -1312,7 +1358,8 @@ PIXEL_TWINS_SRAM void drawResultPanel(
     const auto rowCount = std::min<std::size_t>(5, boardCount);
     const auto startRank = rowCount == 0 ? 0U
         : std::min(focusRank > 2 ? focusRank - 2U : 0U, boardCount - rowCount);
-    pixel_twins::drawText(target, assets::kWizwardFont, 91, 20, "RANK", 25, 6);
+    pixel_twins::drawText(target, assets::kWizwardFont, 91, 20, "RANK",
+                          assets::palette::kRankingTitle, 6);
     for (std::size_t rowIndex = 0; rowIndex < rowCount; ++rowIndex) {
         const auto rank = startRank + rowIndex;
         const auto y = static_cast<std::int16_t>(32 + rowIndex * 10U);
@@ -1335,7 +1382,8 @@ PIXEL_TWINS_SRAM void drawResultPanel(
         auto rowLength = 7U + score.size();
         if (abbreviated) rowText[rowLength++] = 'K';
         const auto color = static_cast<std::uint8_t>(
-            rank == focusRank && entries[viewer].active ? 15 : 18);
+            rank == focusRank && entries[viewer].active ? assets::palette::kHighlight
+                                                       : assets::palette::kFontBody);
         pixel_twins::drawText(target, assets::kWizwardFont, 84, y,
                               std::string_view(rowText, rowLength), color, 6);
     }
@@ -1344,11 +1392,13 @@ PIXEL_TWINS_SRAM void drawResultPanel(
         char rankLabel[] = "RANK #01";
         rankLabel[6] = static_cast<char>('0' + ((entry.rank + 1U) / 10U) % 10U);
         rankLabel[7] = static_cast<char>('0' + (entry.rank + 1U) % 10U);
-        pixel_twins::drawText(target, assets::kWizwardFont, 5, 68, rankLabel, 25, 6);
+        pixel_twins::drawText(target, assets::kWizwardFont, 5, 68, rankLabel,
+                              assets::palette::kRankingTitle, 6);
         if ((resultTicks / 20U) % 2U == 0U) drawCenteredText(target, "ENTER YOUR NAME", 80, 82);
         drawCenteredText(target, std::string_view(entry.name.data(), 3), 80, 96, 8);
         pixel_twins::drawText(target, assets::kWizwardFont,
-                              static_cast<std::int16_t>(68 + entry.cursor * 8U), 106, "^", 18, 6);
+                              static_cast<std::int16_t>(68 + entry.cursor * 8U), 106, "^",
+                              assets::palette::kFontBody, 6);
     } else if (outcome == GameplayOutcome::Clear
                && continueTicks >= kResultContinueDelayTicks
                && (resultTicks / 30U) % 2U == 0U) {

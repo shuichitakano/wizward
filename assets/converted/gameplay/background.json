@@ -5,7 +5,7 @@
   "source_config": "../../manifests/background.json",
   "binary": "background.bin",
   "header": "background.hpp",
-  "sha256": "9944967db860f7195967b411bb5ab4c5095a6e8a130a7e7348717258d0aa9a32",
+  "sha256": "44ea659e3fbd16e55247aa1b2b97efbee20e125ee91deed023cc66cafdcba9e5",
   "layout": {
     "byte_order": "little-endian",
     "header_bytes": 32,

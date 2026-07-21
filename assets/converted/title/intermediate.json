@@ -4,12 +4,13 @@
   "name": "wizward-title",
   "manifest": "../../manifests/title.json",
   "quantizer": "median_cut",
+  "palette_targets": [],
   "palette_binary": {
     "file": "palette.bin",
     "format": "RGB888",
     "entry_count": 256,
     "bytes": 768,
-    "sha256": "e185cce862166754f9d9624f7ab9c0e1b23dcd92f64d9f3efa74866de46534b9"
+    "sha256": "cef4d95ea838bd8da75da440d74cad7f5a2540cba6d0fc290b1d162bca57f2a7"
   },
   "palette": [
     {
@@ -37,6 +38,17 @@
     {
       "index": 2,
       "rgb": [
+        241,
+        234,
+        216
+      ],
+      "role": "reserved",
+      "name": "font_body",
+      "usage_pixels": 7
+    },
+    {
+      "index": 3,
+      "rgb": [
         254,
         252,
         238
@@ -46,7 +58,7 @@
       "usage_pixels": 14
     },
     {
-      "index": 3,
+      "index": 4,
       "rgb": [
         253,
         241,
@@ -54,10 +66,10 @@
       ],
       "role": "asset",
       "name": "",
-      "usage_pixels": 131
+      "usage_pixels": 130
     },
     {
-      "index": 4,
+      "index": 5,
       "rgb": [
         254,
         240,
@@ -68,7 +80,7 @@
       "usage_pixels": 182
     },
     {
-      "index": 5,
+      "index": 6,
       "rgb": [
         254,
         233,
@@ -79,7 +91,7 @@
       "usage_pixels": 25
     },
     {
-      "index": 6,
+      "index": 7,
       "rgb": [
         253,
         230,
@@ -90,7 +102,7 @@
       "usage_pixels": 25
     },
     {
-      "index": 7,
+      "index": 8,
       "rgb": [
         253,
         229,
@@ -98,10 +110,10 @@
       ],
       "role": "asset",
       "name": "",
-      "usage_pixels": 19
+      "usage_pixels": 20
     },
     {
-      "index": 8,
+      "index": 9,
       "rgb": [
         254,
         229,
@@ -109,18 +121,7 @@
       ],
       "role": "asset",
       "name": "",
-      "usage_pixels": 22
-    },
-    {
-      "index": 9,
-      "rgb": [
-        253,
-        228,
-        181
-      ],
-      "role": "asset",
-      "name": "",
-      "usage_pixels": 26
+      "usage_pixels": 30
     },
     {
       "index": 10,
@@ -131,7 +132,7 @@
       ],
       "role": "asset",
       "name": "",
-      "usage_pixels": 32
+      "usage_pixels": 43
     },
     {
       "index": 11,
@@ -153,7 +154,7 @@
       ],
       "role": "asset",
       "name": "",
-      "usage_pixels": 5
+      "usage_pixels": 11
     },
     {
       "index": 13,
@@ -230,7 +231,7 @@
       ],
       "role": "asset",
       "name": "",
-      "usage_pixels": 20
+      "usage_pixels": 17
     },
     {
       "index": 20,
@@ -384,7 +385,7 @@
       ],
       "role": "asset",
       "name": "",
-      "usage_pixels": 25
+      "usage_pixels": 22
     },
     {
       "index": 34,
@@ -2832,12 +2833,12 @@
   "summary": {
     "asset_count": 2,
     "used_palette_entries": 255,
-    "reserved_entries": 3,
-    "generated_asset_entries": 253,
+    "reserved_entries": 4,
+    "generated_asset_entries": 252,
     "palette_rgb888_bytes": 768,
     "source_file_bytes": 48540,
     "indexed_pixel_bytes": 21280,
-    "indexed_png_bytes": 16281
+    "indexed_png_bytes": 16279
   },
   "assets": [
     {
@@ -2852,15 +2853,14 @@
       "alpha_threshold": 0,
       "palette_weight": 1,
       "source_color_count": 13158,
-      "indexed_color_count": 232,
+      "indexed_color_count": 231,
       "used_indices": [
-        2,
         3,
         4,
         5,
         6,
         7,
-        9,
+        8,
         10,
         11,
         14,
@@ -3088,14 +3088,13 @@
         255
       ],
       "index_usage": {
-        "2": 2,
-        "3": 111,
-        "4": 177,
-        "5": 24,
-        "6": 6,
-        "7": 4,
-        "9": 3,
-        "10": 3,
+        "3": 2,
+        "4": 111,
+        "5": 177,
+        "6": 24,
+        "7": 6,
+        "8": 5,
+        "10": 5,
         "11": 11,
         "14": 2,
         "16": 7,
@@ -3325,8 +3324,8 @@
         "metric": "Euclidean distance in RGB888 (0..441.67)",
         "opaque_pixels": 19200,
         "transparent_pixels": 0,
-        "mean_rgb_distance": 6.277297652753509,
-        "rms_rgb_distance": 10.664988474755454,
+        "mean_rgb_distance": 6.277312701007942,
+        "rms_rgb_distance": 10.664993358335172,
         "p95_rgb_distance": 16.431676725154983,
         "max_rgb_distance": 142.83907028540895,
         "changed_pixels": 18914,
@@ -3335,7 +3334,7 @@
       "sizes": {
         "source_file_bytes": 43019,
         "indexed_pixel_bytes": 19200,
-        "indexed_png_bytes": 13953
+        "indexed_png_bytes": 13954
       },
       "previews": {
         "source": "previews/title_screen_selected__title_screen_160x120-source.png",
@@ -3488,24 +3487,24 @@
       "index_usage": {
         "0": 503,
         "1": 23,
-        "2": 12,
-        "3": 20,
-        "4": 5,
-        "5": 1,
-        "6": 19,
-        "7": 15,
-        "8": 22,
-        "9": 23,
-        "10": 29,
+        "2": 7,
+        "3": 12,
+        "4": 19,
+        "5": 5,
+        "6": 1,
+        "7": 19,
+        "8": 15,
+        "9": 30,
+        "10": 38,
         "11": 10,
-        "12": 5,
+        "12": 11,
         "13": 25,
         "14": 17,
         "15": 17,
         "16": 39,
         "17": 12,
         "18": 11,
-        "19": 20,
+        "19": 17,
         "20": 32,
         "21": 3,
         "22": 8,
@@ -3519,7 +3518,7 @@
         "30": 26,
         "31": 35,
         "32": 8,
-        "33": 9,
+        "33": 6,
         "34": 35,
         "35": 8,
         "36": 5,
@@ -3616,17 +3615,17 @@
         "metric": "Euclidean distance in RGB888 (0..441.67)",
         "opaque_pixels": 1577,
         "transparent_pixels": 503,
-        "mean_rgb_distance": 5.095817478960923,
-        "rms_rgb_distance": 7.246016551565938,
-        "p95_rgb_distance": 14.866068747318506,
+        "mean_rgb_distance": 5.0781992924534,
+        "rms_rgb_distance": 7.2094315736025845,
+        "p95_rgb_distance": 14.45683229480096,
         "max_rgb_distance": 94.13819628609845,
-        "changed_pixels": 1528,
-        "changed_pixel_ratio": 0.9689283449587826
+        "changed_pixels": 1530,
+        "changed_pixel_ratio": 0.9701965757767914
       },
       "sizes": {
         "source_file_bytes": 5521,
         "indexed_pixel_bytes": 2080,
-        "indexed_png_bytes": 2328
+        "indexed_png_bytes": 2325
       },
       "previews": {
         "source": "previews/title_screen_selected__wizward_logo_104x20-source.png",

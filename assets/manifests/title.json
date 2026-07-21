@@ -3,13 +3,20 @@
   "name": "wizward-title",
   "palette": {
     "asset_range": [
-      2,
+      3,
       254
     ],
     "sample_pixels": 1000000,
     "max_pixels_per_asset": 4096,
     "quantizer": "median_cut",
-    "reserved": []
+    "reserved": [
+      {
+        "index": 2,
+        "name": "font_body",
+        "color": "#f1ead8"
+      }
+    ],
+    "targets": []
   },
   "assets": [
     {

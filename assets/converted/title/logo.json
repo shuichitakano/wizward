@@ -4,7 +4,7 @@
   "source_intermediate": "intermediate.json",
   "binary": "logo.bin",
   "header": "title_sprites.hpp",
-  "sha256": "7c4c7059c0e656dcbce57f12c5e5f058f404caae4d86918f975e792f1b616ce1",
+  "sha256": "5f5ce6c71ae05ae99bfd1a9a40d4dac49cbe3480dd0930e09c2f56cb147f3fb7",
   "layout": {
     "byte_order": "little-endian",
     "header_bytes": 24,

@@ -95,6 +95,41 @@ def _verify_palette(output: Path, report: dict) -> None:
         raise ValueError(f"{output.name}: palette.binがレポートと一致しません")
     if hashlib.sha256(palette).hexdigest() != report["palette_binary"]["sha256"]:
         raise ValueError(f"{output.name}: palette.binのSHA-256が一致しません")
+    candidates = [
+        entry for entry in report["palette"]
+        if entry["index"] != 0 and entry["role"] != "unused"
+    ]
+    for target in report.get("palette_targets", []):
+        desired = target["desired_rgb"]
+        nearest = min(candidates, key=lambda entry: sum(
+            (entry["rgb"][channel] - desired[channel]) ** 2 for channel in range(3)
+        ))
+        if target["resolved_index"] != nearest["index"] or target["resolved_rgb"] != nearest["rgb"]:
+            raise ValueError(f"{output.name}: 目標色の最近傍割り当てが不正です: {target['name']}")
+
+
+def _verify_gameplay_palette_contract(output: Path, report: dict) -> None:
+    expected = {
+        2: "font_body", 3: "player_1", 4: "player_2", 5: "hp_gauge",
+        6: "highlight", 7: "ranking_title", 8: "gauge_dark",
+        9: "minimap_collision", 10: "minimap_field", 11: "minimap_border",
+        12: "minimap_landmark", 13: "boss_gauge_empty",
+    }
+    actual = {
+        entry["index"]: entry["name"] for entry in report["palette"]
+        if entry["role"] == "reserved" and entry["index"] not in (0, 1, 255)
+    }
+    if actual != expected:
+        raise ValueError(f"固定UIパレット契約が不正です: {actual}")
+    header = (output / "palette_indices.hpp").read_text(encoding="utf-8")
+    for index, name in expected.items():
+        constant = "k" + "".join(part.capitalize() for part in name.split("_"))
+        if f"{constant} = {index};" not in header:
+            raise ValueError(f"固定UIパレット定数が不正です: {constant}")
+    for target in report["palette_targets"]:
+        constant = "k" + "".join(part.capitalize() for part in target["name"].split("_"))
+        if f"{constant} = {target['resolved_index']};" not in header:
+            raise ValueError(f"演出パレット定数が不正です: {constant}")
 
 
 def _verify_background_pack(output: Path, intermediate: dict) -> None:
@@ -173,6 +208,7 @@ def verify(prototype: Path, project: Path) -> int:
                     if source_alpha != indexed_transparent:
                         raise ValueError(f"透過インデックスが一致しません: {indexed_path}")
         if set_name == "gameplay":
+            _verify_gameplay_palette_contract(output, report)
             _verify_sprite_pack(output, report)
             _verify_background_pack(output, report)
         else:

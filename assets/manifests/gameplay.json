@@ -3,7 +3,7 @@
   "name": "wizward-gameplay",
   "palette": {
     "asset_range": [
-      32,
+      14,
       254
     ],
     "sample_pixels": 1000000,
@@ -12,153 +12,160 @@
     "reserved": [
       {
         "index": 2,
-        "name": "effect fire",
-        "color": "#ff7b32"
-      },
-      {
-        "index": 3,
-        "name": "effect wind",
-        "color": "#79f05b"
-      },
-      {
-        "index": 4,
-        "name": "effect thunder",
-        "color": "#ffe35a"
-      },
-      {
-        "index": 5,
-        "name": "effect ice",
-        "color": "#8de9ff"
-      },
-      {
-        "index": 6,
-        "name": "effect orb",
-        "color": "#9b7cff"
-      },
-      {
-        "index": 7,
-        "name": "effect familiar",
-        "color": "#ff8bd1"
-      },
-      {
-        "index": 8,
-        "name": "effect speed",
-        "color": "#39e6d0"
-      },
-      {
-        "index": 9,
-        "name": "effect hp",
-        "color": "#ff4c6d"
-      },
-      {
-        "index": 10,
-        "name": "effect heal",
-        "color": "#57f287"
-      },
-      {
-        "index": 11,
-        "name": "effect gold",
-        "color": "#ffcf5a"
-      },
-      {
-        "index": 12,
-        "name": "effect energy blue",
-        "color": "#5ec8ff"
-      },
-      {
-        "index": 13,
-        "name": "effect energy pale",
-        "color": "#e8fbff"
-      },
-      {
-        "index": 14,
-        "name": "effect damage",
-        "color": "#ff3d5a"
-      },
-      {
-        "index": 15,
-        "name": "effect highlight",
-        "color": "#ffd96a"
-      },
-      {
-        "index": 16,
-        "name": "effect success",
-        "color": "#70ff9b"
-      },
-      {
-        "index": 17,
-        "name": "effect magic",
-        "color": "#b88cff"
-      },
-      {
-        "index": 18,
-        "name": "font body default",
+        "name": "font_body",
         "color": "#f1ead8"
       },
       {
-        "index": 19,
-        "name": "player 1 marker",
+        "index": 3,
+        "name": "player_1",
         "color": "#ff7648"
       },
       {
-        "index": 20,
-        "name": "player 2 marker",
+        "index": 4,
+        "name": "player_2",
         "color": "#69a8ff"
       },
       {
-        "index": 21,
-        "name": "ranking title",
+        "index": 5,
+        "name": "hp_gauge",
+        "color": "#ff4c6d"
+      },
+      {
+        "index": 6,
+        "name": "highlight",
+        "color": "#ffd96a"
+      },
+      {
+        "index": 7,
+        "name": "ranking_title",
         "color": "#8fd7ff"
       },
       {
-        "index": 22,
-        "name": "result down",
-        "color": "#ff8b7a"
-      },
-      {
-        "index": 23,
-        "name": "result time up",
-        "color": "#ffb86b"
-      },
-      {
-        "index": 24,
-        "name": "seal cyan",
-        "color": "#61dff2"
-      },
-      {
-        "index": 25,
-        "name": "seal deep cyan",
-        "color": "#286b8d"
-      },
-      {
-        "index": 26,
-        "name": "seal pale cyan",
-        "color": "#dffcff"
-      },
-      {
-        "index": 27,
-        "name": "panel dark",
-        "color": "#111816"
-      },
-      {
-        "index": 28,
-        "name": "gauge dark",
+        "index": 8,
+        "name": "gauge_dark",
         "color": "#141716"
       },
       {
-        "index": 29,
-        "name": "collision map",
+        "index": 9,
+        "name": "minimap_collision",
         "color": "#425245"
       },
       {
-        "index": 30,
-        "name": "minimap field",
+        "index": 10,
+        "name": "minimap_field",
         "color": "#315344"
       },
       {
-        "index": 31,
-        "name": "ui beige outline",
-        "color": "#f4d8a6"
+        "index": 11,
+        "name": "minimap_border",
+        "color": "#9e9864"
+      },
+      {
+        "index": 12,
+        "name": "minimap_landmark",
+        "color": "#665533"
+      },
+      {
+        "index": 13,
+        "name": "boss_gauge_empty",
+        "color": "#5f5f5a"
+      }
+    ],
+    "targets": [
+      {
+        "name": "thunder",
+        "color": "#ffe35a",
+        "weight": 256
+      },
+      {
+        "name": "energy_blue",
+        "color": "#5ec8ff",
+        "weight": 256
+      },
+      {
+        "name": "energy_pale",
+        "color": "#e8fbff",
+        "weight": 256
+      },
+      {
+        "name": "magic",
+        "color": "#b88cff",
+        "weight": 256
+      },
+      {
+        "name": "seal_cyan",
+        "color": "#61dff2",
+        "weight": 256
+      },
+      {
+        "name": "seal_deep_cyan",
+        "color": "#286b8d",
+        "weight": 256
+      },
+      {
+        "name": "seal_pale_cyan",
+        "color": "#dffcff",
+        "weight": 256
+      },
+      {
+        "name": "seal_trail_dark",
+        "color": "#664b42",
+        "weight": 256
+      },
+      {
+        "name": "seal_trail_bright",
+        "color": "#a7e6f0",
+        "weight": 256
+      },
+      {
+        "name": "effect_warm",
+        "color": "#785648",
+        "weight": 256
+      },
+      {
+        "name": "spawn_shadow",
+        "color": "#111816",
+        "weight": 256
+      },
+      {
+        "name": "boss_shadow_landed",
+        "color": "#572b22",
+        "weight": 256
+      },
+      {
+        "name": "boss_shadow_airborne",
+        "color": "#635849",
+        "weight": 256
+      },
+      {
+        "name": "boss_impact",
+        "color": "#c7b283",
+        "weight": 256
+      },
+      {
+        "name": "clear_energy_dark",
+        "color": "#7e2a34",
+        "weight": 256
+      },
+      {
+        "name": "clear_rock_light",
+        "color": "#b19b76",
+        "weight": 256
+      },
+      {
+        "name": "clear_rock_black",
+        "color": "#1e1d26",
+        "weight": 256
+      },
+      {
+        "name": "clear_rock_mid",
+        "color": "#776b58",
+        "weight": 256
+      },
+      {
+        "name": "clear_rock_base",
+        "color": "#37342c",
+        "weight": 256
       }
     ]
   },
