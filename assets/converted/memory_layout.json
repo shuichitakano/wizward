@@ -5,9 +5,9 @@
   "asset_sram": {
     "background_pixels": 125952,
     "sprite_metadata": 5752,
-    "sprite_pixels": 167990,
+    "sprite_pixels": 167209,
     "font_glyphs": 1710,
-    "total": 301404
+    "total": 300623
   },
   "flash_only": {
     "background_metadata": 164,
@@ -22,9 +22,9 @@
     "tilemap": 10000,
     "active_palette": 768,
     "terrain_generation_workspace": 5000,
-    "steady_total_including_assets": 388972,
-    "generation_peak_including_assets": 393972,
-    "remaining_at_generation_peak_before_code_stack_audio_game_state": 138508
+    "steady_total_including_assets": 388191,
+    "generation_peak_including_assets": 393191,
+    "remaining_at_generation_peak_before_code_stack_audio_game_state": 139289
   },
   "note": "SRAM初期値はFlashにもロードイメージを持つ"
 }

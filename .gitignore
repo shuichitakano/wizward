@@ -5,3 +5,4 @@ CMakeUserPresets.json
 
 # クラウド同期などで生成される番号付きの競合コピー
 assets/converted/**/* [2-9].*
+assets/**/* [2-9]/
