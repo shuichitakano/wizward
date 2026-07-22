@@ -1314,23 +1314,31 @@ PIXEL_TWINS_SRAM void drawResultPanel(
     drawCenteredText(target, title, 80, 5);
     char playerText[] = "P1 RESULT";
     playerText[1] = static_cast<char>('1' + viewer);
-    pixel_twins::drawText(target, assets::kWizwardFont, 5, 20, playerText,
+    pixel_twins::drawText(target, assets::kWizwardFont, 5, 18, playerText,
                           viewer == 0 ? assets::palette::kPlayer1
                                       : assets::palette::kPlayer2, 6);
-    pixel_twins::drawText(target, assets::kWizwardFont, 5, 32, "SCORE",
+    pixel_twins::drawText(target, assets::kWizwardFont, 5, 29, "SCORE",
                           assets::palette::kFontBody, 6);
-    pixel_twins::drawText(target, assets::kWizwardFont, 5, 44, "TIME",
+    pixel_twins::drawText(target, assets::kWizwardFont, 5, 38, "TIME",
                           assets::palette::kFontBody, 6);
-    pixel_twins::drawText(target, assets::kWizwardFont, 5, 56, "TOTAL",
+    pixel_twins::drawText(target, assets::kWizwardFont, 5, 47, "TOTAL",
+                          assets::palette::kFontBody, 6);
+    pixel_twins::drawText(target, assets::kWizwardFont, 5, 70, "KILLS",
+                          assets::palette::kFontBody, 6);
+    pixel_twins::drawText(target, assets::kWizwardFont, 5, 79, "EXP",
                           assets::palette::kFontBody, 6);
     char scoreText[12]{};
     char bonusText[12]{};
     char totalText[12]{};
-    drawRightAlignedText(target, formatUnsigned(gameplay.score(viewer), scoreText), 78, 32);
-    drawRightAlignedText(target, formatUnsigned(timeBonuses[viewer], bonusText), 78, 44);
-    pixel_twins::drawText(target, assets::kWizwardFont, 42, 44, "+",
+    char killsText[12]{};
+    char xpText[12]{};
+    drawRightAlignedText(target, formatUnsigned(gameplay.score(viewer), scoreText), 78, 29);
+    drawRightAlignedText(target, formatUnsigned(timeBonuses[viewer], bonusText), 78, 38);
+    pixel_twins::drawText(target, assets::kWizwardFont, 42, 38, "+",
                           assets::palette::kFontBody, 6);
-    drawRightAlignedText(target, formatUnsigned(finalScores[viewer], totalText), 78, 56);
+    drawRightAlignedText(target, formatUnsigned(finalScores[viewer], totalText), 78, 47);
+    drawRightAlignedText(target, formatUnsigned(gameplay.killCount(viewer), killsText), 78, 70);
+    drawRightAlignedText(target, formatUnsigned(gameplay.xpEarned(viewer), xpText), 78, 79);
 
     std::array<ResultRankingRow, kRankingLimit + pixel_twins::kControllerCount> board{};
     std::size_t boardCount = 0;
@@ -1394,12 +1402,12 @@ PIXEL_TWINS_SRAM void drawResultPanel(
         char rankLabel[] = "RANK #01";
         rankLabel[6] = static_cast<char>('0' + ((entry.rank + 1U) / 10U) % 10U);
         rankLabel[7] = static_cast<char>('0' + (entry.rank + 1U) % 10U);
-        pixel_twins::drawText(target, assets::kWizwardFont, 5, 68, rankLabel,
+        pixel_twins::drawText(target, assets::kWizwardFont, 5, 58, rankLabel,
                               assets::palette::kRankingTitle, 6);
-        if ((resultTicks / 20U) % 2U == 0U) drawCenteredText(target, "ENTER YOUR NAME", 80, 82);
-        drawCenteredText(target, std::string_view(entry.name.data(), 3), 80, 96, 8);
+        if ((resultTicks / 20U) % 2U == 0U) drawCenteredText(target, "ENTER YOUR NAME", 80, 88);
+        drawCenteredText(target, std::string_view(entry.name.data(), 3), 80, 99, 8);
         pixel_twins::drawText(target, assets::kWizwardFont,
-                              static_cast<std::int16_t>(68 + entry.cursor * 8U), 106, "^",
+                              static_cast<std::int16_t>(68 + entry.cursor * 8U), 109, "^",
                               assets::palette::kFontBody, 6);
     } else if (outcome == GameplayOutcome::Clear
                && continueTicks >= kResultContinueDelayTicks

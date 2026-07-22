@@ -278,109 +278,202 @@ void updatePerkEffects(std::array<PerkEffectState, kMaximumPerkEffects>& effects
     }
 }
 
-struct AiAvoidance {
-    float x = 0.0F;
-    float y = 0.0F;
-    bool active = false;
-};
-
-void addAiAvoidance(AiAvoidance& result, float playerX, float playerY,
-                    float threatX, float threatY, float range,
-                    float strength) noexcept {
-    auto dx = playerX - threatX;
-    auto dy = playerY - threatY;
-    const auto distanceSquared = dx * dx + dy * dy;
-    if (distanceSquared >= range * range) return;
-    auto distance = std::sqrt(distanceSquared);
-    if (distance < 0.01F) {
-        dx = 1.0F;
-        dy = 0.0F;
-        distance = 1.0F;
-    }
-    const auto weight = (range - distance) / range * strength;
-    result.x += dx / distance * weight;
-    result.y += dy / distance * weight;
-    result.active = true;
-}
-
-AiAvoidance aiAvoidance(
-    const PlayerState& player,
+float aiDangerAt(
+    float x, float y,
     const std::array<EnemyState, kMaximumEnemies>& enemies,
     const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets) noexcept {
-    AiAvoidance result{};
+    auto danger = 0.0F;
     for (const auto& enemy : enemies) {
         if (!enemy.active || enemy.hp <= 0 || enemy.bornTicks > 0
             || enemy.spawnDelayTicks > 0) continue;
-        addAiAvoidance(result, player.x, player.y, enemy.x, enemy.y,
-                       52.0F + enemy.radius, 1.3F);
+        const auto range = 100.0F + enemy.radius;
+        const auto distanceSquared = squaredDistance(x, y, enemy.x, enemy.y);
+        if (distanceSquared >= range * range) continue;
+        const auto gap = range - std::sqrt(distanceSquared);
+        danger += gap * gap * 0.08F;
     }
     for (const auto& bullet : enemyBullets) {
         if (!bullet.active || bullet.launchDelayTicks > 0) continue;
-        constexpr float kPredictionTicks = 8.0F;
-        addAiAvoidance(result, player.x, player.y,
-                       bullet.x + bullet.velocityX * kPredictionTicks,
-                       bullet.y + bullet.velocityY * kPredictionTicks,
-                       48.0F + bullet.radius, 2.4F);
+        const auto speedSquared = bullet.velocityX * bullet.velocityX
+            + bullet.velocityY * bullet.velocityY;
+        const auto towardX = x - bullet.x;
+        const auto towardY = y - bullet.y;
+        const auto closestTicks = speedSquared > 0.0F
+            ? std::clamp((towardX * bullet.velocityX + towardY * bullet.velocityY)
+                         / speedSquared, 0.0F, 42.0F)
+            : 0.0F;
+        const auto closestX = bullet.x + bullet.velocityX * closestTicks;
+        const auto closestY = bullet.y + bullet.velocityY * closestTicks;
+        const auto range = kPlayerRadius + bullet.radius + 22.0F;
+        const auto distanceSquared = squaredDistance(x, y, closestX, closestY);
+        if (distanceSquared >= range * range) continue;
+        const auto gap = range - std::sqrt(distanceSquared);
+        danger += gap * gap * 1.8F;
     }
-    return result;
+    return danger;
 }
 
-float aiMoveScore(float x, float y, float targetX, float targetY,
-                  const PlayerState& leader) noexcept {
-    auto score = std::sqrt(squaredDistance(x, y, targetX, targetY));
+float aiViewPenalty(float x, float y, const PlayerState& leader) noexcept {
+    const auto dx = x - leader.x;
+    const auto dy = y - leader.y;
+    const auto softOverflow = std::max(0.0F, std::abs(dx) - 58.0F)
+        + std::max(0.0F, -42.0F - dy)
+        + std::max(0.0F, dy - 28.0F);
+    const auto screenOverflow = std::max(0.0F, std::abs(dx) - 68.0F)
+        + std::max(0.0F, -50.0F - dy)
+        + std::max(0.0F, dy - 34.0F);
+    return softOverflow * 4.0F
+        + (screenOverflow > 0.0F ? 600.0F + screenOverflow * 30.0F : 0.0F);
+}
+
+float aiMoveScore(
+    const PlayerState& player, float x, float y,
+    float targetX, float targetY, const PlayerState& leader,
+    const std::array<EnemyState, kMaximumEnemies>& enemies,
+    const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
+    bool rescuing, float moved, float lookahead) noexcept {
+    auto score = aiDangerAt(x, y, enemies, enemyBullets) * (rescuing ? 0.24F : 1.0F);
+    score += std::sqrt(squaredDistance(x, y, targetX, targetY))
+        * (rescuing ? 1.8F : 0.45F);
     const auto linkDistance = std::sqrt(squaredDistance(x, y, leader.x, leader.y));
-    if (linkDistance > 100.0F) score += (linkDistance - 100.0F) * 0.35F;
-    if (linkDistance > 128.0F) score += (linkDistance - 128.0F) * 3.0F;
+    if (linkDistance > 100.0F) score += (linkDistance - 100.0F) * 0.8F;
+    if (linkDistance > 125.0F) score += (linkDistance - 125.0F) * 6.0F;
     if (linkDistance > kLinkRange) score += 1000.0F + (linkDistance - kLinkRange) * 20.0F;
+    score += aiViewPenalty(x, y, leader);
+    score += std::max(0.0F, lookahead - moved) * 8.0F;
+    if (moved > 0.05F) {
+        auto directionX = x - player.x;
+        auto directionY = y - player.y;
+        normalize(directionX, directionY);
+        const auto directionDot = directionX * player.aiDirectionX
+            + directionY * player.aiDirectionY;
+        score += (1.0F - directionDot) * 1.6F;
+        if (player.aiStuckTicks > 5U) {
+            auto towardX = targetX - player.x;
+            auto towardY = targetY - player.y;
+            normalize(towardX, towardY);
+            const auto side = towardX * directionY - towardY * directionX;
+            if (side * static_cast<float>(player.aiTurnSign) < 0.0F) score += 5.0F;
+        }
+    }
     return score;
 }
 
-float moveAiPlayerSmart(PlayerState& player, float targetX, float targetY,
-                        const PlayerState& leader, const world::WorldMap& map,
-                        float stepScale) noexcept {
-    auto directionX = targetX - player.x;
-    auto directionY = targetY - player.y;
-    normalize(directionX, directionY);
-    const auto sideX = -directionY;
-    const auto sideY = directionX;
-    std::array<std::array<float, 2>, 12> directions{{
-        {{directionX, directionY}},
-        {{directionX + sideX * 0.7F, directionY + sideY * 0.7F}},
-        {{directionX - sideX * 0.7F, directionY - sideY * 0.7F}},
-        {{directionX + sideX * 1.35F, directionY + sideY * 1.35F}},
-        {{directionX - sideX * 1.35F, directionY - sideY * 1.35F}},
-        {{sideX, sideY}}, {{-sideX, -sideY}}, {{-directionX, -directionY}},
-        {{1.0F, 0.0F}}, {{-1.0F, 0.0F}}, {{0.0F, 1.0F}}, {{0.0F, -1.0F}},
-    }};
+void probeAiMovement(const world::WorldMap& map, float startX, float startY,
+                     float dx, float dy, float& resultX, float& resultY) noexcept {
+    constexpr float kProbeStep = 4.0F;
+    const auto steps = std::max(1, static_cast<int>(std::ceil(
+        std::max(std::abs(dx), std::abs(dy)) / kProbeStep)));
+    const auto stepX = dx / static_cast<float>(steps);
+    const auto stepY = dy / static_cast<float>(steps);
+    resultX = startX;
+    resultY = startY;
+    for (auto index = 0; index < steps; ++index) {
+        const auto x = resultX + stepX;
+        if (playerPositionIsWalkable(map, x, resultY)) resultX = x;
+        const auto y = resultY + stepY;
+        if (playerPositionIsWalkable(map, resultX, y)) resultY = y;
+    }
+}
+
+float moveAiPlayerSmart(
+    PlayerState& player, float targetX, float targetY,
+    const PlayerState& leader,
+    const std::array<EnemyState, kMaximumEnemies>& enemies,
+    const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
+    const world::WorldMap& map, bool rescuing) noexcept {
+    constexpr float kLookahead = 22.0F;
+    auto towardX = targetX - player.x;
+    auto towardY = targetY - player.y;
+    normalize(towardX, towardY);
+    const auto currentDanger = aiDangerAt(player.x, player.y, enemies, enemyBullets);
+    const auto urgent = currentDanger > 350.0F;
+    const auto evading = currentDanger >= 80.0F;
+    if (player.aiDecisionTicks > 0) --player.aiDecisionTicks;
+    if (player.aiDecisionTicks == 0 || urgent) {
+        std::array<std::array<float, 2>, 18> directions{};
+        directions[0] = {{player.aiDesiredDirectionX, player.aiDesiredDirectionY}};
+        directions[1] = {{towardX, towardY}};
+        for (std::size_t index = 0; index < 16U; ++index) {
+            const auto angle = static_cast<float>(index) * kTau / 16.0F;
+            directions[index + 2U] = {{std::cos(angle), std::sin(angle)}};
+        }
+        auto bestScore = std::numeric_limits<float>::max();
+        auto retainedScore = std::numeric_limits<float>::max();
+        auto bestDirectionX = towardX;
+        auto bestDirectionY = towardY;
+        auto retainedDirectionX = player.aiDesiredDirectionX;
+        auto retainedDirectionY = player.aiDesiredDirectionY;
+        auto retained = false;
+        for (std::size_t index = 0; index < directions.size(); ++index) {
+            auto directionX = directions[index][0];
+            auto directionY = directions[index][1];
+            normalize(directionX, directionY);
+            float probeX = player.x;
+            float probeY = player.y;
+            probeAiMovement(map, player.x, player.y,
+                            directionX * kLookahead, directionY * kLookahead,
+                            probeX, probeY);
+            const auto moved = std::sqrt(squaredDistance(player.x, player.y, probeX, probeY));
+            if (moved < 0.05F) continue;
+            directionX = probeX - player.x;
+            directionY = probeY - player.y;
+            normalize(directionX, directionY);
+            const auto score = aiMoveScore(player, probeX, probeY, targetX, targetY,
+                                           leader, enemies, enemyBullets,
+                                           rescuing, moved, kLookahead);
+            if (index == 0U) {
+                retained = true;
+                retainedScore = score;
+                retainedDirectionX = directionX;
+                retainedDirectionY = directionY;
+            }
+            if (score >= bestScore) continue;
+            bestScore = score;
+            bestDirectionX = directionX;
+            bestDirectionY = directionY;
+        }
+        const auto switchMargin = urgent ? 3.0F : (evading ? 10.0F : 18.0F);
+        if (retained && retainedScore <= bestScore + switchMargin) {
+            player.aiDesiredDirectionX = retainedDirectionX;
+            player.aiDesiredDirectionY = retainedDirectionY;
+        } else {
+            player.aiDesiredDirectionX = bestDirectionX;
+            player.aiDesiredDirectionY = bestDirectionY;
+        }
+        player.aiDecisionTicks = urgent ? 4U : (evading ? 11U : 21U);
+    }
+    const auto maximumTurn = urgent ? 14.0F / 60.0F
+        : (evading ? 8.0F / 60.0F : 5.0F / 60.0F);
+    const auto currentAngle = std::atan2(player.aiDirectionY, player.aiDirectionX);
+    const auto desiredAngle = std::atan2(
+        player.aiDesiredDirectionY, player.aiDesiredDirectionX);
+    auto angleDifference = std::remainder(desiredAngle - currentAngle, kTau);
+    if (std::abs(std::abs(angleDifference) - kTau * 0.5F) < 0.001F) {
+        angleDifference = static_cast<float>(player.aiTurnSign) * kTau * 0.5F;
+    }
+    const auto movementAngle = currentAngle
+        + std::clamp(angleDifference, -maximumTurn, maximumTurn);
+    const auto movementX = std::cos(movementAngle);
+    const auto movementY = std::sin(movementAngle);
     const auto beforeX = player.x;
     const auto beforeY = player.y;
-    auto bestX = beforeX;
-    auto bestY = beforeY;
-    auto bestMoved = 0.0F;
-    auto bestScore = std::numeric_limits<float>::max();
-    const auto step = playerSpeedPerTick(player) * stepScale;
-    for (auto& direction : directions) {
-        normalize(direction[0], direction[1]);
-        auto probeX = beforeX + direction[0] * step;
-        auto probeY = beforeY;
-        if (!playerPositionIsWalkable(map, probeX, probeY)) probeX = beforeX;
-        probeY = beforeY + direction[1] * step;
-        if (!playerPositionIsWalkable(map, probeX, probeY)) probeY = beforeY;
-        const auto moved = std::sqrt(squaredDistance(beforeX, beforeY, probeX, probeY));
-        if (moved < 0.05F) continue;
-        const auto score = aiMoveScore(probeX, probeY, targetX, targetY, leader)
-            - moved * 0.08F;
-        if (score >= bestScore) continue;
-        bestX = probeX;
-        bestY = probeY;
-        bestMoved = moved;
-        bestScore = score;
+    const auto step = playerSpeedPerTick(player);
+    const auto x = player.x + movementX * step;
+    if (playerPositionIsWalkable(map, x, player.y)) player.x = x;
+    const auto y = player.y + movementY * step;
+    if (playerPositionIsWalkable(map, player.x, y)) player.y = y;
+    const auto moved = std::sqrt(squaredDistance(beforeX, beforeY, player.x, player.y));
+    player.moving = moved > 0.05F;
+    if (player.moving) {
+        player.aiDirectionX = player.x - beforeX;
+        player.aiDirectionY = player.y - beforeY;
+        normalize(player.aiDirectionX, player.aiDirectionY);
+        player.facing = facingFor(player.aiDirectionX, player.aiDirectionY);
+    } else {
+        player.aiDecisionTicks = 0;
     }
-    player.x = bestX;
-    player.y = bestY;
-    player.moving = bestMoved > 0.05F;
-    if (player.moving) player.facing = facingFor(bestX - beforeX, bestY - beforeY);
-    return bestMoved;
+    return moved;
 }
 
 void followAiPartner(PlayerState& player, const PlayerState& leader,
@@ -392,47 +485,39 @@ void followAiPartner(PlayerState& player, const PlayerState& leader,
     const auto formationY = rescuing ? leader.y : leader.y + 24.0F;
     const auto distance = std::sqrt(squaredDistance(player.x, player.y, formationX, formationY));
     const auto stopDistance = rescuing ? kPlayerRadius * 2.0F + 6.0F : 8.0F;
-    const auto avoidance = aiAvoidance(player, enemies, enemyBullets);
-    if (distance <= stopDistance && (!avoidance.active || rescuing)) {
+    const auto currentDanger = aiDangerAt(player.x, player.y, enemies, enemyBullets);
+    const auto shouldEvade = currentDanger >= 80.0F;
+    if (rescuing && distance <= stopDistance) {
         player.moving = false;
         return;
     }
-    auto targetX = formationX;
-    auto targetY = formationY;
-    if (avoidance.active) {
-        auto towardX = formationX - player.x;
-        auto towardY = formationY - player.y;
-        normalize(towardX, towardY);
-        auto avoidX = avoidance.x;
-        auto avoidY = avoidance.y;
-        normalize(avoidX, avoidY);
-        const auto linkDistance = std::sqrt(squaredDistance(player.x, player.y, leader.x, leader.y));
-        const auto avoidanceWeight = rescuing ? 0.45F : (linkDistance > 110.0F ? 0.55F : 1.65F);
-        auto steerX = towardX + avoidX * avoidanceWeight;
-        auto steerY = towardY + avoidY * avoidanceWeight;
-        normalize(steerX, steerY);
-        targetX = player.x + steerX * 64.0F;
-        targetY = player.y + steerY * 64.0F;
+    if (!rescuing && !shouldEvade) {
+        if (player.aiHoldingFormation && distance <= 24.0F) {
+            player.moving = false;
+            player.aiDecisionTicks = 0;
+            return;
+        }
+        if (distance <= 12.0F) {
+            player.aiHoldingFormation = true;
+            player.moving = false;
+            player.aiDecisionTicks = 0;
+            return;
+        }
+        player.aiHoldingFormation = false;
+    } else {
+        player.aiHoldingFormation = false;
     }
-    const auto movementDistance = avoidance.active ? std::max(40.0F, distance) : distance;
-    const auto moved = moveAiPlayerSmart(player, targetX, targetY, leader, map,
-                                          std::min(1.4F, movementDistance / 40.0F));
-    if (moved >= 0.2F
-        || squaredDistance(player.x, player.y, leader.x, leader.y) <= kLinkRange * kLinkRange) return;
-    constexpr std::array<std::array<float, 2>, 8> kCatchUpOffsets{{
-        {{-36.0F, 24.0F}}, {{36.0F, 24.0F}}, {{-48.0F, 0.0F}}, {{48.0F, 0.0F}},
-        {{0.0F, 42.0F}}, {{0.0F, -42.0F}}, {{-64.0F, 32.0F}}, {{64.0F, 32.0F}},
-    }};
-    for (const auto& offset : kCatchUpOffsets) {
-        const auto x = std::clamp(leader.x + offset[0], kPlayerCollisionRadius,
-                                  kMapPixelWidth - kPlayerCollisionRadius);
-        const auto y = std::clamp(leader.y + offset[1], kPlayerCollisionRadius,
-                                  kMapPixelHeight - kPlayerCollisionRadius);
-        if (!playerPositionIsWalkable(map, x, y)) continue;
-        player.x = x;
-        player.y = y;
-        player.moving = false;
-        return;
+    const auto moved = moveAiPlayerSmart(player, formationX, formationY, leader,
+                                          enemies, enemyBullets, map, rescuing);
+    if (moved < 0.2F && distance > stopDistance) {
+        if (player.aiStuckTicks < 255U) ++player.aiStuckTicks;
+        if (player.aiStuckTicks > 39U) {
+            player.aiTurnSign = static_cast<std::int8_t>(-player.aiTurnSign);
+            player.aiStuckTicks = 12U;
+        }
+    } else {
+        player.aiStuckTicks = player.aiStuckTicks > 2U
+            ? static_cast<std::uint8_t>(player.aiStuckTicks - 2U) : 0U;
     }
 }
 
@@ -559,7 +644,9 @@ bool spawnBulletAt(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets
 void killEnemy(EnemyState& enemy,
                std::uint8_t owner,
                std::array<XpGemState, kMaximumXpGems>& xpGems,
-               std::array<std::uint32_t, pixel_twins::kControllerCount>& scores) noexcept {
+               std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
+               std::array<std::uint32_t, pixel_twins::kControllerCount>& killCounts) noexcept {
+    if (owner < killCounts.size()) ++killCounts[owner];
     if (enemy.kind == EnemyKind::Boss) {
         for (auto& score : scores) score += 5000;
     } else {
@@ -829,7 +916,8 @@ void spawnThunder(PlayerState& player, std::uint8_t owner,
                   std::array<ThunderStrikeState, kMaximumThunderStrikes>& strikes,
                   std::array<EnemyState, kMaximumEnemies>& enemies,
                   std::array<XpGemState, kMaximumXpGems>& xpGems,
-                  std::array<std::uint32_t, pixel_twins::kControllerCount>& scores) noexcept {
+                  std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
+                  std::array<std::uint32_t, pixel_twins::kControllerCount>& killCounts) noexcept {
     const auto stats = attackStats(player.thunderLevel, 1, 12, 100.0F, 5, 8.0F);
     for (std::uint8_t strikeIndex = 0; strikeIndex < stats.count; ++strikeIndex) {
         const auto slot = std::find_if(strikes.begin(), strikes.end(),
@@ -850,7 +938,7 @@ void spawnThunder(PlayerState& player, std::uint8_t owner,
             const auto range = slot->radius + enemy.radius;
             if (squaredDistance(slot->x, slot->y, enemy.x, enemy.y) > range * range) continue;
             enemy.hp = static_cast<std::int16_t>(enemy.hp - stats.damage);
-            if (enemy.hp <= 0) killEnemy(enemy, owner, xpGems, scores);
+            if (enemy.hp <= 0) killEnemy(enemy, owner, xpGems, scores, killCounts);
         }
     }
 }
@@ -860,6 +948,7 @@ void damageOrbs(PlayerState& player, std::uint8_t owner,
                 std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                 std::array<XpGemState, kMaximumXpGems>& xpGems,
                 std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
+                std::array<std::uint32_t, pixel_twins::kControllerCount>& killCounts,
                 std::array<ImpactEffectState, kMaximumImpactEffects>& impacts) noexcept {
     const auto stats = attackStats(player.orbLevel, 1, 4, 22.0F, 2, 4.0F);
     for (std::uint8_t orbIndex = 0; orbIndex < stats.count; ++orbIndex) {
@@ -877,7 +966,7 @@ void damageOrbs(PlayerState& player, std::uint8_t owner,
             if (squaredDistance(x, y, enemy.x, enemy.y) >= range * range) continue;
             enemy.hp = static_cast<std::int16_t>(enemy.hp - stats.damage);
             spawnImpact(impacts, ImpactEffectType::Orb, enemy.x, enemy.y);
-            if (enemy.hp <= 0) killEnemy(enemy, owner, xpGems, scores);
+            if (enemy.hp <= 0) killEnemy(enemy, owner, xpGems, scores, killCounts);
         }
     }
 }
@@ -964,6 +1053,7 @@ void processBombs(std::array<PlayerState, pixel_twins::kControllerCount>& player
                   std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                   std::array<XpGemState, kMaximumXpGems>& xpGems,
                   std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
+                  std::array<std::uint32_t, pixel_twins::kControllerCount>& killCounts,
                   std::uint32_t randomState) noexcept {
     constexpr float kRadius = 96.0F;
     for (std::size_t playerIndex = 0; playerIndex < players.size(); ++playerIndex) {
@@ -982,7 +1072,8 @@ void processBombs(std::array<PlayerState, pixel_twins::kControllerCount>& player
             if (squaredDistance(player.x, player.y, enemy.x, enemy.y) > range * range) continue;
             enemy.hp = static_cast<std::int16_t>(enemy.hp - 300);
             if (enemy.hp <= 0) {
-                killEnemy(enemy, static_cast<std::uint8_t>(playerIndex), xpGems, scores);
+                killEnemy(enemy, static_cast<std::uint8_t>(playerIndex), xpGems, scores,
+                          killCounts);
             }
         }
         for (auto& bullet : enemyBullets) {
@@ -1001,6 +1092,7 @@ void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets
                    std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                    std::array<XpGemState, kMaximumXpGems>& xpGems,
                    std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
+                   std::array<std::uint32_t, pixel_twins::kControllerCount>& killCounts,
                    std::array<ImpactEffectState, kMaximumImpactEffects>& impacts) noexcept {
     for (auto& bullet : bullets) {
         if (!bullet.active) continue;
@@ -1044,7 +1136,7 @@ void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets
                 else if (bullet.type == PlayerAttack::Familiar) impactType = ImpactEffectType::Familiar;
                 spawnImpact(impacts, impactType, bullet.x, bullet.y - 10.0F);
                 if (enemy.hp <= 0) {
-                    killEnemy(enemy, bullet.owner, xpGems, scores);
+                    killEnemy(enemy, bullet.owner, xpGems, scores, killCounts);
                 }
                 bullet.active = false;
                 break;
@@ -1059,6 +1151,7 @@ void updateWindSlashes(std::array<WindSlashState, kMaximumWindSlashes>& slashes,
                        std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                        std::array<XpGemState, kMaximumXpGems>& xpGems,
                        std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
+                       std::array<std::uint32_t, pixel_twins::kControllerCount>& killCounts,
                        std::array<ImpactEffectState, kMaximumImpactEffects>& impacts) noexcept {
     for (auto& slash : slashes) {
         if (!slash.active) continue;
@@ -1087,7 +1180,7 @@ void updateWindSlashes(std::array<WindSlashState, kMaximumWindSlashes>& slashes,
             enemy.hp = static_cast<std::int16_t>(enemy.hp - slash.damage);
             slash.hitCooldownTicks[enemyIndex] = 7;
             spawnImpact(impacts, ImpactEffectType::Wind, enemy.x, enemy.y);
-            if (enemy.hp <= 0) killEnemy(enemy, slash.owner, xpGems, scores);
+            if (enemy.hp <= 0) killEnemy(enemy, slash.owner, xpGems, scores, killCounts);
         }
     }
 }
@@ -1471,6 +1564,7 @@ bool updateXpRecallCircle(std::array<XpGemState, kMaximumXpGems>& xpGems,
 
 void updateXpGems(std::array<XpGemState, kMaximumXpGems>& xpGems,
                   std::array<PlayerState, pixel_twins::kControllerCount>& players,
+                  std::array<std::uint32_t, pixel_twins::kControllerCount>& xpEarned,
                   std::uint32_t& randomState,
                   std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects,
                   Difficulty difficulty) noexcept {
@@ -1499,6 +1593,7 @@ void updateXpGems(std::array<XpGemState, kMaximumXpGems>& xpGems,
         if (target == nullptr) continue;
         if (targetSquared < kXpCollectRange * kXpCollectRange) {
             const auto owner = static_cast<std::uint8_t>(target - players.data());
+            xpEarned[owner] += gem.value;
             gainXp(*target, owner, gem.value, randomState, perkEffects, difficulty);
             gem.active = false;
             continue;
@@ -1653,6 +1748,16 @@ void GameplayState::reset(const world::WorldMap& map, std::size_t startingPlayer
                           Difficulty difficulty) noexcept {
     players_[0] = {kWorldCenter - 28.0F, kWorldCenter, Facing::East};
     players_[1] = {kWorldCenter + 28.0F, kWorldCenter, Facing::West};
+    players_[0].aiDirectionX = 1.0F;
+    players_[0].aiDirectionY = 0.0F;
+    players_[0].aiDesiredDirectionX = 1.0F;
+    players_[0].aiDesiredDirectionY = 0.0F;
+    players_[0].aiTurnSign = 1;
+    players_[1].aiDirectionX = -1.0F;
+    players_[1].aiDirectionY = 0.0F;
+    players_[1].aiDesiredDirectionX = -1.0F;
+    players_[1].aiDesiredDirectionY = 0.0F;
+    players_[1].aiTurnSign = -1;
     difficulty_ = difficulty;
     const auto balance = balanceProfile(difficulty_);
     for (auto& player : players_) {
@@ -1674,6 +1779,8 @@ void GameplayState::reset(const world::WorldMap& map, std::size_t startingPlayer
         28U * 60U * balance.spawnIntervalPercent / 100U);
     elapsedTicks_ = 0;
     scores_.fill(0);
+    killCounts_.fill(0);
+    xpEarned_.fill(0);
     manualPlayers_ = {{false, false}};
     manualPlayers_[std::min(startingPlayer, manualPlayers_.size() - 1U)] = true;
     seals_.fill({});
@@ -1781,6 +1888,8 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
             || controllers[index].held != 0 || controllers[index].pressed != 0)) {
             // AI操作中に得た内部スコアを途中参加プレイヤーへ引き継がない。
             scores_[index] = 0;
+            killCounts_[index] = 0;
+            xpEarned_[index] = 0;
             manualPlayers_[index] = true;
         }
         if (players_[index].hp > 0) {
@@ -1835,25 +1944,29 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
     }
     if (spawnCooldownTicks_ > 0) --spawnCooldownTicks_;
     if (swarmCooldownTicks_ > 0) --swarmCooldownTicks_;
+    const auto enemyProgressTicks = std::max(
+        elapsedTicks_, static_cast<std::uint32_t>(activeSealCount_) * 60U * 60U);
     const auto* activeBoss = boss();
     if (activeBoss == nullptr && swarmCooldownTicks_ == 0 && enemyCount() < kMaximumEnemies - 8U) {
-        spawnSwarm(enemies_, players_, map, elapsedTicks_, randomState_, balance);
+        spawnSwarm(enemies_, players_, map, enemyProgressTicks, randomState_, balance);
         swarmCooldownTicks_ = static_cast<std::uint16_t>(
             std::round((34.0F + randomUnit(randomState_) * 24.0F) * 60.0F
                        * balance.spawnIntervalPercent / 100.0F));
     }
     if (spawnCooldownTicks_ == 0) {
-        const auto requestedCount = static_cast<std::uint8_t>(2U + elapsedTicks_ / (45U * 60U));
+        const auto requestedCount = static_cast<std::uint8_t>(
+            2U + enemyProgressTicks / (45U * 60U));
         recycleDistantEnemiesForSpawn(enemies_, players_, requestedCount);
         const auto focusIndex = randomUnit(randomState_) < 0.5F ? 0U : 1U;
         const auto& focus = players_[players_[focusIndex].hp > 0 ? focusIndex : 1U - focusIndex];
         for (std::uint8_t index = 0; index < requestedCount; ++index) {
             (void)spawnEnemyNear(enemies_, focus, map,
-                                 rollEnemyKind(elapsedTicks_, randomState_), elapsedTicks_, randomState_,
+                                 rollEnemyKind(enemyProgressTicks, randomState_),
+                                 enemyProgressTicks, randomState_,
                                  activeBoss, balance);
         }
         const auto intervalSeconds = std::max(0.38F,
-            1.25F - static_cast<float>(elapsedTicks_) / 60.0F / 420.0F);
+            1.25F - static_cast<float>(enemyProgressTicks) / 60.0F / 420.0F);
         spawnCooldownTicks_ = static_cast<std::uint16_t>(std::round(
             intervalSeconds * (activeBoss != nullptr ? 3.0F : 1.0F) * 60.0F
                 * balance.spawnIntervalPercent / 100.0F));
@@ -1882,7 +1995,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         }
         if (player.hp > 0 && player.thunderLevel > 0 && player.thunderCooldownTicks == 0) {
             spawnThunder(player, static_cast<std::uint8_t>(index), randomState_, thunderStrikes_,
-                         enemies_, xpGems_, scores_);
+                         enemies_, xpGems_, scores_, killCounts_);
             player.thunderCooldownTicks = cooldownTicks(1.05F, 0.045F, player.thunderLevel, 0.45F);
         }
         if (player.hp > 0 && player.iceLevel > 0 && player.iceCooldownTicks == 0) {
@@ -1899,18 +2012,18 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         }
         if (player.hp > 0 && player.orbLevel > 0 && player.orbCooldownTicks == 0) {
             damageOrbs(player, static_cast<std::uint8_t>(index), enemies_, enemyBullets_,
-                       xpGems_, scores_, impactEffects_);
+                       xpGems_, scores_, killCounts_, impactEffects_);
             player.orbCooldownTicks = 10;
         }
     }
-    processBombs(players_, enemies_, enemyBullets_, xpGems_, scores_, randomState_);
-    updateBullets(bullets_, enemies_, enemyBullets_, xpGems_, scores_, impactEffects_);
+    processBombs(players_, enemies_, enemyBullets_, xpGems_, scores_, killCounts_, randomState_);
+    updateBullets(bullets_, enemies_, enemyBullets_, xpGems_, scores_, killCounts_, impactEffects_);
     updateWindSlashes(windSlashes_, players_, enemies_, enemyBullets_, xpGems_, scores_,
-                      impactEffects_);
+                      killCounts_, impactEffects_);
     updateThunderStrikes(thunderStrikes_);
     updateEnemyBullets(enemyBullets_, players_, balance);
     const auto xpRecallStarted = updateXpRecallCircle(xpGems_, players_);
-    updateXpGems(xpGems_, players_, randomState_, perkEffects_, difficulty_);
+    updateXpGems(xpGems_, players_, xpEarned_, randomState_, perkEffects_, difficulty_);
     outcome_ = updateRevives(players_);
     for (auto& enemy : enemies_) {
         if (!enemy.active && enemy.deathTicks > 0) --enemy.deathTicks;
@@ -2041,6 +2154,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
 
 void GameplayState::grantXp(std::size_t playerIndex, std::uint16_t amount) noexcept {
     if (playerIndex < players_.size()) {
+        xpEarned_[playerIndex] += amount;
         gainXp(players_[playerIndex], static_cast<std::uint8_t>(playerIndex), amount,
                randomState_, perkEffects_, difficulty_);
     }

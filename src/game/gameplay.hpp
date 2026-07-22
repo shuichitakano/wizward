@@ -204,6 +204,14 @@ struct PlayerState {
     bool xpRecallInside = false;
     bool sharePending = false;
     Perk sharePerk = Perk::Light;
+    float aiDirectionX = 0.0F;
+    float aiDirectionY = 1.0F;
+    float aiDesiredDirectionX = 0.0F;
+    float aiDesiredDirectionY = 1.0F;
+    std::uint8_t aiDecisionTicks = 0;
+    std::uint8_t aiStuckTicks = 0;
+    std::int8_t aiTurnSign = 1;
+    bool aiHoldingFormation = false;
 };
 
 struct CameraState {
@@ -374,6 +382,12 @@ public:
     [[nodiscard]] std::uint32_t score(std::size_t playerIndex) const noexcept {
         return manualPlayers_[playerIndex] ? scores_[playerIndex] : 0U;
     }
+    [[nodiscard]] std::uint32_t killCount(std::size_t playerIndex) const noexcept {
+        return manualPlayers_[playerIndex] ? killCounts_[playerIndex] : 0U;
+    }
+    [[nodiscard]] std::uint32_t xpEarned(std::size_t playerIndex) const noexcept {
+        return manualPlayers_[playerIndex] ? xpEarned_[playerIndex] : 0U;
+    }
     [[nodiscard]] const SealState& seal(std::size_t index) const noexcept {
         return seals_[index];
     }
@@ -411,6 +425,8 @@ private:
     std::uint16_t swarmCooldownTicks_ = 0;
     std::uint32_t elapsedTicks_ = 0;
     std::array<std::uint32_t, pixel_twins::kControllerCount> scores_{};
+    std::array<std::uint32_t, pixel_twins::kControllerCount> killCounts_{};
+    std::array<std::uint32_t, pixel_twins::kControllerCount> xpEarned_{};
     std::array<bool, pixel_twins::kControllerCount> manualPlayers_{{true, false}};
     std::array<SealState, 3> seals_{};
     std::uint16_t sealNoticeTicks_ = 0;

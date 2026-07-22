@@ -132,8 +132,16 @@ int main() {
     assert(gameplay.addEnemy(partnerBeforeAvoidance.x - 10.0F,
                              partnerBeforeAvoidance.y,
                              wizward::game::EnemyKind::Imp));
-    gameplay.tick(controllersWith(0, 0), map);
-    assert(gameplay.player(1).x > partnerBeforeAvoidance.x);
+    for (int tick = 0; tick < 24; ++tick) {
+        const auto beforeTick = gameplay.player(1);
+        gameplay.tick(controllersWith(0, 0), map);
+        assert(std::sqrt(std::pow(gameplay.player(1).x - beforeTick.x, 2.0F)
+                       + std::pow(gameplay.player(1).y - beforeTick.y, 2.0F))
+               <= 1.01F);
+    }
+    assert(std::sqrt(std::pow(gameplay.player(1).x - (partnerBeforeAvoidance.x - 10.0F), 2.0F)
+                   + std::pow(gameplay.player(1).y - partnerBeforeAvoidance.y, 2.0F))
+           > 10.0F);
 
     gameplay.reset(map);
     for (int tick = 0; tick < 240; ++tick) {
@@ -238,6 +246,7 @@ int main() {
     assert(sawLightImpact);
     assert(sawGenericImpact);
     assert(gameplay.score(0) + gameplay.score(1) > 0);
+    assert(gameplay.killCount(0) + gameplay.killCount(1) > 0);
 
     gameplay.reset(map);
     const auto contactPlayer = gameplay.player(0);
@@ -392,6 +401,11 @@ int main() {
     assert(gameplay.player(1).fireLevel == 1);
     assert(gameplay.player(1).linkedUpgradeTenths[fireIndex] == 2);
 
+    gameplay.reset(map);
+    gameplay.grantXp(0, 7);
+    assert(gameplay.xpEarned(0) == 7U);
+    assert(gameplay.xpEarned(1) == 0U);
+
     map.seals[0] = {50, 50};
     map.seals[1] = {8, 8};
     map.seals[2] = {92, 92};
@@ -404,6 +418,8 @@ int main() {
     assert(gameplay.sealNoticeTicks() == 132);
     assert(gameplay.score(0) == 1000U);
     assert(gameplay.score(1) == 1000U);
+    assert(std::count_if(gameplay.enemies().begin(), gameplay.enemies().end(),
+        [](const auto& enemy) { return enemy.active && enemy.bornTicks > 0; }) >= 3);
 
     map.seals.fill({50, 50});
     gameplay.reset(map);
