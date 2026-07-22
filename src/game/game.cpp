@@ -1565,11 +1565,12 @@ void Game::finalizeResult() noexcept {
         ? remainingSeconds * kTimeBonusPerSecond : 0U;
     rankingEntries_.fill({});
     for (std::size_t player = 0; player < finalScores_.size(); ++player) {
-        timeBonuses_[player] = bonus;
-        finalScores_[player] = gameplay_.score(player) + bonus;
+        const auto eligible = gameplay_.playerIsManual(player);
+        timeBonuses_[player] = eligible ? bonus : 0U;
+        finalScores_[player] = eligible ? gameplay_.score(player) + bonus : 0U;
     }
     for (std::size_t player = 0; player < finalScores_.size(); ++player) {
-        if (finalScores_[player] == 0) continue;
+        if (!gameplay_.playerIsManual(player) || finalScores_[player] == 0) continue;
         std::size_t rank = 0;
         for (std::size_t index = 0; index < rankingCount_; ++index) {
             if (rankings_[index].score >= finalScores_[player]) ++rank;

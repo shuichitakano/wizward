@@ -137,5 +137,18 @@ int main() {
         (void)game.tick(idle);
     }
     assert(game.scene() == Scene::Title);
+
+    wizward::game::Game aiResultGame;
+    assert(aiResultGame.initialize(Scene::Gameplay, 0x2468ace0U));
+    assert(aiResultGame.gameplay().playerIsManual(0));
+    assert(!aiResultGame.gameplay().playerIsManual(1));
+    for (std::uint32_t tick = 0;
+         tick < 300U * 60U && aiResultGame.scene() == Scene::Gameplay; ++tick) {
+        (void)aiResultGame.tick(idle);
+    }
+    assert(aiResultGame.scene() == Scene::Result);
+    assert(aiResultGame.finalScore(1) == 0U);
+    assert(aiResultGame.timeBonus(1) == 0U);
+    assert(!aiResultGame.rankingEntry(1).active);
     return 0;
 }

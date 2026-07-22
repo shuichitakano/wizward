@@ -163,6 +163,19 @@ int main() {
     gameplay.tick(player2ControllersWith(32767, 0), map);
     assert(gameplay.playerIsManual(1));
 
+    map = {};
+    map.seals[0] = {51, 50};
+    map.seals[1] = {0, 0};
+    map.seals[2] = {0, 0};
+    gameplay.reset(map);
+    gameplay.tick(controllersWith(0, 0), map);
+    assert(gameplay.seal(0).active);
+    assert(!gameplay.playerIsManual(1));
+    assert(gameplay.score(1) == 0U);
+    gameplay.tick(player2ControllersWith(32767, 0), map);
+    assert(gameplay.playerIsManual(1));
+    assert(gameplay.score(1) == 0U);
+
     gameplay.reset(map);
     const auto beforeCollision = gameplay.player(0);
     const auto blockedX = static_cast<std::uint16_t>(beforeCollision.x / wizward::game::kWorldTileSize + 1.0F);

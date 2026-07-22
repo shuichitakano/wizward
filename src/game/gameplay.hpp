@@ -372,7 +372,7 @@ public:
     [[nodiscard]] Difficulty difficulty() const noexcept { return difficulty_; }
     [[nodiscard]] std::uint16_t xpNeeded(std::uint8_t level) const noexcept;
     [[nodiscard]] std::uint32_t score(std::size_t playerIndex) const noexcept {
-        return scores_[playerIndex];
+        return manualPlayers_[playerIndex] ? scores_[playerIndex] : 0U;
     }
     [[nodiscard]] const SealState& seal(std::size_t index) const noexcept {
         return seals_[index];

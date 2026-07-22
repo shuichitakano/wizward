@@ -1697,6 +1697,8 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         if (!manualPlayers_[index] && (std::abs(controllers[index].x) >= kAxisDeadzone
             || std::abs(controllers[index].y) >= kAxisDeadzone
             || controllers[index].held != 0 || controllers[index].pressed != 0)) {
+            // AI操作中に得た内部スコアを途中参加プレイヤーへ引き継がない。
+            scores_[index] = 0;
             manualPlayers_[index] = true;
         }
         if (players_[index].hp > 0) {
