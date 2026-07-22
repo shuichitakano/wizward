@@ -22,7 +22,7 @@ constexpr std::uint32_t kRankingResultDelayTicks = 156;
 constexpr std::uint32_t kRankingInputTimeoutTicks = 1800;
 constexpr std::uint16_t kResultContinueDelayTicks = 15;
 constexpr std::uint16_t kResultAutoReturnTicks = 300;
-constexpr std::uint32_t kTimeBonusPerSecond = 200;
+constexpr std::uint32_t kTimeBonusPerSecond = 50;
 constexpr std::string_view kRankingCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.- ";
 
 void copySfxCues(const GameplayState& gameplay, UpdateResult& result) noexcept {

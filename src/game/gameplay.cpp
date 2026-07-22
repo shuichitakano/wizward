@@ -1319,7 +1319,7 @@ void updateSealStones(
                 >= kActivationRange * kActivationRange) continue;
             seal.active = true;
             seal.activatedAtTicks = elapsedTicks;
-            scores[playerIndex] += kSealScore;
+            for (auto& score : scores) score += kSealScore;
             activeCount = static_cast<std::uint8_t>(activeCount + 1U);
             noticeTicks = 132;
             if (activeCount == seals.size()) bossSpawnPendingTicks = 53;

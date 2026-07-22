@@ -171,6 +171,7 @@ int main() {
     gameplay.tick(controllersWith(0, 0), map);
     assert(gameplay.seal(0).active);
     assert(!gameplay.playerIsManual(1));
+    assert(gameplay.score(0) == 1000U);
     assert(gameplay.score(1) == 0U);
     gameplay.tick(player2ControllersWith(32767, 0), map);
     assert(gameplay.playerIsManual(1));
@@ -379,12 +380,14 @@ int main() {
     map.seals[1] = {8, 8};
     map.seals[2] = {92, 92};
     gameplay.reset(map);
-    gameplay.tick(idle, map);
+    gameplay.tick(player2ControllersWith(32767, 0), map);
     assert(gameplay.seal(0).active);
     assert(!gameplay.seal(1).active);
+    assert(gameplay.playerIsManual(1));
     assert(gameplay.activeSealCount() == 1);
     assert(gameplay.sealNoticeTicks() == 132);
-    assert(gameplay.score(0) + gameplay.score(1) == 1000);
+    assert(gameplay.score(0) == 1000U);
+    assert(gameplay.score(1) == 1000U);
 
     map.seals.fill({50, 50});
     gameplay.reset(map);
