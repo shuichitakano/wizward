@@ -127,6 +127,22 @@ int main() {
     assert(std::abs((gameplay.camera(0).x + 80.0F) - gameplay.player(0).x) < 0.01F);
     assert(std::abs((gameplay.camera(0).y + 60.0F) - (gameplay.player(0).y - 16.0F)) < 0.01F);
 
+    gameplay.reset(map);
+    const auto partnerBeforeAvoidance = gameplay.player(1);
+    assert(gameplay.addEnemy(partnerBeforeAvoidance.x - 10.0F,
+                             partnerBeforeAvoidance.y,
+                             wizward::game::EnemyKind::Imp));
+    gameplay.tick(controllersWith(0, 0), map);
+    assert(gameplay.player(1).x > partnerBeforeAvoidance.x);
+
+    gameplay.reset(map);
+    for (int tick = 0; tick < 240; ++tick) {
+        gameplay.tick(moveRight, map);
+        assert(std::sqrt(std::pow(gameplay.player(1).x - gameplay.player(0).x, 2.0F)
+                       + std::pow(gameplay.player(1).y - gameplay.player(0).y, 2.0F))
+               <= 141.0F);
+    }
+
     wizward::world::WorldMap alternateSeedMap;
     alternateSeedMap.seed = 0x12345678U;
     gameplay.reset(alternateSeedMap);

@@ -22,6 +22,7 @@ constexpr float kXpCollectRange = 9.0F;
 constexpr float kXpPullSpeedPerTick = 2.0F;
 constexpr float kXpRecallRadius = 18.0F;
 constexpr float kXpRecallSpeedPerTick = 8.0F;
+constexpr float kLinkRange = 140.0F;
 constexpr std::int16_t kAxisDeadzone = 4096;
 constexpr std::int16_t kLightDamage = 6;
 constexpr std::int16_t kContactDamage = 3;
@@ -277,27 +278,86 @@ void updatePerkEffects(std::array<PerkEffectState, kMaximumPerkEffects>& effects
     }
 }
 
+struct AiAvoidance {
+    float x = 0.0F;
+    float y = 0.0F;
+    bool active = false;
+};
+
+void addAiAvoidance(AiAvoidance& result, float playerX, float playerY,
+                    float threatX, float threatY, float range,
+                    float strength) noexcept {
+    auto dx = playerX - threatX;
+    auto dy = playerY - threatY;
+    const auto distanceSquared = dx * dx + dy * dy;
+    if (distanceSquared >= range * range) return;
+    auto distance = std::sqrt(distanceSquared);
+    if (distance < 0.01F) {
+        dx = 1.0F;
+        dy = 0.0F;
+        distance = 1.0F;
+    }
+    const auto weight = (range - distance) / range * strength;
+    result.x += dx / distance * weight;
+    result.y += dy / distance * weight;
+    result.active = true;
+}
+
+AiAvoidance aiAvoidance(
+    const PlayerState& player,
+    const std::array<EnemyState, kMaximumEnemies>& enemies,
+    const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets) noexcept {
+    AiAvoidance result{};
+    for (const auto& enemy : enemies) {
+        if (!enemy.active || enemy.hp <= 0 || enemy.bornTicks > 0
+            || enemy.spawnDelayTicks > 0) continue;
+        addAiAvoidance(result, player.x, player.y, enemy.x, enemy.y,
+                       52.0F + enemy.radius, 1.3F);
+    }
+    for (const auto& bullet : enemyBullets) {
+        if (!bullet.active || bullet.launchDelayTicks > 0) continue;
+        constexpr float kPredictionTicks = 8.0F;
+        addAiAvoidance(result, player.x, player.y,
+                       bullet.x + bullet.velocityX * kPredictionTicks,
+                       bullet.y + bullet.velocityY * kPredictionTicks,
+                       48.0F + bullet.radius, 2.4F);
+    }
+    return result;
+}
+
+float aiMoveScore(float x, float y, float targetX, float targetY,
+                  const PlayerState& leader) noexcept {
+    auto score = std::sqrt(squaredDistance(x, y, targetX, targetY));
+    const auto linkDistance = std::sqrt(squaredDistance(x, y, leader.x, leader.y));
+    if (linkDistance > 100.0F) score += (linkDistance - 100.0F) * 0.35F;
+    if (linkDistance > 128.0F) score += (linkDistance - 128.0F) * 3.0F;
+    if (linkDistance > kLinkRange) score += 1000.0F + (linkDistance - kLinkRange) * 20.0F;
+    return score;
+}
+
 float moveAiPlayerSmart(PlayerState& player, float targetX, float targetY,
-                        const world::WorldMap& map, float stepScale) noexcept {
+                        const PlayerState& leader, const world::WorldMap& map,
+                        float stepScale) noexcept {
     auto directionX = targetX - player.x;
     auto directionY = targetY - player.y;
     normalize(directionX, directionY);
     const auto sideX = -directionY;
     const auto sideY = directionX;
-    std::array<std::array<float, 2>, 7> directions{{
+    std::array<std::array<float, 2>, 12> directions{{
         {{directionX, directionY}},
         {{directionX + sideX * 0.7F, directionY + sideY * 0.7F}},
         {{directionX - sideX * 0.7F, directionY - sideY * 0.7F}},
         {{directionX + sideX * 1.35F, directionY + sideY * 1.35F}},
         {{directionX - sideX * 1.35F, directionY - sideY * 1.35F}},
-        {{sideX, sideY}}, {{-sideX, -sideY}},
+        {{sideX, sideY}}, {{-sideX, -sideY}}, {{-directionX, -directionY}},
+        {{1.0F, 0.0F}}, {{-1.0F, 0.0F}}, {{0.0F, 1.0F}}, {{0.0F, -1.0F}},
     }};
     const auto beforeX = player.x;
     const auto beforeY = player.y;
     auto bestX = beforeX;
     auto bestY = beforeY;
     auto bestMoved = 0.0F;
-    auto bestScore = std::sqrt(squaredDistance(beforeX, beforeY, targetX, targetY));
+    auto bestScore = std::numeric_limits<float>::max();
     const auto step = playerSpeedPerTick(player) * stepScale;
     for (auto& direction : directions) {
         normalize(direction[0], direction[1]);
@@ -308,7 +368,8 @@ float moveAiPlayerSmart(PlayerState& player, float targetX, float targetY,
         if (!playerPositionIsWalkable(map, probeX, probeY)) probeY = beforeY;
         const auto moved = std::sqrt(squaredDistance(beforeX, beforeY, probeX, probeY));
         if (moved < 0.05F) continue;
-        const auto score = std::sqrt(squaredDistance(probeX, probeY, targetX, targetY)) - moved * 0.08F;
+        const auto score = aiMoveScore(probeX, probeY, targetX, targetY, leader)
+            - moved * 0.08F;
         if (score >= bestScore) continue;
         bestX = probeX;
         bestY = probeY;
@@ -323,19 +384,41 @@ float moveAiPlayerSmart(PlayerState& player, float targetX, float targetY,
 }
 
 void followAiPartner(PlayerState& player, const PlayerState& leader,
+                     const std::array<EnemyState, kMaximumEnemies>& enemies,
+                     const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                      const world::WorldMap& map) noexcept {
     const auto rescuing = leader.hp <= 0;
-    const auto targetX = rescuing ? leader.x : leader.x - 38.0F;
-    const auto targetY = rescuing ? leader.y : leader.y + 24.0F;
-    const auto distance = std::sqrt(squaredDistance(player.x, player.y, targetX, targetY));
+    const auto formationX = rescuing ? leader.x : leader.x - 38.0F;
+    const auto formationY = rescuing ? leader.y : leader.y + 24.0F;
+    const auto distance = std::sqrt(squaredDistance(player.x, player.y, formationX, formationY));
     const auto stopDistance = rescuing ? kPlayerRadius * 2.0F + 6.0F : 8.0F;
-    if (distance <= stopDistance) {
+    const auto avoidance = aiAvoidance(player, enemies, enemyBullets);
+    if (distance <= stopDistance && (!avoidance.active || rescuing)) {
         player.moving = false;
         return;
     }
-    const auto moved = moveAiPlayerSmart(player, targetX, targetY, map,
-                                          std::min(1.4F, distance / 40.0F));
-    if (moved >= 0.2F || squaredDistance(player.x, player.y, leader.x, leader.y) <= 190.0F * 190.0F) return;
+    auto targetX = formationX;
+    auto targetY = formationY;
+    if (avoidance.active) {
+        auto towardX = formationX - player.x;
+        auto towardY = formationY - player.y;
+        normalize(towardX, towardY);
+        auto avoidX = avoidance.x;
+        auto avoidY = avoidance.y;
+        normalize(avoidX, avoidY);
+        const auto linkDistance = std::sqrt(squaredDistance(player.x, player.y, leader.x, leader.y));
+        const auto avoidanceWeight = rescuing ? 0.45F : (linkDistance > 110.0F ? 0.55F : 1.65F);
+        auto steerX = towardX + avoidX * avoidanceWeight;
+        auto steerY = towardY + avoidY * avoidanceWeight;
+        normalize(steerX, steerY);
+        targetX = player.x + steerX * 64.0F;
+        targetY = player.y + steerY * 64.0F;
+    }
+    const auto movementDistance = avoidance.active ? std::max(40.0F, distance) : distance;
+    const auto moved = moveAiPlayerSmart(player, targetX, targetY, leader, map,
+                                          std::min(1.4F, movementDistance / 40.0F));
+    if (moved >= 0.2F
+        || squaredDistance(player.x, player.y, leader.x, leader.y) <= kLinkRange * kLinkRange) return;
     constexpr std::array<std::array<float, 2>, 8> kCatchUpOffsets{{
         {{-36.0F, 24.0F}}, {{36.0F, 24.0F}}, {{-48.0F, 0.0F}}, {{48.0F, 0.0F}},
         {{0.0F, 42.0F}}, {{0.0F, -42.0F}}, {{-64.0F, 32.0F}}, {{64.0F, 32.0F}},
@@ -1274,7 +1357,6 @@ void applyLinkedUpgrade(PlayerState& player, Perk perk) noexcept {
 void processLinkShares(std::array<PlayerState, pixel_twins::kControllerCount>& players,
                        std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects,
                        std::uint32_t& randomState) noexcept {
-    constexpr float kLinkRange = 140.0F;
     for (std::size_t ownerIndex = 0; ownerIndex < players.size(); ++ownerIndex) {
         auto& owner = players[ownerIndex];
         if (!owner.sharePending) continue;
@@ -1709,7 +1791,8 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
             } else {
                 updateAutoPerkChoice(players_[index], static_cast<std::uint8_t>(index),
                                      enemies_, randomState_, perkEffects_);
-                followAiPartner(players_[index], players_[1U - index], map);
+                followAiPartner(players_[index], players_[1U - index],
+                                enemies_, enemyBullets_, map);
             }
         }
         else players_[index].moving = false;
