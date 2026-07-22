@@ -29,6 +29,14 @@ UI_RESERVED = [
     (13, "boss_gauge_empty", "#5f5f5a"),
 ]
 
+ATTRACT_RESERVED = [
+    UI_RESERVED[0],
+    UI_RESERVED[4],
+    UI_RESERVED[5],
+    (14, "hard_ranking", "#ff7f73"),
+    (15, "hard_ranking_focus", "#ffb08f"),
+]
+
 # 固定インデックスを消費せず、減色標本へ加えて生成後に最近傍色を解決する演出色。
 EFFECT_TARGETS = [
     ("thunder", "#ffe35a"),
@@ -81,7 +89,9 @@ def _runtime_image_references(prototype: Path) -> List[str]:
     references = {
         match
         for match in IMAGE_REFERENCE_RE.findall(source)
-        if "_selected/" in match and "title_screen_selected/" not in match
+        if "_selected/" in match
+        and "title_screen_selected/" not in match
+        and "attract_selected/" not in match
     }
     return sorted(references)
 
@@ -161,7 +171,8 @@ def _asset_layout(
 ) -> Tuple[str, str, Optional[Dict[str, int]]]:
     if relative.parts[:2] == ("map_tiles_selected", "overlays"):
         return "sprite", "sprite", {"width": 32, "height": 32}
-    if relative.parts[0] == "map_tiles_selected" or relative.name == "title_screen_160x120.png":
+    if (relative.parts[0] in ("map_tiles_selected", "attract_selected")
+            or relative.name == "title_screen_160x120.png"):
         return "background", "background", None
     if relative.parts[0] == "fonts_selected":
         return "sprite", "font", {"width": 8, "height": 9}
@@ -206,13 +217,15 @@ def _copy_and_describe(
     return assets
 
 
-def _converter_manifest(name: str, assets: List[Dict[str, object]], gameplay: bool) -> Dict[str, object]:
-    reserved = UI_RESERVED if gameplay else [UI_RESERVED[0]]
+def _converter_manifest(
+    name: str, assets: List[Dict[str, object]], gameplay: bool, attract: bool = False
+) -> Dict[str, object]:
+    reserved = UI_RESERVED if gameplay else ATTRACT_RESERVED if attract else [UI_RESERVED[0]]
     return {
         "version": 1,
         "name": name,
         "palette": {
-            "asset_range": [14, 254] if gameplay else [3, 254],
+            "asset_range": [14, 254] if gameplay else [16, 254] if attract else [3, 254],
             "sample_pixels": 1_000_000,
             "max_pixels_per_asset": 4096,
             "quantizer": "fast_octree" if gameplay else "median_cut",
@@ -234,8 +247,8 @@ def _write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def collect(prototype: Path, project: Path) -> Tuple[int, int]:
-    for set_name in ("gameplay", "title"):
+def collect(prototype: Path, project: Path) -> Tuple[int, int, int]:
+    for set_name in ("gameplay", "title", "attract"):
         source_root = project / "assets" / "source" / set_name
         if source_root.exists():
             shutil.rmtree(source_root)
@@ -245,9 +258,14 @@ def collect(prototype: Path, project: Path) -> Tuple[int, int]:
         "assets/title_screen_selected/title_screen_160x120.png",
         "assets/title_screen_selected/wizward_logo_104x20.png",
     ]
+    attract_references = [
+        "assets/attract_selected/downscaled/ranking_p1_girl_mage_160x120.png",
+        "assets/attract_selected/downscaled/ranking_p2_boy_mage_160x120.png",
+    ]
 
     gameplay = _copy_and_describe(prototype, project, gameplay_references, "gameplay")
     title = _copy_and_describe(prototype, project, title_references, "title")
+    attract = _copy_and_describe(prototype, project, attract_references, "attract")
     _write_json(
         project / "assets/manifests/gameplay.json",
         _converter_manifest("wizward-gameplay", gameplay, gameplay=True),
@@ -256,6 +274,10 @@ def collect(prototype: Path, project: Path) -> Tuple[int, int]:
         project / "assets/manifests/title.json",
         _converter_manifest("wizward-title", title, gameplay=False),
     )
+    _write_json(
+        project / "assets/manifests/attract.json",
+        _converter_manifest("wizward-attract", attract, gameplay=False, attract=True),
+    )
     _write_json(project / "assets/manifests/background.json", _background_pack_config())
     inventory = {
         "version": 1,
@@ -263,10 +285,11 @@ def collect(prototype: Path, project: Path) -> Tuple[int, int]:
         "sets": {
             "gameplay": [asset["adopted_from"] for asset in gameplay],
             "title": [asset["adopted_from"] for asset in title],
+            "attract": [asset["adopted_from"] for asset in attract],
         },
     }
     _write_json(project / "assets/adopted_inventory.json", inventory)
-    return len(gameplay), len(title)
+    return len(gameplay), len(title), len(attract)
 
 
 def main() -> int:
@@ -282,8 +305,10 @@ def main() -> int:
         default=Path(__file__).resolve().parents[1],
     )
     args = parser.parse_args()
-    gameplay_count, title_count = collect(args.prototype.resolve(), args.project.resolve())
-    print(f"collected gameplay={gameplay_count}, title={title_count}")
+    gameplay_count, title_count, attract_count = collect(
+        args.prototype.resolve(), args.project.resolve())
+    print(
+        f"collected gameplay={gameplay_count}, title={title_count}, attract={attract_count}")
     return 0
 
 

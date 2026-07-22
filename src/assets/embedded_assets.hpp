@@ -21,5 +21,11 @@ extern const std::uint8_t kTitleSpriteData[];
 extern const std::size_t kTitleSpriteDataSize;
 extern const std::uint8_t kTitlePaletteData[];
 extern const std::size_t kTitlePaletteDataSize;
+extern const std::uint8_t kAttractP1ScreenData[];
+extern const std::size_t kAttractP1ScreenDataSize;
+extern const std::uint8_t kAttractP2ScreenData[];
+extern const std::size_t kAttractP2ScreenDataSize;
+extern const std::uint8_t kAttractPaletteData[];
+extern const std::size_t kAttractPaletteDataSize;
 
 } // namespace wizward::assets

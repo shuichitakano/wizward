@@ -16,6 +16,7 @@ def main() -> int:
     project = args.project.resolve()
     gameplay = project / "assets/converted/gameplay"
     title = project / "assets/converted/title"
+    attract = project / "assets/converted/attract"
     background = (gameplay / "background.bin").read_bytes()
     background_header = struct.unpack_from("<4sHHBBBBBBBBIIII", background)
     background_pixel_offset = background_header[12]
@@ -26,12 +27,15 @@ def main() -> int:
     title_sprites = (title / "logo.bin").stat().st_size
     title_palette = (title / "palette.bin").stat().st_size
     gameplay_palette = (gameplay / "palette.bin").stat().st_size
+    attract_screens = sum((attract / name).stat().st_size for name in (
+        "attract_p1_girl.bin", "attract_p2_boy.bin"))
+    attract_palette = (attract / "palette.bin").stat().st_size
 
     font_glyphs = 95 * 18
     gameplay_sram = len(sprites) + len(background) - background_pixel_offset + font_glyphs
     flash_only = (
         background_pixel_offset + gameplay_palette
-        + title_screen + title_sprites + title_palette
+        + title_screen + title_sprites + title_palette + attract_screens + attract_palette
     )
     framebuffer = 320 * 120 * 2
     tilemap = 100 * 100
@@ -57,6 +61,8 @@ def main() -> int:
             "title_screen": title_screen,
             "title_sprites": title_sprites,
             "title_palette_source": title_palette,
+            "attract_screens": attract_screens,
+            "attract_palette_source": attract_palette,
             "total": flash_only,
         },
         "runtime_sram": {
@@ -85,6 +91,8 @@ def main() -> int:
 | タイトル一枚絵 | {title_screen:,} | Flash |
 | タイトルロゴ | {title_sprites:,} | Flash |
 | タイトルパレット原本 | {title_palette:,} | Flash |
+| アトラクトランキング背景 | {attract_screens:,} | Flash |
+| アトラクトランキングパレット原本 | {attract_palette:,} | Flash |
 
 ゲーム画像のSRAM配置は合計{gameplay_sram:,} bytesです。ダブルフレームバッファ、タイルマップ、
 現在パレットを含む定常使用量は{steady_sram:,} bytes、地形生成時ピークは{generation_peak:,} bytesです。

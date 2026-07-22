@@ -21,6 +21,7 @@ public:
 
     [[nodiscard]] const pixel_twins::BackgroundAssetPackView& background() const noexcept;
     [[nodiscard]] const pixel_twins::SpriteAssetPackView& sprites() const noexcept;
+    [[nodiscard]] std::uint8_t hardRankingColor(bool focused) const noexcept;
 
     [[nodiscard]] bool makeSprite(SpriteAssetId asset,
                                   std::uint8_t animationFrame,
@@ -44,6 +45,7 @@ private:
     pixel_twins::BackgroundAssetPackView background_;
     pixel_twins::SpriteAssetPackView sprites_;
     std::array<std::array<std::uint8_t, 64>, 2> xpGemPatterns_{};
+    std::array<std::uint8_t, 2> hardRankingColors_{};
 };
 
 } // namespace wizward::assets

@@ -197,6 +197,10 @@
     "title": [
       "assets/title_screen_selected/title_screen_160x120.png",
       "assets/title_screen_selected/wizward_logo_104x20.png"
+    ],
+    "attract": [
+      "assets/attract_selected/downscaled/ranking_p1_girl_mage_160x120.png",
+      "assets/attract_selected/downscaled/ranking_p2_boy_mage_160x120.png"
     ]
   }
 }

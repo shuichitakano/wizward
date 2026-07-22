@@ -86,6 +86,62 @@ int main() {
         assert(game.scene() == Scene::Title);
     }
 
+    wizward::game::Game attractGame;
+    assert(attractGame.initialize(Scene::Title, 0x13572468U));
+    for (std::uint16_t frame = 0; frame < 479U; ++frame) {
+        (void)attractGame.tick(idle);
+        assert(attractGame.scene() == Scene::Title);
+    }
+    auto attractResult = attractGame.tick(idle);
+    assert(attractResult.succeeded);
+    assert(attractResult.audio == AudioEvent::StopBgm);
+    assert(attractGame.scene() == Scene::AttractRanking);
+    attractGame.render();
+    const auto& rankingPixels = attractGame.framebuffer().displayBuffer();
+    bool rankingPanelsDiffer = false;
+    for (std::size_t index = 0; index < pixel_twins::kPanelWidth * pixel_twins::kScreenHeight;
+         ++index) {
+        const auto y = index / pixel_twins::kPanelWidth;
+        const auto x = index % pixel_twins::kPanelWidth;
+        rankingPanelsDiffer = rankingPanelsDiffer
+            || rankingPixels[y * pixel_twins::kScreenWidth + x]
+                != rankingPixels[y * pixel_twins::kScreenWidth + pixel_twins::kPanelWidth + x];
+    }
+    assert(rankingPanelsDiffer);
+    for (std::uint16_t frame = 0; frame < 598U; ++frame) {
+        (void)attractGame.tick(idle);
+        assert(attractGame.scene() == Scene::AttractRanking);
+    }
+    attractResult = attractGame.tick(idle);
+    assert(attractResult.succeeded);
+    assert(attractResult.audio == AudioEvent::StopBgm);
+    assert(attractResult.playStartSfx);
+    assert(attractGame.scene() == Scene::AttractDemo);
+    assert(attractGame.gameplay().elapsedTicks() == 105U * 60U);
+    assert(!attractGame.gameplay().playerIsManual(0));
+    assert(!attractGame.gameplay().playerIsManual(1));
+    assert(attractGame.gameplay().player(0).level == 8U);
+    assert(attractGame.gameplay().player(1).fireLevel == 2U);
+    const auto demoStart = pressedController(1, ControllerButton::choiceRight);
+    const auto demoStartResult = attractGame.processInput(demoStart);
+    assert(demoStartResult.audio == AudioEvent::PlayField);
+    assert(demoStartResult.playStartSfx);
+    assert(attractGame.scene() == Scene::Gameplay);
+
+    assert(attractGame.initialize(Scene::Title, 0x24681357U));
+    for (std::uint16_t frame = 0; frame < 480U + 599U; ++frame) {
+        (void)attractGame.tick(idle);
+    }
+    assert(attractGame.scene() == Scene::AttractDemo);
+    for (std::uint16_t frame = 0; frame < 1798U; ++frame) {
+        (void)attractGame.tick(idle);
+        assert(attractGame.scene() == Scene::AttractDemo);
+    }
+    attractResult = attractGame.tick(idle);
+    assert(attractResult.audio == AudioEvent::StopBgm);
+    assert(attractGame.scene() == Scene::Title);
+    assert(attractGame.rankingCount() == 0U);
+
     const auto player2Start = pressedController(1, ControllerButton::choiceRight);
     const auto startResult = game.processInput(player2Start);
     assert(startResult.succeeded);

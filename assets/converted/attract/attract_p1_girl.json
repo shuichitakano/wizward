@@ -1,0 +1,11 @@
+{
+  "format": "pixel-twins-raw-image",
+  "version": 1,
+  "source_intermediate": "intermediate.json",
+  "asset_id": "attract_selected__downscaled__ranking_p1_girl_mage_160x120",
+  "binary": "attract_p1_girl.bin",
+  "width": 160,
+  "height": 120,
+  "pixel_bytes": 19200,
+  "sha256": "1a8eb005e46a02bb10c21ec81c4aa3ba0379a8bce87674d77da6054771831034"
+}

@@ -339,6 +339,8 @@ class GameplayState {
 public:
     void reset(const world::WorldMap& map, std::size_t startingPlayer = 0,
                Difficulty difficulty = Difficulty::Hard) noexcept;
+    void resetAttract(const world::WorldMap& map,
+                      Difficulty difficulty = Difficulty::Hard) noexcept;
     void tick(const pixel_twins::Controllers& controllers, const world::WorldMap& map) noexcept;
     [[nodiscard]] bool addEnemy(float x, float y, EnemyKind kind = EnemyKind::Imp) noexcept;
     void grantXp(std::size_t playerIndex, std::uint16_t amount) noexcept;
@@ -434,6 +436,7 @@ private:
     std::uint16_t bossSpawnPendingTicks_ = 0;
     std::uint16_t bossIntroTicks_ = 0;
     bool bossSpawned_ = false;
+    bool attractMode_ = false;
     std::uint16_t clearSequenceTicks_ = 0;
     float clearX_ = 0.0F;
     float clearY_ = 0.0F;

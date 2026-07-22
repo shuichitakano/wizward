@@ -1,0 +1,11 @@
+{
+  "format": "pixel-twins-raw-image",
+  "version": 1,
+  "source_intermediate": "intermediate.json",
+  "asset_id": "attract_selected__downscaled__ranking_p2_boy_mage_160x120",
+  "binary": "attract_p2_boy.bin",
+  "width": 160,
+  "height": 120,
+  "pixel_bytes": 19200,
+  "sha256": "9746a8d8e6dd1f85215d2fc1d14f812a2356314c4e0fd0071fc9f2fd28652050"
+}

@@ -521,6 +521,67 @@ void followAiPartner(PlayerState& player, const PlayerState& leader,
     }
 }
 
+void moveAttractPlayer(
+    PlayerState& player, std::size_t playerIndex, const PlayerState& partner,
+    const std::array<EnemyState, kMaximumEnemies>& enemies,
+    const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
+    const std::array<XpGemState, kMaximumXpGems>& xpGems,
+    const world::WorldMap& map, std::uint32_t elapsedTicks) noexcept {
+    if (partner.hp <= 0) {
+        (void)moveAiPlayerSmart(player, partner.x, partner.y, partner,
+                                enemies, enemyBullets, map, true);
+        return;
+    }
+    const EnemyState* nearest = nullptr;
+    auto nearestSquared = 190.0F * 190.0F;
+    for (const auto& enemy : enemies) {
+        if (!enemy.active || enemy.hp <= 0 || enemy.bornTicks > 0
+            || enemy.spawnDelayTicks > 0) continue;
+        const auto candidate = squaredDistance(player.x, player.y, enemy.x, enemy.y);
+        if (candidate > nearestSquared) continue;
+        nearestSquared = candidate;
+        nearest = &enemy;
+    }
+    auto targetX = player.x;
+    auto targetY = player.y;
+    if (nearest != nullptr) {
+        const auto gap = std::sqrt(nearestSquared);
+        auto awayX = player.x - nearest->x;
+        auto awayY = player.y - nearest->y;
+        normalize(awayX, awayY);
+        const auto orbitSign = playerIndex == 0 ? 1.0F : -1.0F;
+        const auto tangentX = -awayY * orbitSign;
+        const auto tangentY = awayX * orbitSign;
+        const auto retreat = gap < 48.0F ? 1.25F : gap > 105.0F ? -0.35F : 0.12F;
+        auto directionX = tangentX + awayX * retreat;
+        auto directionY = tangentY + awayY * retreat;
+        normalize(directionX, directionY);
+        targetX += directionX * 72.0F;
+        targetY += directionY * 72.0F;
+    } else {
+        const XpGemState* ownedXp = nullptr;
+        auto xpDistance = 180.0F * 180.0F;
+        for (const auto& gem : xpGems) {
+            if (!gem.active || gem.owner != playerIndex) continue;
+            const auto candidate = squaredDistance(player.x, player.y, gem.x, gem.y);
+            if (candidate > xpDistance) continue;
+            xpDistance = candidate;
+            ownedXp = &gem;
+        }
+        if (ownedXp != nullptr) {
+            targetX = ownedXp->x;
+            targetY = ownedXp->y;
+        } else {
+            const auto sealIndex = static_cast<std::size_t>(
+                (elapsedTicks / (7U * 60U) + playerIndex) % map.seals.size());
+            targetX = (static_cast<float>(map.seals[sealIndex].x) + 0.5F) * kWorldTileSize;
+            targetY = (static_cast<float>(map.seals[sealIndex].y) + 0.5F) * kWorldTileSize;
+        }
+    }
+    (void)moveAiPlayerSmart(player, targetX, targetY, partner,
+                            enemies, enemyBullets, map, false);
+}
+
 EnemyState* nearestEnemy(std::array<EnemyState, kMaximumEnemies>& enemies,
                          float x, float y, float range) noexcept {
     EnemyState* nearest = nullptr;
@@ -1789,6 +1850,7 @@ void GameplayState::reset(const world::WorldMap& map, std::size_t startingPlayer
     bossSpawnPendingTicks_ = 0;
     bossIntroTicks_ = 0;
     bossSpawned_ = false;
+    attractMode_ = false;
     clearSequenceTicks_ = 0;
     clearX_ = 0.0F;
     clearY_ = 0.0F;
@@ -1797,6 +1859,29 @@ void GameplayState::reset(const world::WorldMap& map, std::size_t startingPlayer
     sfxCueCount_ = 0;
     for (std::size_t index = 0; index < cameras_.size(); ++index) {
         updateCamera(cameras_[index], players_[index]);
+    }
+}
+
+void GameplayState::resetAttract(const world::WorldMap& map,
+                                 Difficulty difficulty) noexcept {
+    reset(map, 0, difficulty);
+    attractMode_ = true;
+    manualPlayers_.fill(false);
+    elapsedTicks_ = 105U * 60U;
+    spawnCooldownTicks_ = 0;
+    swarmCooldownTicks_ = 5U * 60U;
+    for (auto& player : players_) {
+        player.level = 8;
+        player.maxHp = std::max<std::int16_t>(player.maxHp, 50);
+        player.hp = player.maxHp;
+        player.lightLevel = 2;
+        player.fireLevel = 2;
+        player.windLevel = 2;
+        player.thunderLevel = 1;
+        player.iceLevel = 1;
+        player.orbLevel = 1;
+        player.familiarLevel = 1;
+        player.speedLevel = 1;
     }
 }
 
@@ -1883,7 +1968,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
     }
     updatePerkEffects(perkEffects_);
     for (std::size_t index = 0; index < players_.size(); ++index) {
-        if (!manualPlayers_[index] && (std::abs(controllers[index].x) >= kAxisDeadzone
+        if (!attractMode_ && !manualPlayers_[index] && (std::abs(controllers[index].x) >= kAxisDeadzone
             || std::abs(controllers[index].y) >= kAxisDeadzone
             || controllers[index].held != 0 || controllers[index].pressed != 0)) {
             // AI操作中に得た内部スコアを途中参加プレイヤーへ引き継がない。
@@ -1897,6 +1982,11 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
                 updatePerkChoice(players_[index], controllers[index],
                                  static_cast<std::uint8_t>(index), randomState_, perkEffects_);
                 movePlayer(players_[index], controllers[index], map);
+            } else if (attractMode_) {
+                updateAutoPerkChoice(players_[index], static_cast<std::uint8_t>(index),
+                                     enemies_, randomState_, perkEffects_);
+                moveAttractPlayer(players_[index], index, players_[1U - index], enemies_,
+                                  enemyBullets_, xpGems_, map, elapsedTicks_ - 105U * 60U);
             } else {
                 updateAutoPerkChoice(players_[index], static_cast<std::uint8_t>(index),
                                      enemies_, randomState_, perkEffects_);

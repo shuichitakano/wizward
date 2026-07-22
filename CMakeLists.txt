@@ -24,6 +24,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(WIZWARD_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 set(WIZWARD_GAMEPLAY_ASSETS "${CMAKE_CURRENT_SOURCE_DIR}/assets/converted/gameplay")
 set(WIZWARD_TITLE_ASSETS "${CMAKE_CURRENT_SOURCE_DIR}/assets/converted/title")
+set(WIZWARD_ATTRACT_ASSETS "${CMAKE_CURRENT_SOURCE_DIR}/assets/converted/attract")
 add_custom_command(
     OUTPUT "${WIZWARD_GENERATED_DIR}/embedded_assets.cpp"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${WIZWARD_GENERATED_DIR}"
@@ -35,6 +36,9 @@ add_custom_command(
         --title-screen "${WIZWARD_TITLE_ASSETS}/screen.bin"
         --title-sprites "${WIZWARD_TITLE_ASSETS}/logo.bin"
         --title-palette "${WIZWARD_TITLE_ASSETS}/palette.bin"
+        --attract-p1 "${WIZWARD_ATTRACT_ASSETS}/attract_p1_girl.bin"
+        --attract-p2 "${WIZWARD_ATTRACT_ASSETS}/attract_p2_boy.bin"
+        --attract-palette "${WIZWARD_ATTRACT_ASSETS}/palette.bin"
     DEPENDS
         tools/embed_assets.py
         "${WIZWARD_GAMEPLAY_ASSETS}/background.bin"
@@ -43,6 +47,9 @@ add_custom_command(
         "${WIZWARD_TITLE_ASSETS}/screen.bin"
         "${WIZWARD_TITLE_ASSETS}/logo.bin"
         "${WIZWARD_TITLE_ASSETS}/palette.bin"
+        "${WIZWARD_ATTRACT_ASSETS}/attract_p1_girl.bin"
+        "${WIZWARD_ATTRACT_ASSETS}/attract_p2_boy.bin"
+        "${WIZWARD_ATTRACT_ASSETS}/palette.bin"
     VERBATIM
 )
 

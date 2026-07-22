@@ -15,7 +15,9 @@
     "title_screen": 19200,
     "title_sprites": 2020,
     "title_palette_source": 768,
-    "total": 22920
+    "attract_screens": 38400,
+    "attract_palette_source": 768,
+    "total": 62088
   },
   "runtime_sram": {
     "framebuffers": 76800,

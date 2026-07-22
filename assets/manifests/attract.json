@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "name": "wizward-attract",
+  "palette": {
+    "asset_range": [
+      16,
+      254
+    ],
+    "sample_pixels": 1000000,
+    "max_pixels_per_asset": 4096,
+    "quantizer": "median_cut",
+    "reserved": [
+      {
+        "index": 2,
+        "name": "font_body",
+        "color": "#f1ead8"
+      },
+      {
+        "index": 6,
+        "name": "highlight",
+        "color": "#ffd96a"
+      },
+      {
+        "index": 7,
+        "name": "ranking_title",
+        "color": "#8fd7ff"
+      },
+      {
+        "index": 14,
+        "name": "hard_ranking",
+        "color": "#ff7f73"
+      },
+      {
+        "index": 15,
+        "name": "hard_ranking_focus",
+        "color": "#ffb08f"
+      }
+    ],
+    "targets": []
+  },
+  "assets": [
+    {
+      "id": "attract_selected__downscaled__ranking_p1_girl_mage_160x120",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/attract/attract_selected/downscaled/ranking_p1_girl_mage_160x120.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/attract_selected/downscaled/ranking_p1_girl_mage_160x120.png"
+    },
+    {
+      "id": "attract_selected__downscaled__ranking_p2_boy_mage_160x120",
+      "kind": "background",
+      "pack_kind": "background",
+      "frame": null,
+      "source": "../source/attract/attract_selected/downscaled/ranking_p2_boy_mage_160x120.png",
+      "alpha_threshold": 0,
+      "palette_weight": 1,
+      "adopted_from": "assets/attract_selected/downscaled/ranking_p2_boy_mage_160x120.png"
+    }
+  ]
+}

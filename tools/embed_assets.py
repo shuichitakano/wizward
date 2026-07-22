@@ -28,6 +28,9 @@ def main() -> int:
     parser.add_argument("--title-screen", type=Path, required=True)
     parser.add_argument("--title-sprites", type=Path, required=True)
     parser.add_argument("--title-palette", type=Path, required=True)
+    parser.add_argument("--attract-p1", type=Path, required=True)
+    parser.add_argument("--attract-p2", type=Path, required=True)
+    parser.add_argument("--attract-palette", type=Path, required=True)
     args = parser.parse_args()
     text = """// tools/embed_assets.pyにより生成されました。編集しないでください。
 #include "assets/embedded_assets.hpp"
@@ -62,6 +65,9 @@ namespace wizward::assets {
     text += "\n" + _array("kTitleScreenData", args.title_screen.read_bytes())
     text += "\n" + _array("kTitleSpriteData", args.title_sprites.read_bytes())
     text += "\n" + _array("kTitlePaletteData", args.title_palette.read_bytes())
+    text += "\n" + _array("kAttractP1ScreenData", args.attract_p1.read_bytes())
+    text += "\n" + _array("kAttractP2ScreenData", args.attract_p2.read_bytes())
+    text += "\n" + _array("kAttractPaletteData", args.attract_palette.read_bytes())
     text += "\n} // namespace wizward::assets\n"
     args.output.write_text(text, encoding="utf-8")
     return 0

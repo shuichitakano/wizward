@@ -68,6 +68,8 @@ bool GameAssets::initialize() noexcept {
             xpGemPatterns_[owner][pixel] = tint[brightness < 90 ? 0 : brightness < 210 ? 1 : 2];
         }
     }
+    hardRankingColors_[0] = nearestPaletteIndex(255, 127, 115);
+    hardRankingColors_[1] = nearestPaletteIndex(255, 176, 143);
     return true;
 }
 
@@ -102,6 +104,10 @@ const pixel_twins::BackgroundAssetPackView& GameAssets::background() const noexc
 
 const pixel_twins::SpriteAssetPackView& GameAssets::sprites() const noexcept {
     return sprites_;
+}
+
+std::uint8_t GameAssets::hardRankingColor(bool focused) const noexcept {
+    return hardRankingColors_[focused ? 1U : 0U];
 }
 
 bool GameAssets::makeSprite(SpriteAssetId asset,

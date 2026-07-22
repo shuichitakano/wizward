@@ -77,8 +77,8 @@ def _verify_sprite_pack(output: Path, intermediate: dict, report_stem: str = "sp
         raise ValueError("総フレーム数が一致しません")
 
 
-def _verify_raw_image(output: Path, intermediate: dict) -> None:
-    report = json.loads((output / "screen.json").read_text(encoding="utf-8"))
+def _verify_raw_image(output: Path, intermediate: dict, report_name: str = "screen") -> None:
+    report = json.loads((output / f"{report_name}.json").read_text(encoding="utf-8"))
     binary = (output / report["binary"]).read_bytes()
     if hashlib.sha256(binary).hexdigest() != report["sha256"]:
         raise ValueError("タイトル画面バイナリのSHA-256が一致しません")
@@ -211,9 +211,12 @@ def verify(prototype: Path, project: Path) -> int:
             _verify_gameplay_palette_contract(output, report)
             _verify_sprite_pack(output, report)
             _verify_background_pack(output, report)
-        else:
+        elif set_name == "title":
             _verify_sprite_pack(output, report, "logo")
             _verify_raw_image(output, report)
+        else:
+            _verify_raw_image(output, report, "attract_p1_girl")
+            _verify_raw_image(output, report, "attract_p2_boy")
     return checked
 
 

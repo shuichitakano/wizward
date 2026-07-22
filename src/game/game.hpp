@@ -18,6 +18,8 @@ namespace wizward::game {
 
 enum class Scene : std::uint8_t {
     Title,
+    AttractRanking,
+    AttractDemo,
     Gameplay,
     Result,
 };
@@ -89,6 +91,9 @@ public:
         return rankingEntries_[player];
     }
     [[nodiscard]] std::size_t rankingCount() const noexcept { return rankingCount_; }
+    [[nodiscard]] bool attractMode() const noexcept {
+        return scene_ == Scene::AttractRanking || scene_ == Scene::AttractDemo;
+    }
 
 private:
     [[nodiscard]] UpdateResult changeScene(Scene scene, bool playStartSfx) noexcept;

@@ -19,6 +19,9 @@ namespace wizward::game {
 namespace {
 
 constexpr std::uint32_t kRankingResultDelayTicks = 156;
+constexpr std::uint32_t kTitleAttractDelayTicks = 8U * 60U;
+constexpr std::uint32_t kAttractRankingTicks = 10U * 60U;
+constexpr std::uint32_t kAttractDemoTicks = 30U * 60U;
 constexpr std::uint32_t kRankingInputTimeoutTicks = 1800;
 constexpr std::uint16_t kResultContinueDelayTicks = 15;
 constexpr std::uint16_t kResultAutoReturnTicks = 300;
@@ -132,16 +135,26 @@ std::string_view formatUnsigned(std::uint32_t value, char (&buffer)[12]) noexcep
     return {buffer, digits};
 }
 
+std::string_view formatShortScore(std::uint32_t value, char (&buffer)[12]) noexcept {
+    const auto abbreviated = value >= 100000U;
+    if (abbreviated) value /= 1000U;
+    const auto score = formatUnsigned(value, buffer);
+    if (!abbreviated) return score;
+    buffer[score.size()] = 'K';
+    return {buffer, score.size() + 1U};
+}
+
 PIXEL_TWINS_SRAM void drawRightAlignedText(pixel_twins::RenderTarget target,
                           std::string_view text,
                           std::int16_t right,
                           std::int16_t y,
-                          std::int16_t stride = 6) noexcept {
+                          std::int16_t stride = 6,
+                          std::uint8_t color = assets::palette::kFontBody) noexcept {
     const auto width = static_cast<std::int16_t>(
         text.empty() ? 0 : (text.size() - 1U) * static_cast<std::size_t>(stride) + 8U);
     pixel_twins::drawText(target, assets::kWizwardFont,
                           static_cast<std::int16_t>(right - width), y, text,
-                          assets::palette::kFontBody, stride);
+                          color, stride);
 }
 
 PIXEL_TWINS_SRAM void drawCenteredText(pixel_twins::RenderTarget target,
@@ -849,6 +862,47 @@ PIXEL_TWINS_SRAM void drawTitle(pixel_twins::Framebuffer& framebuffer,
     }
 }
 
+PIXEL_TWINS_SRAM void drawAttractRanking(
+    pixel_twins::Framebuffer& framebuffer,
+    const assets::TitleAssets& title,
+    const std::array<RankingRecord, kRankingLimit>& rankings,
+    std::size_t rankingCount) noexcept {
+    for (std::size_t viewer = 0; viewer < pixel_twins::kControllerCount; ++viewer) {
+        const auto screen = viewer == 0 ? pixel_twins::Screen::Left : pixel_twins::Screen::Right;
+        auto target = pixel_twins::makeRenderTarget(framebuffer.drawBuffer(), screen);
+        title.drawAttractScreen(target, viewer);
+        pixel_twins::drawText(target, assets::kWizwardFont, 46, 3, "TOP PLAYERS",
+                              assets::palette::kRankingTitle, 6);
+        const auto firstRank = viewer * 10U;
+        const auto nameX = static_cast<std::int16_t>(viewer == 0 ? 74 : 16);
+        const auto scoreX = static_cast<std::int16_t>(nameX + 70);
+        for (std::size_t index = 0; index < 10U; ++index) {
+            const auto rank = firstRank + index;
+            const auto hasEntry = rank < rankingCount;
+            char name[7]{};
+            name[0] = static_cast<char>('0' + ((rank + 1U) / 10U) % 10U);
+            name[1] = static_cast<char>('0' + (rank + 1U) % 10U);
+            name[2] = '.';
+            name[3] = hasEntry ? rankings[rank].name[0] : '-';
+            name[4] = hasEntry ? rankings[rank].name[1] : '-';
+            name[5] = hasEntry ? rankings[rank].name[2] : '-';
+            const auto focused = rank < 3U;
+            const auto hard = hasEntry && rankings[rank].hard;
+            const auto color = static_cast<std::uint8_t>(hard
+                ? (focused ? 15U : 14U)
+                : (focused ? assets::palette::kHighlight : assets::palette::kFontBody));
+            const auto y = static_cast<std::int16_t>(17 + index * 9U);
+            pixel_twins::drawText(target, assets::kWizwardFont, nameX, y,
+                                  std::string_view(name, 6), color, 6);
+            char scoreBuffer[12]{};
+            const auto score = hasEntry
+                ? formatShortScore(rankings[rank].score, scoreBuffer)
+                : std::string_view("-----");
+            drawRightAlignedText(target, score, scoreX, y, 6, color);
+        }
+    }
+}
+
 template<std::size_t Capacity, std::size_t ExCapacity>
 PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        const world::WorldMap& map,
@@ -858,7 +912,8 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        pixel_twins::SpriteBuckets<Capacity, ExCapacity>& spriteBuckets,
                        std::uint32_t frame,
                        std::size_t viewer,
-                       bool showHud = true) noexcept {
+                       bool showHud = true,
+                       bool attractMode = false) noexcept {
     // The prototype rounds the camera once before drawing the world and every overlay.
     // Keep that shared pixel origin so fixed world details cannot drift by one pixel.
     const CameraState camera{std::round(cameraState.x), std::round(cameraState.y)};
@@ -1126,7 +1181,6 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        strike.y - camera.y);
         }
     }
-    queuePerkEffectUnder(spriteBuckets, assets, camera, gameplay);
     for (std::size_t playerIndex = 0; playerIndex < pixel_twins::kControllerCount; ++playerIndex) {
         const auto& player = gameplay.player(playerIndex);
         if (player.hp <= 0) continue;
@@ -1178,6 +1232,9 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
         queueAsset(spriteBuckets, assets, asset, animationFrame, screenX, screenY,
                    player.y - camera.y, directionRow);
     }
+    // SpriteBuckets draws equal-Y entries in reverse insertion order. Queue the
+    // ground rings last so they are drawn first, behind players and other actors.
+    queuePerkEffectUnder(spriteBuckets, assets, camera, gameplay);
     spriteBuckets.draw(target);
     drawPerkEffectOver(target, assets, camera, gameplay);
     drawBossIntroOverlay(target, gameplay, camera);
@@ -1270,13 +1327,18 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
         char sealText[] = "SEAL 0/3";
         sealText[5] = static_cast<char>('0' + gameplay.activeSealCount());
         drawCenteredText(target, sealText, 80, 38);
-    } else if (!gameplay.playerIsManual(viewer) && (gameplay.elapsedTicks() / 30U) % 2U == 0U) {
+    } else if (!attractMode && !gameplay.playerIsManual(viewer)
+               && (gameplay.elapsedTicks() / 30U) % 2U == 0U) {
         drawCenteredText(target, "PUSH BUTTON TO JOIN", 80, 39);
     }
     drawWeaponLevels(target, assets, viewedPlayer);
     drawPerkChoices(target, assets, viewedPlayer, viewer);
     drawMiniMap(target, map, gameplay, viewer);
     drawOffscreenPartnerArrow(target, gameplay, camera, viewer);
+    if (attractMode && (frame / 30U) % 2U == 0U) {
+        pixel_twins::drawText(target, assets::kWizwardFont, 129, 108, "DEMO",
+                              assets::palette::kRankingTitle, 6);
+    }
 }
 
 std::string_view outcomeText(GameplayOutcome outcome) noexcept {
@@ -1296,6 +1358,7 @@ struct ResultRankingRow {
 
 PIXEL_TWINS_SRAM void drawResultPanel(
     pixel_twins::RenderTarget target,
+    const assets::GameAssets& gameAssets,
     const GameplayState& gameplay,
     GameplayOutcome outcome,
     std::uint32_t resultTicks,
@@ -1373,29 +1436,23 @@ PIXEL_TWINS_SRAM void drawResultPanel(
     for (std::size_t rowIndex = 0; rowIndex < rowCount; ++rowIndex) {
         const auto rank = startRank + rowIndex;
         const auto y = static_cast<std::int16_t>(32 + rowIndex * 10U);
-        char rowText[16]{};
+        char rowText[7]{};
         rowText[0] = static_cast<char>('0' + ((rank + 1U) / 10U) % 10U);
         rowText[1] = static_cast<char>('0' + (rank + 1U) % 10U);
-        rowText[2] = board[rank].hard ? 'H' : '.';
+        rowText[2] = '.';
         rowText[3] = board[rank].name[0];
         rowText[4] = board[rank].name[1];
         rowText[5] = board[rank].name[2];
-        rowText[6] = ' ';
         char rankScore[12]{};
-        auto scoreValue = board[rank].score;
-        const auto abbreviated = scoreValue >= 100000U;
-        if (abbreviated) scoreValue /= 1000U;
-        const auto score = formatUnsigned(scoreValue, rankScore);
-        for (std::size_t index = 0; index < score.size(); ++index) {
-            rowText[7U + index] = score[index];
-        }
-        auto rowLength = 7U + score.size();
-        if (abbreviated) rowText[rowLength++] = 'K';
-        const auto color = static_cast<std::uint8_t>(
-            rank == focusRank && entries[viewer].active ? assets::palette::kHighlight
-                                                       : assets::palette::kFontBody);
+        const auto score = formatShortScore(board[rank].score, rankScore);
+        const auto focused = rank == focusRank && entries[viewer].active;
+        const auto color = board[rank].hard
+            ? gameAssets.hardRankingColor(focused)
+            : static_cast<std::uint8_t>(focused ? assets::palette::kHighlight
+                                                : assets::palette::kFontBody);
         pixel_twins::drawText(target, assets::kWizwardFont, 84, y,
-                              std::string_view(rowText, rowLength), color, 6);
+                              std::string_view(rowText, 6), color, 6);
+        drawRightAlignedText(target, score, 154, y, 6, color);
     }
     const auto& entry = entries[viewer];
     if (entry.active && !entry.submitted) {
@@ -1427,11 +1484,15 @@ bool Game::initialize(Scene initialScene, std::uint32_t mapSeed,
         || !mapGenerator.generate(mapSeedState_, gameAssets_.background(), terrainWorkspace_, worldMap_)) {
         return false;
     }
-    gameplay_.reset(worldMap_, startingPlayer_, difficulty_);
+    if (initialScene == Scene::AttractDemo) gameplay_.resetAttract(worldMap_, difficulty_);
+    else gameplay_.reset(worldMap_, startingPlayer_, difficulty_);
     scene_ = initialScene;
+    frame_ = 0;
+    sceneFrame_ = 0;
     paused_ = false;
-    return scene_ == Scene::Title ? titleAssets_.applyPalette(framebuffer_)
-                                  : gameAssets_.applyPalette(framebuffer_);
+    if (scene_ == Scene::Title) return titleAssets_.applyPalette(framebuffer_);
+    if (scene_ == Scene::AttractRanking) return titleAssets_.applyAttractPalette(framebuffer_);
+    return gameAssets_.applyPalette(framebuffer_);
 }
 
 UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
@@ -1440,19 +1501,22 @@ UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
     paused_ = false;
     resultContinueTicks_ = 0;
     nameEntryBgmStarted_ = false;
-    if (scene_ == Scene::Gameplay) {
+    if (scene_ == Scene::Gameplay || scene_ == Scene::AttractDemo) {
         mapSeedState_ = mapSeedState_ * 1664525U + 1013904223U;
         world::MapGenerator mapGenerator;
         if (!mapGenerator.generate(mapSeedState_, gameAssets_.background(),
                                    terrainWorkspace_, worldMap_)) {
             return {AudioEvent::StopBgm, playStartSfx, false};
         }
-        gameplay_.reset(worldMap_, startingPlayer_, difficulty_);
+        if (scene_ == Scene::AttractDemo) gameplay_.resetAttract(worldMap_, difficulty_);
+        else gameplay_.reset(worldMap_, startingPlayer_, difficulty_);
         resultOutcome_ = GameplayOutcome::Running;
     }
     const bool paletteApplied = scene_ == Scene::Title
         ? titleAssets_.applyPalette(framebuffer_)
-        : gameAssets_.applyPalette(framebuffer_);
+        : scene_ == Scene::AttractRanking
+            ? titleAssets_.applyAttractPalette(framebuffer_)
+            : gameAssets_.applyPalette(framebuffer_);
     AudioEvent audio = AudioEvent::StopBgm;
     if (scene_ == Scene::Gameplay) audio = AudioEvent::PlayField;
     if (scene_ == Scene::Result && resultOutcome_ == GameplayOutcome::Clear) {
@@ -1462,7 +1526,8 @@ UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
 }
 
 UpdateResult Game::processInput(const pixel_twins::Controllers& controllers) noexcept {
-    if (scene_ == Scene::Title) {
+    if (scene_ == Scene::Title || scene_ == Scene::AttractRanking
+        || scene_ == Scene::AttractDemo) {
         for (std::uint8_t index = 0; index < pixel_twins::kControllerCount; ++index) {
             if (controllers[index].pressed == 0) continue;
             startingPlayer_ = index;
@@ -1533,6 +1598,33 @@ UpdateResult Game::tick(const pixel_twins::Controllers& controllers) noexcept {
         ++frame_;
         ++sceneFrame_;
         return tickResult;
+    } else if (scene_ == Scene::AttractDemo) {
+        gameplay_.tick(controllers, worldMap_);
+        UpdateResult result{};
+        copySfxCues(gameplay_, result);
+        for (std::uint8_t index = 0; index < worldMap_.seals.size(); ++index) {
+            if (gameplay_.seal(index).active) {
+                (void)worldMap_.activateSeal(index, gameAssets_.background());
+            }
+        }
+        if (sceneFrame_ + 1U >= kAttractDemoTicks
+            || gameplay_.outcome() != GameplayOutcome::Running) {
+            result = changeScene(Scene::Title, false);
+        }
+        ++frame_;
+        ++sceneFrame_;
+        return result;
+    } else if (scene_ == Scene::Title && sceneFrame_ + 1U >= kTitleAttractDelayTicks) {
+        auto result = changeScene(Scene::AttractRanking, false);
+        ++frame_;
+        ++sceneFrame_;
+        return result;
+    } else if (scene_ == Scene::AttractRanking
+               && sceneFrame_ + 1U >= kAttractRankingTicks) {
+        auto result = changeScene(Scene::AttractDemo, true);
+        ++frame_;
+        ++sceneFrame_;
+        return result;
     } else if (scene_ == Scene::Result && sceneFrame_ >= kRankingResultDelayTicks) {
         if (resultOutcome_ != GameplayOutcome::Clear
             && hasPendingRanking() && !nameEntryBgmStarted_) {
@@ -1653,6 +1745,15 @@ void Game::updateRankingInput(const pixel_twins::Controllers& controllers) noexc
 void Game::render() noexcept {
     if (scene_ == Scene::Title) {
         drawTitle(framebuffer_, titleAssets_, frame_, difficulty_);
+    } else if (scene_ == Scene::AttractRanking) {
+        drawAttractRanking(framebuffer_, titleAssets_, rankings_, rankingCount_);
+    } else if (scene_ == Scene::AttractDemo) {
+        const auto left = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Left);
+        const auto right = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Right);
+        drawGameplayPanel(left, worldMap_, gameAssets_, gameplay_.camera(0), gameplay_,
+                          spriteBuckets_, frame_, 0, true, true);
+        drawGameplayPanel(right, worldMap_, gameAssets_, gameplay_.camera(1), gameplay_,
+                          spriteBuckets_, frame_, 1, true, true);
     } else if (scene_ == Scene::Gameplay) {
         const auto left = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Left);
         const auto right = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Right);
@@ -1671,9 +1772,9 @@ void Game::render() noexcept {
                           spriteBuckets_, frame_, 0, false);
         drawGameplayPanel(right, worldMap_, gameAssets_, gameplay_.camera(1), gameplay_,
                           spriteBuckets_, frame_, 1, false);
-        drawResultPanel(left, gameplay_, resultOutcome_, sceneFrame_, resultContinueTicks_, 0,
+        drawResultPanel(left, gameAssets_, gameplay_, resultOutcome_, sceneFrame_, resultContinueTicks_, 0,
                         timeBonuses_, finalScores_, rankings_, rankingCount_, rankingEntries_);
-        drawResultPanel(right, gameplay_, resultOutcome_, sceneFrame_, resultContinueTicks_, 1,
+        drawResultPanel(right, gameAssets_, gameplay_, resultOutcome_, sceneFrame_, resultContinueTicks_, 1,
                         timeBonuses_, finalScores_, rankings_, rankingCount_, rankingEntries_);
     }
     framebuffer_.flip();

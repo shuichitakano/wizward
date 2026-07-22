@@ -32,36 +32,73 @@ bool applyTitlePalette(pixel_twins::Framebuffer& framebuffer) noexcept {
     return true;
 }
 
+bool applyAttractPaletteData(pixel_twins::Framebuffer& framebuffer) noexcept {
+    if (kAttractPaletteDataSize != 256U * 3U) return false;
+    for (std::uint16_t index = 2; index < 255; ++index) {
+        const auto offset = static_cast<std::size_t>(index) * 3U;
+        if (!framebuffer.setPaletteColor(
+                static_cast<pixel_twins::ColorIndex>(index),
+                pixel_twins::Rgb{kAttractPaletteData[offset],
+                                  kAttractPaletteData[offset + 1U],
+                                  kAttractPaletteData[offset + 2U]})) return false;
+    }
+    return true;
+}
+
+void drawRawScreen(pixel_twins::RenderTarget target,
+                   const std::uint8_t* source, std::size_t size) noexcept {
+    if (target.pixels == nullptr
+        || size != static_cast<std::size_t>(kTitleWidth) * kTitleHeight) return;
+    const auto width = std::min(target.width, kTitleWidth);
+    const auto height = std::min(target.height, kTitleHeight);
+    for (std::uint16_t y = 0; y < height; ++y) {
+        auto* destination = target.pixels
+            + static_cast<std::size_t>(target.originY + y) * target.stride + target.originX;
+        std::copy_n(source + static_cast<std::size_t>(y) * kTitleWidth, width, destination);
+    }
+}
+
 } // namespace
 
 bool TitleAssets::initialize() noexcept {
     return kTitleScreenDataSize == static_cast<std::size_t>(kTitleWidth) * kTitleHeight
         && kTitlePaletteDataSize == 256U * 3U
+        && kAttractP1ScreenDataSize == static_cast<std::size_t>(kTitleWidth) * kTitleHeight
+        && kAttractP2ScreenDataSize == static_cast<std::size_t>(kTitleWidth) * kTitleHeight
+        && kAttractPaletteDataSize == 256U * 3U
         && logo_.reset(kTitleSpriteData, kTitleSpriteDataSize);
 }
 
 bool TitleAssets::valid() const noexcept {
     return logo_.valid()
         && kTitleScreenDataSize == static_cast<std::size_t>(kTitleWidth) * kTitleHeight
-        && kTitlePaletteDataSize == 256U * 3U;
+        && kTitlePaletteDataSize == 256U * 3U
+        && kAttractP1ScreenDataSize == static_cast<std::size_t>(kTitleWidth) * kTitleHeight
+        && kAttractP2ScreenDataSize == static_cast<std::size_t>(kTitleWidth) * kTitleHeight
+        && kAttractPaletteDataSize == 256U * 3U;
 }
 
 bool TitleAssets::applyPalette(pixel_twins::Framebuffer& framebuffer) const noexcept {
     return valid() && applyTitlePalette(framebuffer);
 }
 
+bool TitleAssets::applyAttractPalette(pixel_twins::Framebuffer& framebuffer) const noexcept {
+    return valid() && applyAttractPaletteData(framebuffer);
+}
+
 void TitleAssets::drawScreen(pixel_twins::RenderTarget target) const noexcept {
     if (!valid() || target.pixels == nullptr) {
         return;
     }
-    const auto width = std::min(target.width, kTitleWidth);
-    const auto height = std::min(target.height, kTitleHeight);
-    for (std::uint16_t y = 0; y < height; ++y) {
-        auto* destination = target.pixels
-            + static_cast<std::size_t>(target.originY + y) * target.stride + target.originX;
-        const auto* source = kTitleScreenData + static_cast<std::size_t>(y) * kTitleWidth;
-        std::copy_n(source, width, destination);
-    }
+    drawRawScreen(target, kTitleScreenData, kTitleScreenDataSize);
+}
+
+void TitleAssets::drawAttractScreen(pixel_twins::RenderTarget target,
+                                    std::size_t player) const noexcept {
+    if (!valid()) return;
+    drawRawScreen(target,
+                  player == 0 ? kAttractP1ScreenData : kAttractP2ScreenData,
+                  player == 0 ? kAttractP1ScreenDataSize : kAttractP2ScreenDataSize);
 }
 
 bool TitleAssets::makeLogo(std::int16_t logicalX,

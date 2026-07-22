@@ -31,6 +31,7 @@ def main() -> int:
         _run([sys.executable, "tools/collect_selected_assets.py"], project)
     gameplay = project / "assets" / "converted" / "gameplay"
     title = project / "assets" / "converted" / "title"
+    attract = project / "assets" / "converted" / "attract"
     _run([
         "uv", "run", "pixel-twins-assets", str(project / "assets/manifests/gameplay.json"),
         "-o", str(gameplay), "--clean",
@@ -42,6 +43,10 @@ def main() -> int:
     _run([
         "uv", "run", "pixel-twins-assets", str(project / "assets/manifests/title.json"),
         "-o", str(title), "--clean",
+    ], converter)
+    _run([
+        "uv", "run", "pixel-twins-assets", str(project / "assets/manifests/attract.json"),
+        "-o", str(attract), "--clean",
     ], converter)
     _run([
         "uv", "run", "pixel-twins-sprites", str(gameplay / "intermediate.json"),
@@ -61,6 +66,12 @@ def main() -> int:
         "title_screen_selected__title_screen_160x120",
         "-o", str(title / "screen.bin"),
     ], converter)
+    for player in ("p1_girl", "p2_boy"):
+        _run([
+            "uv", "run", "pixel-twins-raw-image", str(attract / "intermediate.json"),
+            f"attract_selected__downscaled__ranking_{player}_mage_160x120",
+            "-o", str(attract / f"attract_{player}.bin"),
+        ], converter)
     _run([sys.executable, "tools/report_asset_memory.py"], project)
     _run([
         "uv", "run", "--with", "pillow", "python", str(project / "tools/verify_converted_assets.py"),
