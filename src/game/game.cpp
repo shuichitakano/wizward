@@ -838,6 +838,8 @@ PIXEL_TWINS_SRAM void drawTitle(pixel_twins::Framebuffer& framebuffer,
     title.drawScreen(left);
     title.drawScreen(right);
     if (difficulty == Difficulty::Hard) {
+        pixel_twins::drawText(left, assets::kWizwardFont, 132, 5, "HARD",
+                              assets::palette::kFontBody, 6);
         pixel_twins::drawText(right, assets::kWizwardFont, 132, 5, "HARD",
                               assets::palette::kFontBody, 6);
     }

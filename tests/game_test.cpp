@@ -36,17 +36,32 @@ int main() {
     using wizward::game::AudioEvent;
     using wizward::game::Scene;
 
+    assert(game.initialize(Scene::Title, 123U, wizward::game::Difficulty::Easy));
+    game.render();
+    std::array<std::uint8_t, 8U * 32U> normalLabelPixels{};
+    for (std::size_t y = 5; y < 13; ++y) {
+        const auto row = y * pixel_twins::kScreenWidth;
+        for (std::size_t x = 128; x < 160; ++x) {
+            normalLabelPixels[(y - 5U) * 32U + x - 128U] =
+                game.framebuffer().displayBuffer()[row + x];
+        }
+    }
     assert(game.initialize(Scene::Title, 123U, wizward::game::Difficulty::Hard));
     game.render();
     const auto& hardTitlePixels = game.framebuffer().displayBuffer();
+    bool hardLabelChangedLeftPanel = false;
     bool hardLabelChangedRightPanel = false;
     for (std::size_t y = 5; y < 13; ++y) {
         const auto row = y * pixel_twins::kScreenWidth;
         for (std::size_t x = 128; x < 160; ++x) {
+            const auto normalPixel = normalLabelPixels[(y - 5U) * 32U + x - 128U];
+            hardLabelChangedLeftPanel = hardLabelChangedLeftPanel
+                || hardTitlePixels[row + x] != normalPixel;
             hardLabelChangedRightPanel = hardLabelChangedRightPanel
-                || hardTitlePixels[row + x] != hardTitlePixels[row + pixel_twins::kPanelWidth + x];
+                || hardTitlePixels[row + pixel_twins::kPanelWidth + x] != normalPixel;
         }
     }
+    assert(hardLabelChangedLeftPanel);
     assert(hardLabelChangedRightPanel);
 
     assert(game.initialize());
