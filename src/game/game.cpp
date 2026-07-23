@@ -409,23 +409,34 @@ PIXEL_TWINS_SRAM void drawBossIntroOverlay(pixel_twins::RenderTarget target,
     const auto* boss = gameplay.boss();
     const auto x = static_cast<std::int16_t>(std::round(boss->x - camera.x));
     const auto y = static_cast<std::int16_t>(std::round(boss->y - camera.y));
-    if (impactTicks < 30U) {
-        const auto progress = smoothStep(static_cast<float>(impactTicks) / 30.0F);
-        const auto radius = 10.0F + progress * 58.0F;
+    if (impactTicks < 38U) {
+        const auto progress = smoothStep(static_cast<float>(impactTicks) / 38.0F);
+        const auto radius = 12.0F + progress * 72.0F;
         const auto color = impactTicks < 11U ? assets::palette::kEffectWarm
                                              : assets::palette::kBossImpact;
-        pixel_twins::drawEllipse(target, x, y,
-            static_cast<std::uint16_t>(std::round(radius)),
-            static_cast<std::uint16_t>(std::max(3.0F, std::round(radius * 0.24F))), color);
-        for (std::uint8_t ray = 0; ray < 12; ++ray) {
-            const auto angle = static_cast<float>(ray) * 6.2831853F / 12.0F;
-            const auto inner = 12.0F + progress * 8.0F;
-            const auto outer = 24.0F + progress * 66.0F;
+        pixel_twins::drawCircle(target, x, y,
+            static_cast<std::uint16_t>(std::round(radius)), color);
+        if (impactTicks > 4U) {
+            pixel_twins::drawCircle(target, x, y,
+                static_cast<std::uint16_t>(std::round(std::max(5.0F, radius - 10.0F))),
+                assets::palette::kBossImpact);
+        }
+    }
+    if (impactTicks < 23U) {
+        const auto progress = smoothStep(static_cast<float>(impactTicks) / 23.0F);
+        for (std::uint8_t ray = 0; ray < 28; ++ray) {
+            const auto offset = (ray & 1U) != 0U ? 0.35F : 0.0F;
+            const auto angle = (static_cast<float>(ray) + offset) * 6.2831853F / 28.0F;
+            const auto length = 8.0F + static_cast<float>(ray % 4U) * 3.0F + progress * 8.0F;
+            const auto inner = 28.0F + static_cast<float>(ray % 3U) * 2.0F + progress * 6.0F;
+            const auto outer = inner + length + 34.0F * (1.0F - progress);
+            const auto color = (ray % 4U == 0U && impactTicks < 10U)
+                ? assets::palette::kEffectWarm : assets::palette::kBossImpact;
             pixel_twins::drawLine(target,
-                static_cast<std::int16_t>(std::round(static_cast<float>(x) + std::cos(angle) * inner)),
-                static_cast<std::int16_t>(std::round(static_cast<float>(y) + std::sin(angle) * inner * 0.34F)),
                 static_cast<std::int16_t>(std::round(static_cast<float>(x) + std::cos(angle) * outer)),
-                static_cast<std::int16_t>(std::round(static_cast<float>(y) + std::sin(angle) * outer * 0.34F)),
+                static_cast<std::int16_t>(std::round(static_cast<float>(y) + std::sin(angle) * outer)),
+                static_cast<std::int16_t>(std::round(static_cast<float>(x) + std::cos(angle) * inner)),
+                static_cast<std::int16_t>(std::round(static_cast<float>(y) + std::sin(angle) * inner)),
                 color);
         }
     }
@@ -1235,9 +1246,9 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     // SpriteBuckets draws equal-Y entries in reverse insertion order. Queue the
     // ground rings last so they are drawn first, behind players and other actors.
     queuePerkEffectUnder(spriteBuckets, assets, camera, gameplay);
+    drawBossIntroOverlay(target, gameplay, camera);
     spriteBuckets.draw(target);
     drawPerkEffectOver(target, assets, camera, gameplay);
-    drawBossIntroOverlay(target, gameplay, camera);
     drawClearSequence(target, assets, gameplay, camera, frame);
     for (std::size_t playerIndex = 0; playerIndex < pixel_twins::kControllerCount; ++playerIndex) {
         const auto& player = gameplay.player(playerIndex);
