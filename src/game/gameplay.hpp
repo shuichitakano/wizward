@@ -243,6 +243,7 @@ struct EnemyState {
     std::int16_t hp = 0;
     std::int16_t maxHp = 0;
     std::uint16_t slowTicks = 0;
+    std::uint16_t contactStunTicks = 0;
     std::uint16_t bornTicks = 0;
     std::uint16_t spawnDelayTicks = 0;
     std::uint16_t attackCooldownTicks = 0;

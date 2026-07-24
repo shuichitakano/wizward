@@ -1366,8 +1366,10 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     if (xpWidth > 0) {
         pixel_twins::fillRectangle(target, 50, 8, xpWidth, 2, assets::palette::kPlayer2);
     }
-    char scoreBuffer[12]{};
-    drawRightAlignedText(target, formatUnsigned(gameplay.score(viewer), scoreBuffer), 155, 5);
+    if (gameplay.playerIsManual(viewer)) {
+        char scoreBuffer[12]{};
+        drawRightAlignedText(target, formatUnsigned(gameplay.score(viewer), scoreBuffer), 155, 5);
+    }
     drawTimer(target, gameplay.elapsedTicks(), gameplay.difficulty() == Difficulty::Endless,
               assets.endlessRankingColor(false));
     if (gameplay.bossCount() > 0) {
@@ -1453,42 +1455,44 @@ PIXEL_TWINS_SRAM void drawResultPanel(
         return;
     }
     drawCenteredText(target, title, 80, 5, 6, titleColor);
-    char playerText[] = "P1 RESULT";
-    playerText[1] = static_cast<char>('1' + viewer);
-    pixel_twins::drawText(target, assets::kWizwardFont, 5, 18, playerText,
-                          viewer == 0 ? assets::palette::kPlayer1
-                                      : assets::palette::kPlayer2, 6);
-    pixel_twins::drawText(target, assets::kWizwardFont, 5, 29, "SCORE",
-                          assets::palette::kFontBody, 6);
-    pixel_twins::drawText(target, assets::kWizwardFont, 5, 38, "TIME",
-                          assets::palette::kFontBody, 6);
-    pixel_twins::drawText(target, assets::kWizwardFont, 5, 47, "TOTAL",
-                          assets::palette::kFontBody, 6);
-    pixel_twins::drawText(target, assets::kWizwardFont, 5, 70, "KILLS",
-                          assets::palette::kFontBody, 6);
-    pixel_twins::drawText(target, assets::kWizwardFont, 5, 79, "EXP",
-                          assets::palette::kFontBody, 6);
-    char scoreText[12]{};
-    char bonusText[12]{};
-    char totalText[12]{};
-    char killsText[12]{};
-    char xpText[12]{};
-    drawRightAlignedText(target, formatUnsigned(gameplay.score(viewer), scoreText), 78, 29);
-    if (gameplay.difficulty() == Difficulty::Endless) {
-        char elapsedText[12]{};
-        drawRightAlignedText(target,
-            formatElapsedTicks(gameplay.elapsedTicks(), elapsedText), 78, 38);
-    } else {
-        char valueText[12]{};
-        const auto value = formatUnsigned(timeBonuses[viewer], valueText);
-        bonusText[0] = '+';
-        std::copy(value.begin(), value.end(), bonusText + 1);
-        drawRightAlignedText(target,
-            std::string_view(bonusText, value.size() + 1U), 78, 38);
+    if (gameplay.playerIsManual(viewer)) {
+        char playerText[] = "P1 RESULT";
+        playerText[1] = static_cast<char>('1' + viewer);
+        pixel_twins::drawText(target, assets::kWizwardFont, 5, 18, playerText,
+                              viewer == 0 ? assets::palette::kPlayer1
+                                          : assets::palette::kPlayer2, 6);
+        pixel_twins::drawText(target, assets::kWizwardFont, 5, 29, "SCORE",
+                              assets::palette::kFontBody, 6);
+        pixel_twins::drawText(target, assets::kWizwardFont, 5, 38, "TIME",
+                              assets::palette::kFontBody, 6);
+        pixel_twins::drawText(target, assets::kWizwardFont, 5, 47, "TOTAL",
+                              assets::palette::kFontBody, 6);
+        pixel_twins::drawText(target, assets::kWizwardFont, 5, 70, "KILLS",
+                              assets::palette::kFontBody, 6);
+        pixel_twins::drawText(target, assets::kWizwardFont, 5, 79, "EXP",
+                              assets::palette::kFontBody, 6);
+        char scoreText[12]{};
+        char bonusText[12]{};
+        char totalText[12]{};
+        char killsText[12]{};
+        char xpText[12]{};
+        drawRightAlignedText(target, formatUnsigned(gameplay.score(viewer), scoreText), 78, 29);
+        if (gameplay.difficulty() == Difficulty::Endless) {
+            char elapsedText[12]{};
+            drawRightAlignedText(target,
+                formatElapsedTicks(gameplay.elapsedTicks(), elapsedText), 78, 38);
+        } else {
+            char valueText[12]{};
+            const auto value = formatUnsigned(timeBonuses[viewer], valueText);
+            bonusText[0] = '+';
+            std::copy(value.begin(), value.end(), bonusText + 1);
+            drawRightAlignedText(target,
+                std::string_view(bonusText, value.size() + 1U), 78, 38);
+        }
+        drawRightAlignedText(target, formatUnsigned(finalScores[viewer], totalText), 78, 47);
+        drawRightAlignedText(target, formatUnsigned(gameplay.killCount(viewer), killsText), 78, 70);
+        drawRightAlignedText(target, formatUnsigned(gameplay.xpEarned(viewer), xpText), 78, 79);
     }
-    drawRightAlignedText(target, formatUnsigned(finalScores[viewer], totalText), 78, 47);
-    drawRightAlignedText(target, formatUnsigned(gameplay.killCount(viewer), killsText), 78, 70);
-    drawRightAlignedText(target, formatUnsigned(gameplay.xpEarned(viewer), xpText), 78, 79);
 
     std::array<ResultRankingRow, kRankingLimit + pixel_twins::kControllerCount> board{};
     std::size_t boardCount = 0;

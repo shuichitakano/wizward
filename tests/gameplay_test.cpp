@@ -111,6 +111,10 @@ int main() {
     assert(gameplay.enemies()[0].hp == 69);
     gameplay.tick(controllersWith(0, 0), map);
     assert(gameplay.player(0).hp == 36);
+    // 接触反撃の7ダメージに加え、同じtickで自動発射されたLIGHTも6ダメージ入る。
+    assert(gameplay.enemies()[0].hp == 56);
+    assert(gameplay.enemies()[0].contactStunTicks == 30);
+    assert(gameplay.enemies()[0].y < gameplay.player(0).y);
 
     gameplay.reset(map);
 

@@ -27,6 +27,9 @@ constexpr std::int16_t kAxisDeadzone = 4096;
 constexpr std::int16_t kLightDamage = 6;
 constexpr std::int16_t kContactDamage = 3;
 constexpr std::uint16_t kContactInvulnerabilityTicks = 39;
+constexpr std::int16_t kEnemyContactCounterMinimumDamage = 4;
+constexpr std::uint16_t kEnemyContactStunTicks = 30;
+constexpr float kEnemyContactKnockback = 14.0F;
 constexpr std::uint16_t kLightLifetimeTicks = 75;
 
 std::int16_t scaledValue(std::int16_t value, std::uint8_t percent) noexcept {
@@ -874,6 +877,9 @@ void fireBossRadial(EnemyState& enemy,
 void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
                  std::array<PlayerState, pixel_twins::kControllerCount>& players,
                  std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
+                 std::array<XpGemState, kMaximumXpGems>& xpGems,
+                 std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
+                 std::array<std::uint32_t, pixel_twins::kControllerCount>& killCounts,
                  const world::WorldMap& map,
                  std::uint32_t& randomState,
                  const BalanceProfile& balance) noexcept {
@@ -889,67 +895,71 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
         }
         const auto speed = enemy.speedPerTick * (enemy.slowTicks > 0 ? 0.42F : 1.0F);
         if (enemy.slowTicks > 0) --enemy.slowTicks;
+        if (enemy.contactStunTicks > 0) --enemy.contactStunTicks;
         if (enemy.attackCooldownTicks > 0) --enemy.attackCooldownTicks;
         if (enemy.attackAnimationTicks > 0) --enemy.attackAnimationTicks;
         const auto beforeX = enemy.x;
         const auto beforeY = enemy.y;
-        auto* target = nearestLivingPlayer(players, enemy.x, enemy.y);
-        auto dx = target->x - enemy.x;
-        auto dy = target->y - enemy.y;
-        const auto targetDistance = std::sqrt(dx * dx + dy * dy);
-        normalize(dx, dy);
-        if (enemy.kind == EnemyKind::Boss) {
-            moveActor(enemy, dx * speed, dy * speed, map);
-            if (enemy.attackCooldownTicks == 0) {
-                fireBossRadial(enemy, enemyBullets);
-                enemy.attackCooldownTicks = enemy.endlessScaled
-                    ? 105 : (enemy.hp < enemy.maxHp / 2 ? 81 : 105);
-            }
-        } else if (enemy.kind == EnemyKind::Bat) {
-            if (enemy.dashTicks > 0) {
-                --enemy.dashTicks;
-                moveActor(enemy, enemy.dashVelocityX, enemy.dashVelocityY, map);
-            } else {
-                enemy.phase += 7.0F / 60.0F;
-                const auto wave = std::sin(enemy.phase) * (28.0F / 60.0F);
-                moveActor(enemy, dx * speed - dy * wave, dy * speed + dx * wave, map);
-                if (enemy.attackCooldownTicks == 0 && targetDistance < 90.0F) {
-                    enemy.dashTicks = 17;
-                    enemy.dashVelocityX = dx * (155.0F / 60.0F);
-                    enemy.dashVelocityY = dy * (155.0F / 60.0F);
+        if (enemy.contactStunTicks == 0) {
+            auto* target = nearestLivingPlayer(players, enemy.x, enemy.y);
+            auto dx = target->x - enemy.x;
+            auto dy = target->y - enemy.y;
+            const auto targetDistance = std::sqrt(dx * dx + dy * dy);
+            normalize(dx, dy);
+            if (enemy.kind == EnemyKind::Boss) {
+                moveActor(enemy, dx * speed, dy * speed, map);
+                if (enemy.attackCooldownTicks == 0) {
+                    fireBossRadial(enemy, enemyBullets);
+                    enemy.attackCooldownTicks = enemy.endlessScaled
+                        ? 105 : (enemy.hp < enemy.maxHp / 2 ? 81 : 105);
+                }
+            } else if (enemy.kind == EnemyKind::Bat) {
+                if (enemy.dashTicks > 0) {
+                    --enemy.dashTicks;
+                    moveActor(enemy, enemy.dashVelocityX, enemy.dashVelocityY, map);
+                } else {
+                    enemy.phase += 7.0F / 60.0F;
+                    const auto wave = std::sin(enemy.phase) * (28.0F / 60.0F);
+                    moveActor(enemy, dx * speed - dy * wave, dy * speed + dx * wave, map);
+                    if (enemy.attackCooldownTicks == 0 && targetDistance < 90.0F) {
+                        enemy.dashTicks = 17;
+                        enemy.dashVelocityX = dx * (155.0F / 60.0F);
+                        enemy.dashVelocityY = dy * (155.0F / 60.0F);
+                        enemy.attackCooldownTicks = static_cast<std::uint16_t>(
+                            std::round((1.7F + randomUnit(randomState) * 0.8F) * 60.0F));
+                    }
+                }
+            } else if (enemy.kind == EnemyKind::Wisp) {
+                enemy.phase += 4.4F / 60.0F;
+                const auto waveX = std::sin(enemy.phase) * (42.0F / 60.0F);
+                const auto waveY = std::sin(enemy.phase * 1.3F) * (42.0F / 60.0F);
+                moveActor(enemy, dx * speed - dy * waveX, dy * speed + dx * waveY, map);
+            } else if (enemy.kind == EnemyKind::Archer || enemy.kind == EnemyKind::Mage) {
+                const auto nearRange = enemy.kind == EnemyKind::Archer ? 72.0F : 85.0F;
+                const auto farRange = enemy.kind == EnemyKind::Archer ? 105.0F : 135.0F;
+                if (targetDistance < nearRange) moveActor(enemy, -dx * speed, -dy * speed, map);
+                else if (targetDistance > farRange) moveActor(enemy, dx * speed, dy * speed, map);
+                const auto shotRange = enemy.kind == EnemyKind::Archer ? 150.0F : 165.0F;
+                if (enemy.attackCooldownTicks == 0 && targetDistance < shotRange) {
+                    if (enemy.kind == EnemyKind::Archer) {
+                        constexpr float kStep = kTau / 16.0F;
+                        const auto angle = std::round(std::atan2(dy, dx) / kStep) * kStep;
+                        dx = std::cos(angle);
+                        dy = std::sin(angle);
+                        enemy.facing = facingFor(dx, dy);
+                        enemy.attackAnimationTicks = 20;
+                    }
+                    (void)spawnEnemyBullet(enemyBullets, enemy,
+                        enemy.kind == EnemyKind::Archer
+                            ? EnemyBulletType::Arrow : EnemyBulletType::Magic,
+                        dx, dy);
+                    const auto base = enemy.kind == EnemyKind::Archer ? 2.2F : 1.9F;
                     enemy.attackCooldownTicks = static_cast<std::uint16_t>(
-                        std::round((1.7F + randomUnit(randomState) * 0.8F) * 60.0F));
+                        std::round((base + randomUnit(randomState) * 0.9F) * 60.0F));
                 }
+            } else {
+                moveActor(enemy, dx * speed, dy * speed, map);
             }
-        } else if (enemy.kind == EnemyKind::Wisp) {
-            enemy.phase += 4.4F / 60.0F;
-            const auto waveX = std::sin(enemy.phase) * (42.0F / 60.0F);
-            const auto waveY = std::sin(enemy.phase * 1.3F) * (42.0F / 60.0F);
-            moveActor(enemy, dx * speed - dy * waveX, dy * speed + dx * waveY, map);
-        } else if (enemy.kind == EnemyKind::Archer || enemy.kind == EnemyKind::Mage) {
-            const auto nearRange = enemy.kind == EnemyKind::Archer ? 72.0F : 85.0F;
-            const auto farRange = enemy.kind == EnemyKind::Archer ? 105.0F : 135.0F;
-            if (targetDistance < nearRange) moveActor(enemy, -dx * speed, -dy * speed, map);
-            else if (targetDistance > farRange) moveActor(enemy, dx * speed, dy * speed, map);
-            const auto shotRange = enemy.kind == EnemyKind::Archer ? 150.0F : 165.0F;
-            if (enemy.attackCooldownTicks == 0 && targetDistance < shotRange) {
-                if (enemy.kind == EnemyKind::Archer) {
-                    constexpr float kStep = kTau / 16.0F;
-                    const auto angle = std::round(std::atan2(dy, dx) / kStep) * kStep;
-                    dx = std::cos(angle);
-                    dy = std::sin(angle);
-                    enemy.facing = facingFor(dx, dy);
-                    enemy.attackAnimationTicks = 20;
-                }
-                (void)spawnEnemyBullet(enemyBullets, enemy,
-                    enemy.kind == EnemyKind::Archer ? EnemyBulletType::Arrow : EnemyBulletType::Magic,
-                    dx, dy);
-                const auto base = enemy.kind == EnemyKind::Archer ? 2.2F : 1.9F;
-                enemy.attackCooldownTicks = static_cast<std::uint16_t>(
-                    std::round((base + randomUnit(randomState) * 0.9F) * 60.0F));
-            }
-        } else {
-            moveActor(enemy, dx * speed, dy * speed, map);
         }
 
         const auto movedX = enemy.x - beforeX;
@@ -957,7 +967,8 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
         enemy.moving = std::sqrt(movedX * movedX + movedY * movedY) > 0.01F;
         if (enemy.moving) enemy.facing = facingFor(movedX, movedY);
 
-        for (auto& player : players) {
+        for (std::size_t playerIndex = 0; playerIndex < players.size(); ++playerIndex) {
+            auto& player = players[playerIndex];
             if (player.hp <= 0 || player.invulnerabilityTicks != 0) continue;
             const auto contactRange = enemy.radius + kPlayerRadius;
             if (squaredDistance(enemy.x, enemy.y, player.x, player.y) < contactRange * contactRange) {
@@ -968,6 +979,30 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
                 damage = scaledValue(damage, balance.incomingDamagePercent);
                 player.hp = static_cast<std::int16_t>(std::max(0, player.hp - damage));
                 player.invulnerabilityTicks = kContactInvulnerabilityTicks;
+                if (enemy.kind != EnemyKind::Boss) {
+                    const auto counterDamage = std::max<std::int16_t>(
+                        kEnemyContactCounterMinimumDamage,
+                        static_cast<std::int16_t>((enemy.maxHp + 9) / 10));
+                    enemy.hp = static_cast<std::int16_t>(enemy.hp - counterDamage);
+                    enemy.contactStunTicks = kEnemyContactStunTicks;
+                    enemy.dashTicks = 0;
+                    auto awayX = enemy.x - player.x;
+                    auto awayY = enemy.y - player.y;
+                    if (awayX == 0.0F && awayY == 0.0F) {
+                        const auto angle = facingAngle(enemy.facing);
+                        awayX = -std::cos(angle);
+                        awayY = -std::sin(angle);
+                    } else {
+                        normalize(awayX, awayY);
+                    }
+                    moveActor(enemy, awayX * kEnemyContactKnockback,
+                              awayY * kEnemyContactKnockback, map);
+                    if (enemy.hp <= 0) {
+                        killEnemy(enemy, static_cast<std::uint8_t>(playerIndex),
+                                  xpGems, scores, killCounts);
+                        break;
+                    }
+                }
             }
         }
     }
@@ -2258,7 +2293,8 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
                 ? 3.0F : 1.0F) * 60.0F
                 * balance.spawnIntervalPercent / 100.0F));
     }
-    moveEnemies(enemies_, players_, enemyBullets_, map, randomState_, balance);
+    moveEnemies(enemies_, players_, enemyBullets_, xpGems_, scores_, killCounts_,
+                map, randomState_, balance);
     for (std::size_t index = 0; index < players_.size(); ++index) {
         auto& player = players_[index];
         if (player.hp > 0) {
