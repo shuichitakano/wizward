@@ -1757,7 +1757,6 @@ void updatePerkChoice(PlayerState& player, const pixel_twins::ControllerState& c
                       std::uint8_t owner, std::uint32_t& randomState,
                       std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects,
                       bool endless) noexcept {
-    if (player.perkFlashTicks > 0) --player.perkFlashTicks;
     if (!player.choosingPerk) return;
     std::uint8_t choice = 255;
     std::uint8_t slot = 255;
@@ -2157,6 +2156,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
     }
     updatePerkEffects(perkEffects_);
     for (std::size_t index = 0; index < players_.size(); ++index) {
+        if (players_[index].perkFlashTicks > 0) --players_[index].perkFlashTicks;
         if (!attractMode_ && !manualPlayers_[index] && (std::abs(controllers[index].x) >= kAxisDeadzone
             || std::abs(controllers[index].y) >= kAxisDeadzone
             || controllers[index].held != 0 || controllers[index].pressed != 0)) {

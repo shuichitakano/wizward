@@ -307,6 +307,13 @@ int main() {
     }
     assert(!gameplay.player(0).choosingPerk);
 
+    gameplay.grantXp(1, 15);
+    gameplay.tick(controllersWith(0, 0), map);
+    assert(!gameplay.player(1).choosingPerk);
+    assert(gameplay.player(1).perkFlashTicks == 25);
+    for (int tick = 0; tick < 25; ++tick) gameplay.tick(controllersWith(0, 0), map);
+    assert(gameplay.player(1).perkFlashTicks == 0);
+
     gameplay.grantXp(0, 21);
     const auto selectedUp = gameplay.player(0).perkChoices[0];
     const auto selectedUpLevel = perkLevel(gameplay.player(0), selectedUp);
