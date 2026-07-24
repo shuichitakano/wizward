@@ -22,6 +22,10 @@ public:
     [[nodiscard]] const pixel_twins::BackgroundAssetPackView& background() const noexcept;
     [[nodiscard]] const pixel_twins::SpriteAssetPackView& sprites() const noexcept;
     [[nodiscard]] std::uint8_t hardRankingColor(bool focused) const noexcept;
+    [[nodiscard]] std::uint8_t endlessRankingColor(bool focused) const noexcept;
+    [[nodiscard]] std::uint8_t clearTitleColor() const noexcept { return resultTitleColors_[0]; }
+    [[nodiscard]] std::uint8_t gameOverTitleColor() const noexcept { return resultTitleColors_[1]; }
+    [[nodiscard]] std::uint8_t timeUpTitleColor() const noexcept { return resultTitleColors_[2]; }
 
     [[nodiscard]] bool makeSprite(SpriteAssetId asset,
                                   std::uint8_t animationFrame,
@@ -46,6 +50,8 @@ private:
     pixel_twins::SpriteAssetPackView sprites_;
     std::array<std::array<std::uint8_t, 64>, 2> xpGemPatterns_{};
     std::array<std::uint8_t, 2> hardRankingColors_{};
+    std::array<std::uint8_t, 2> endlessRankingColors_{};
+    std::array<std::uint8_t, 3> resultTitleColors_{};
 };
 
 } // namespace wizward::assets

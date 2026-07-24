@@ -121,6 +121,28 @@ void paintSegment(TerrainWorkspace& terrain, MapPoint from, MapPoint to,
     }
 }
 
+void paintOrganicSegment(TerrainWorkspace& terrain, MapPoint from, MapPoint to,
+                         float radius, TerrainId paint,
+                         std::uint32_t seed) noexcept {
+    for (std::uint16_t y = 0; y < kMapRows; ++y) {
+        for (std::uint16_t x = 0; x < kMapColumns; ++x) {
+            const auto current = terrain.get(x, y);
+            if (current == TerrainId::Water) continue;
+            if ((paint == TerrainId::Grass && value(current) >= value(TerrainId::Dirt))
+                || (paint == TerrainId::Dirt && value(current) >= value(TerrainId::Road))
+                || (paint == TerrainId::Road && value(current) >= value(TerrainId::Plaza))) {
+                continue;
+            }
+            const MapPoint point{static_cast<float>(x) + 0.5F,
+                                 static_cast<float>(y) + 0.5F};
+            if (distanceToSegment(point, from, to) / radius
+                    + edgeNoise(x, y, 8801U, seed) * 0.10F <= 1.0F) {
+                terrain.set(x, y, paint);
+            }
+        }
+    }
+}
+
 void paintEllipse(TerrainWorkspace& terrain, MapPoint center, float radiusX,
                   float radiusY, TerrainId paint, std::uint32_t seed) noexcept {
     for (std::uint16_t y = 0; y < kMapRows; ++y) {
@@ -775,16 +797,19 @@ bool MapGenerator::generate(
     if (endless) {
         workspace.fill(TerrainId::Water);
         constexpr MapPoint kEndlessCenter{50.5F, 50.5F};
-        const auto islandRadius = seededRange(9101U, 17.34375F, 19.53125F, seed);
+        const auto islandRadius = seededRange(9001U, 34.6875F, 39.0625F, seed);
+        const auto phaseA = seededRange(9002U, 0.0F, 6.2831853F, seed);
+        const auto phaseB = seededRange(9003U, 0.0F, 6.2831853F, seed);
         for (std::uint16_t y = 0; y < kMapRows; ++y) {
             for (std::uint16_t x = 0; x < kMapColumns; ++x) {
                 const MapPoint point{static_cast<float>(x) + 0.5F,
                                      static_cast<float>(y) + 0.5F};
                 const auto angle = std::atan2(point.y - kEndlessCenter.y,
                                               point.x - kEndlessCenter.x);
-                const auto edge = islandRadius
-                    + std::sin(angle * 5.0F + phase) * 1.1F
-                    + edgeNoise(x / 2U, y / 2U, 9203U, seed) * 1.4F;
+                const auto edge = islandRadius * (1.0F
+                    + std::sin(angle * 3.0F + phaseA) * 0.055F
+                    + std::sin(angle * 7.0F + phaseB) * 0.028F
+                    + edgeNoise(x, y, 9011U, seed) * 0.035F);
                 if (std::hypot(point.x - kEndlessCenter.x,
                                point.y - kEndlessCenter.y) <= edge) {
                     workspace.set(x, y, TerrainId::Grass);
@@ -807,25 +832,29 @@ bool MapGenerator::generate(
             }
         }
         std::array<MapPoint, 7> ring{};
-        const auto ringPhase = seededRange(9301U, 0.0F, 6.2831853F, seed);
+        const auto ringPhase = seededRange(9201U, 0.0F, 6.2831853F, seed);
         for (std::uint8_t index = 0; index < ring.size(); ++index) {
-            const auto angle = ringPhase + static_cast<float>(index) * 6.2831853F / 7.0F;
-            const auto radius = seededRange(9401U + index * 17U, 8.75F, 14.21875F, seed);
+            const auto angle = ringPhase + static_cast<float>(index) * 6.2831853F / 7.0F
+                + seededUnit(9210U + index * 17U, seed) * 0.22F;
+            const auto radius = seededRange(
+                9300U + index * 23U, 17.5F, 28.4375F, seed);
             ring[index] = {kEndlessCenter.x + std::cos(angle) * radius,
                            kEndlessCenter.y + std::sin(angle) * radius};
         }
-        const auto paintRoad = [&](MapPoint from, MapPoint to) noexcept {
-            paintSegment(workspace, from, to, 1.40625F, TerrainId::Grass, true);
-            paintSegment(workspace, from, to, 0.84375F, TerrainId::Dirt, true);
-            paintSegment(workspace, from, to, 0.375F, TerrainId::Road, true);
+        const auto paintRoad = [&](MapPoint from, MapPoint to,
+                                   float grass, float dirt, float road) noexcept {
+            paintOrganicSegment(workspace, from, to, grass, TerrainId::Grass, seed);
+            paintOrganicSegment(workspace, from, to, dirt, TerrainId::Dirt, seed);
+            paintOrganicSegment(workspace, from, to, road, TerrainId::Road, seed);
         };
         for (std::uint8_t index = 0; index < ring.size(); ++index) {
-            paintRoad(ring[index], ring[(index + 1U) % ring.size()]);
+            paintRoad(ring[index], ring[(index + 1U) % ring.size()],
+                      2.8125F, 1.6875F, 0.75F);
         }
-        paintRoad(ring[0], ring[3]);
-        paintRoad(ring[1], ring[5]);
-        paintRoad(ring[2], ring[6]);
-        paintEllipse(workspace, kEndlessCenter, 2.375F, 2.375F, TerrainId::Grass, seed);
+        paintRoad(ring[0], ring[3], 2.5F, 1.4375F, 0.625F);
+        paintRoad(ring[1], ring[5], 2.5F, 1.4375F, 0.625F);
+        paintRoad(ring[2], ring[6], 2.5F, 1.4375F, 0.625F);
+        paintEllipse(workspace, kEndlessCenter, 4.75F, 4.75F, TerrainId::Grass, seed);
         smoothTerrain(workspace, result.tiles);
         resolveTerrainJunctions(workspace, result.tiles);
         normalizeTerrain(workspace, result.tiles);
@@ -891,6 +920,20 @@ bool MapGenerator::generate(
         if (!placeSparseObjects(result, workspace, kObjects[slot], kLimits[slot],
                                 kSalts[slot], kDistances[slot], slot <= 1,
                                 objectPatterns, assets)) return false;
+    }
+    if (endless) {
+        constexpr MapPoint kEndlessCenter{50.5F, 50.5F};
+        for (std::uint16_t y = 0; y < kMapRows; ++y) {
+            for (std::uint16_t x = 0; x < kMapColumns; ++x) {
+                if (std::hypot(static_cast<float>(x) + 0.5F - kEndlessCenter.x,
+                               static_cast<float>(y) + 0.5F - kEndlessCenter.y) > 5.125F) {
+                    continue;
+                }
+                std::uint8_t pattern = 0;
+                if (!basePattern(workspace, x, y, seed, assets, pattern)) return false;
+                result.tiles[static_cast<std::size_t>(y) * kMapColumns + x] = pattern;
+            }
+        }
     }
     return true;
 }

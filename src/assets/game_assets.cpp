@@ -70,6 +70,11 @@ bool GameAssets::initialize() noexcept {
     }
     hardRankingColors_[0] = nearestPaletteIndex(255, 127, 115);
     hardRankingColors_[1] = nearestPaletteIndex(255, 176, 143);
+    endlessRankingColors_[0] = nearestPaletteIndex(112, 230, 160);
+    endlessRankingColors_[1] = nearestPaletteIndex(180, 255, 208);
+    resultTitleColors_[0] = nearestPaletteIndex(112, 255, 155);
+    resultTitleColors_[1] = nearestPaletteIndex(255, 139, 122);
+    resultTitleColors_[2] = nearestPaletteIndex(255, 184, 107);
     return true;
 }
 
@@ -108,6 +113,10 @@ const pixel_twins::SpriteAssetPackView& GameAssets::sprites() const noexcept {
 
 std::uint8_t GameAssets::hardRankingColor(bool focused) const noexcept {
     return hardRankingColors_[focused ? 1U : 0U];
+}
+
+std::uint8_t GameAssets::endlessRankingColor(bool focused) const noexcept {
+    return endlessRankingColors_[focused ? 1U : 0U];
 }
 
 bool GameAssets::makeSprite(SpriteAssetId asset,

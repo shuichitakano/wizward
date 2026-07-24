@@ -147,6 +147,7 @@ enum class ImpactEffectType : std::uint8_t {
     Orb,
     Wind,
     Generic,
+    BossDeath,
 };
 
 enum class GameplayOutcome : std::uint8_t {

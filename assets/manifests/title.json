@@ -3,7 +3,7 @@
   "name": "wizward-title",
   "palette": {
     "asset_range": [
-      3,
+      7,
       254
     ],
     "sample_pixels": 1000000,
@@ -14,6 +14,26 @@
         "index": 2,
         "name": "font_body",
         "color": "#f1ead8"
+      },
+      {
+        "index": 3,
+        "name": "hard_ranking",
+        "color": "#ff7f73"
+      },
+      {
+        "index": 4,
+        "name": "hard_ranking_focus",
+        "color": "#ffb08f"
+      },
+      {
+        "index": 5,
+        "name": "endless_ranking",
+        "color": "#70e6a0"
+      },
+      {
+        "index": 6,
+        "name": "endless_ranking_focus",
+        "color": "#b4ffd0"
       }
     ],
     "targets": []

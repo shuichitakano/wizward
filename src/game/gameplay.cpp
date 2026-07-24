@@ -212,6 +212,7 @@ std::uint16_t impactLifetimeTicks(ImpactEffectType type) noexcept {
     case ImpactEffectType::CastSpark:
     case ImpactEffectType::Fire:
     case ImpactEffectType::Generic: return 13;
+    case ImpactEffectType::BossDeath: return 31;
     }
     return 13;
 }
@@ -556,6 +557,18 @@ void moveAttractPlayer(
                                 enemies, enemyBullets, map, true);
         return;
     }
+    if (map.sealCount > 0 && !player.xpRecallInside
+        && player.xpRecallAiCooldownTicks == 0
+        && squaredDistance(player.x, player.y, kWorldCenter, kWorldCenter)
+            <= 120.0F * 120.0F
+        && std::any_of(xpGems.begin(), xpGems.end(), [&](const XpGemState& gem) {
+            return gem.active && gem.value > 0 && gem.owner == playerIndex
+                && gem.recallPlayer != playerIndex;
+        })) {
+        (void)moveAiPlayerSmart(player, kWorldCenter, kWorldCenter, partner,
+                                enemies, enemyBullets, map, false);
+        return;
+    }
     const EnemyState* nearest = nullptr;
     auto nearestSquared = 190.0F * 190.0F;
     for (const auto& enemy : enemies) {
@@ -822,8 +835,8 @@ EnemyState makeEnemyState(EnemyKind kind, float x, float y,
         const auto hpScale = std::pow(1.13F, scalingMinutes);
         const auto speedScale = 1.0F + std::min(0.65F, scalingMinutes * 0.045F);
         enemy.hp = static_cast<std::int16_t>(std::min(
-            32767.0F, static_cast<float>(enemy.hp) * hpScale
-                / (kind == EnemyKind::Boss ? 3.0F : 1.0F)));
+            32767.0F, std::round(static_cast<float>(enemy.hp) * hpScale
+                / (kind == EnemyKind::Boss ? 3.0F : 1.0F))));
         enemy.speedPerTick *= speedScale;
     }
     enemy.maxHp = enemy.hp;
@@ -1384,7 +1397,7 @@ std::uint8_t perkLevel(const PlayerState& player, Perk perk) noexcept {
     return 0;
 }
 
-void rollPerks(PlayerState& player, std::uint32_t& randomState) noexcept {
+void rollPerks(PlayerState& player, std::uint32_t& randomState, bool endless) noexcept {
     constexpr std::array<Perk, 11> kPool{{
         Perk::Light, Perk::Fire, Perk::Wind, Perk::Thunder, Perk::Ice,
         Perk::Orb, Perk::Familiar, Perk::Speed, Perk::MaxHp, Perk::Heal, Perk::Bomb,
@@ -1399,8 +1412,12 @@ void rollPerks(PlayerState& player, std::uint32_t& randomState) noexcept {
             const auto capped = !instant && perkLevel(player, kPool[index]) >= maximum;
             if (!chosen[index] && !capped) total += kWeights[index];
         }
-        if (total == 0) {
-            player.perkChoices[slot] = (slot & 1U) == 0U ? Perk::Heal : Perk::Bomb;
+        if (total == 0 && endless) {
+            chosen[9] = false;
+            chosen[10] = false;
+            total = kWeights[9] + kWeights[10];
+        } else if (total == 0) {
+            player.perkChoices[slot] = Perk::Heal;
             continue;
         }
         randomState = randomState * 1664525U + 1013904223U;
@@ -1420,9 +1437,10 @@ void rollPerks(PlayerState& player, std::uint32_t& randomState) noexcept {
     }
 }
 
-void beginPerkChoice(PlayerState& player, std::uint32_t& randomState) noexcept {
+void beginPerkChoice(PlayerState& player, std::uint32_t& randomState,
+                     bool endless) noexcept {
     if (player.choosingPerk || player.pendingPerkChoices == 0) return;
-    rollPerks(player, randomState);
+    rollPerks(player, randomState, endless);
     player.choosingPerk = true;
 }
 
@@ -1440,7 +1458,7 @@ void gainXp(PlayerState& player, std::uint8_t owner, std::uint16_t amount,
         leveledUp = true;
     }
     if (leveledUp) spawnPerkEffect(perkEffects, PerkEffectType::LevelUp, owner, randomState);
-    beginPerkChoice(player, randomState);
+    beginPerkChoice(player, randomState, difficulty == Difficulty::Endless);
 }
 
 void applyPerk(PlayerState& player, std::uint8_t owner, Perk perk,
@@ -1494,7 +1512,8 @@ void updateAutoPerkChoice(PlayerState& player,
                           std::uint8_t owner,
                           const std::array<EnemyState, kMaximumEnemies>& enemies,
                           std::uint32_t& randomState,
-                          std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects) noexcept {
+                          std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects,
+                          bool endless) noexcept {
     if (!player.choosingPerk) return;
     constexpr std::array<float, 11> kWeights{{5.0F, 5.0F, 4.0F, 4.0F, 4.0F, 4.0F,
                                                4.0F, 3.0F, 3.0F, 4.0F, 3.0F}};
@@ -1535,7 +1554,7 @@ void updateAutoPerkChoice(PlayerState& player,
     applyPerk(player, owner, player.perkChoices[selected], randomState, perkEffects);
     if (player.pendingPerkChoices > 0) --player.pendingPerkChoices;
     player.choosingPerk = false;
-    beginPerkChoice(player, randomState);
+    beginPerkChoice(player, randomState, endless);
 }
 
 void applyLinkedUpgrade(PlayerState& player, Perk perk) noexcept {
@@ -1637,7 +1656,7 @@ bool spawnBoss(std::array<EnemyState, kMaximumEnemies>& enemies,
     return true;
 }
 
-std::uint8_t spawnEndlessBossWave(
+bool spawnEndlessBossWave(
     std::array<EnemyState, kMaximumEnemies>& enemies,
     const std::array<PlayerState, pixel_twins::kControllerCount>& players,
     const world::WorldMap& map, std::uint8_t targetCount,
@@ -1647,16 +1666,24 @@ std::uint8_t spawnEndlessBossWave(
         enemies.begin(), enemies.end(), [](const EnemyState& enemy) {
             return enemy.active && enemy.kind == EnemyKind::Boss;
         }));
-    auto spawned = std::uint8_t{0};
-    for (auto needed = living; needed < targetCount; ++needed) {
-        auto slot = std::find_if(enemies.begin(), enemies.end(),
-            [](const EnemyState& enemy) { return !enemy.active && enemy.deathTicks == 0; });
-        if (slot == enemies.end()) break;
-        const auto& focus = players[players[needed % players.size()].hp > 0
-            ? needed % players.size() : (needed + 1U) % players.size()];
+    const auto count = static_cast<std::uint8_t>(
+        targetCount > living ? targetCount - living : 0U);
+    if (count == 0U) return true;
+    const auto available = static_cast<std::size_t>(std::count_if(
+        enemies.begin(), enemies.end(), [](const EnemyState& enemy) {
+            return !enemy.active && enemy.deathTicks == 0;
+        }));
+    if (available < count) return false;
+    std::array<std::array<float, 2>, 4> positions{};
+    const auto focusIndex = randomUnit(randomState) < 0.5F ? 0U : 1U;
+    const auto& focus = players[players[focusIndex].hp > 0 ? focusIndex : 1U - focusIndex];
+    const auto phase = randomUnit(randomState) * kTau;
+    const auto step = kTau / static_cast<float>(count);
+    for (std::uint8_t index = 0; index < count; ++index) {
         auto placed = false;
-        for (std::uint8_t attempt = 0; attempt < 48 && !placed; ++attempt) {
-            const auto angle = randomUnit(randomState) * kTau;
+        const auto preferredAngle = phase + static_cast<float>(index) * step;
+        for (std::uint8_t attempt = 0; attempt < 36 && !placed; ++attempt) {
+            const auto angle = preferredAngle + (randomUnit(randomState) - 0.5F) * 0.36F;
             const auto range = 125.0F + randomUnit(randomState) * 55.0F;
             const auto x = std::clamp(focus.x + std::cos(angle) * range,
                                       24.0F, kMapPixelWidth - 24.0F);
@@ -1669,18 +1696,32 @@ std::uint8_t spawnEndlessBossWave(
                         && squaredDistance(x, y, enemy.x, enemy.y) < 80.0F * 80.0F;
                 });
             if (tooClose) continue;
-            *slot = makeEnemyState(EnemyKind::Boss, x, y, elapsedTicks,
-                                   randomState, true, balance);
+            auto overlapsNew = false;
+            for (std::uint8_t other = 0; other < index; ++other) {
+                overlapsNew = overlapsNew
+                    || squaredDistance(x, y, positions[other][0], positions[other][1])
+                        < 80.0F * 80.0F;
+            }
+            if (overlapsNew) continue;
+            positions[index] = {{x, y}};
             placed = true;
-            ++spawned;
         }
+        if (!placed) return false;
     }
-    return spawned;
+    for (std::uint8_t index = 0; index < count; ++index) {
+        auto slot = std::find_if(enemies.begin(), enemies.end(),
+            [](const EnemyState& enemy) { return !enemy.active && enemy.deathTicks == 0; });
+        if (slot == enemies.end()) return false;
+        *slot = makeEnemyState(EnemyKind::Boss, positions[index][0], positions[index][1],
+                               elapsedTicks, randomState, true, balance);
+    }
+    return true;
 }
 
 void updatePerkChoice(PlayerState& player, const pixel_twins::ControllerState& controller,
                       std::uint8_t owner, std::uint32_t& randomState,
-                      std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects) noexcept {
+                      std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects,
+                      bool endless) noexcept {
     if (player.perkFlashTicks > 0) --player.perkFlashTicks;
     if (!player.choosingPerk) return;
     std::uint8_t choice = 255;
@@ -1696,7 +1737,7 @@ void updatePerkChoice(PlayerState& player, const pixel_twins::ControllerState& c
     applyPerk(player, owner, player.perkChoices[choice], randomState, perkEffects);
     if (player.pendingPerkChoices > 0) --player.pendingPerkChoices;
     player.choosingPerk = false;
-    beginPerkChoice(player, randomState);
+    beginPerkChoice(player, randomState, endless);
 }
 
 bool updateXpRecallCircle(std::array<XpGemState, kMaximumXpGems>& xpGems,
@@ -1813,7 +1854,8 @@ bool spawnEnemyNear(std::array<EnemyState, kMaximumEnemies>& enemies,
             + randomUnit(randomState) * (kEnemySpawnMaximumRange - kEnemySpawnMinimumRange);
         const auto x = std::clamp(focus.x + std::cos(angle) * range, 20.0F, kMapPixelWidth - 20.0F);
         const auto y = std::clamp(focus.y + std::sin(angle) * range, 20.0F, kMapPixelHeight - 20.0F);
-        if (boss != nullptr && squaredDistance(x, y, boss->x, boss->y) < 60.0F * 60.0F) continue;
+        if (boss != nullptr && balance.spawnIntervalPercent != 120U
+            && squaredDistance(x, y, boss->x, boss->y) < 60.0F * 60.0F) continue;
         if (!circlePositionIsWalkable(map, x, y, 8.0F)) continue;
         *slot = makeEnemyState(kind, x, y, elapsedTicks, randomState, true, balance);
         slot->spawnDelayTicks = delayTicks;
@@ -1825,12 +1867,12 @@ bool spawnEnemyNear(std::array<EnemyState, kMaximumEnemies>& enemies,
 void recycleDistantEnemiesForSpawn(
     std::array<EnemyState, kMaximumEnemies>& enemies,
     const std::array<PlayerState, pixel_twins::kControllerCount>& players,
-    std::uint8_t requestedCount) noexcept {
+    std::uint8_t requestedCount, std::size_t enemyLimit) noexcept {
     const auto activeCount = static_cast<std::size_t>(std::count_if(
         enemies.begin(), enemies.end(),
         [](const EnemyState& enemy) { return enemy.active; }));
-    auto needed = activeCount + requestedCount > kMaximumEnemies
-        ? activeCount + requestedCount - kMaximumEnemies
+    auto needed = activeCount + requestedCount > enemyLimit
+        ? activeCount + requestedCount - enemyLimit
         : 0U;
     while (needed > 0U) {
         EnemyState* candidate = nullptr;
@@ -2092,16 +2134,19 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         if (players_[index].hp > 0) {
             if (manualPlayers_[index]) {
                 updatePerkChoice(players_[index], controllers[index],
-                                 static_cast<std::uint8_t>(index), randomState_, perkEffects_);
+                                 static_cast<std::uint8_t>(index), randomState_, perkEffects_,
+                                 difficulty_ == Difficulty::Endless);
                 movePlayer(players_[index], controllers[index], map);
             } else if (attractMode_) {
                 updateAutoPerkChoice(players_[index], static_cast<std::uint8_t>(index),
-                                     enemies_, randomState_, perkEffects_);
+                                     enemies_, randomState_, perkEffects_,
+                                     difficulty_ == Difficulty::Endless);
                 moveAttractPlayer(players_[index], index, players_[1U - index], enemies_,
                                   enemyBullets_, xpGems_, map, elapsedTicks_ - 105U * 60U);
             } else {
                 updateAutoPerkChoice(players_[index], static_cast<std::uint8_t>(index),
-                                     enemies_, randomState_, perkEffects_);
+                                     enemies_, randomState_, perkEffects_,
+                                     difficulty_ == Difficulty::Endless);
                 followAiPartner(players_[index], index, players_[1U - index],
                                 enemies_, enemyBullets_, xpGems_, map);
             }
@@ -2149,20 +2194,24 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
             }
         }
     }
-    if (spawnCooldownTicks_ > 0) --spawnCooldownTicks_;
-    if (swarmCooldownTicks_ > 0) --swarmCooldownTicks_;
     if (difficulty_ == Difficulty::Endless && elapsedTicks_ >= nextEndlessBossTicks_) {
-        ++endlessBossWave_;
         const auto target = static_cast<std::uint8_t>(
-            std::min<std::uint8_t>(4U, endlessBossWave_));
+            std::min<std::uint8_t>(4U, endlessBossWave_ + 1U));
         if (spawnEndlessBossWave(enemies_, players_, map, target, elapsedTicks_,
-                                 randomState_, balance) > 0U) {
+                                 randomState_, balance)) {
+            ++endlessBossWave_;
             endlessSpawnPauseTicks_ = 30U * 60U;
             bossSpawned_ = true;
+            nextEndlessBossTicks_ = elapsedTicks_ + 2U * 60U * 60U;
         }
-        nextEndlessBossTicks_ += 2U * 60U * 60U;
     }
-    if (endlessSpawnPauseTicks_ > 0) --endlessSpawnPauseTicks_;
+    const auto spawningPaused = endlessSpawnPauseTicks_ > 0;
+    if (spawningPaused) {
+        --endlessSpawnPauseTicks_;
+    } else {
+        if (spawnCooldownTicks_ > 0) --spawnCooldownTicks_;
+        if (swarmCooldownTicks_ > 0) --swarmCooldownTicks_;
+    }
     const auto enemyProgressTicks = std::max(
         elapsedTicks_, static_cast<std::uint32_t>(activeSealCount_) * 60U * 60U);
     const auto* activeBoss = boss();
@@ -2172,7 +2221,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         ? endlessEnemyLimit : std::size_t{90};
     if ((difficulty_ == Difficulty::Endless || activeBoss == nullptr)
         && swarmCooldownTicks_ == 0 && enemyCount() + 8U < enemyLimit
-        && endlessSpawnPauseTicks_ == 0) {
+        && !spawningPaused) {
         spawnSwarm(enemies_, players_, map, enemyProgressTicks, randomState_, balance);
         const auto minutes = static_cast<float>(elapsedTicks_) / (60.0F * 60.0F);
         const auto seconds = difficulty_ == Difficulty::Endless
@@ -2181,16 +2230,20 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         swarmCooldownTicks_ = static_cast<std::uint16_t>(
             std::round(seconds * 60.0F * balance.spawnIntervalPercent / 100.0F));
     }
-    if (spawnCooldownTicks_ == 0 && endlessSpawnPauseTicks_ == 0
+    if (spawnCooldownTicks_ == 0 && !spawningPaused
         && enemyCount() < enemyLimit) {
         const auto requestedCount = static_cast<std::uint8_t>(
             difficulty_ == Difficulty::Endless
                 ? std::min<std::uint32_t>(12U, 2U + enemyProgressTicks / (50U * 60U))
                 : 2U + enemyProgressTicks / (45U * 60U));
-        recycleDistantEnemiesForSpawn(enemies_, players_, requestedCount);
+        recycleDistantEnemiesForSpawn(enemies_, players_, requestedCount, enemyLimit);
+        const auto availableCount = enemyCount() < enemyLimit
+            ? enemyLimit - enemyCount() : 0U;
+        const auto spawnCount = static_cast<std::uint8_t>(
+            std::min<std::size_t>(requestedCount, availableCount));
         const auto focusIndex = randomUnit(randomState_) < 0.5F ? 0U : 1U;
         const auto& focus = players_[players_[focusIndex].hp > 0 ? focusIndex : 1U - focusIndex];
-        for (std::uint8_t index = 0; index < requestedCount; ++index) {
+        for (std::uint8_t index = 0; index < spawnCount; ++index) {
             (void)spawnEnemyNear(enemies_, focus, map,
                                  rollEnemyKind(enemyProgressTicks, randomState_),
                                  enemyProgressTicks, randomState_,
@@ -2334,7 +2387,8 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
             if (enemy.kind == EnemyKind::Boss && enemy.endlessScaled) {
                 pushSfx(SfxId::BossDeathImpact);
                 pushSfx(SfxId::BossDeathBlast);
-                spawnImpact(impactEffects_, ImpactEffectType::Generic, enemy.x, enemy.y);
+                spawnImpact(impactEffects_, ImpactEffectType::BossDeath,
+                            enemy.x, enemy.y - 10.0F);
             } else if (enemy.kind != EnemyKind::Boss) {
                 killPlayed = true;
                 hitPlayed = true;

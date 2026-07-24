@@ -144,6 +144,16 @@ std::string_view formatShortScore(std::uint32_t value, char (&buffer)[12]) noexc
     return {buffer, score.size() + 1U};
 }
 
+std::string_view formatElapsedTicks(std::uint32_t ticks, char (&buffer)[12]) noexcept {
+    const auto seconds = ticks / 60U;
+    const auto minuteText = formatUnsigned(seconds / 60U, buffer);
+    const auto offset = minuteText.size();
+    buffer[offset] = ':';
+    buffer[offset + 1U] = static_cast<char>('0' + (seconds / 10U) % 6U);
+    buffer[offset + 2U] = static_cast<char>('0' + seconds % 10U);
+    return {buffer, offset + 3U};
+}
+
 PIXEL_TWINS_SRAM void drawRightAlignedText(pixel_twins::RenderTarget target,
                           std::string_view text,
                           std::int16_t right,
@@ -161,26 +171,28 @@ PIXEL_TWINS_SRAM void drawCenteredText(pixel_twins::RenderTarget target,
                       std::string_view text,
                       std::int16_t center,
                       std::int16_t y,
-                      std::int16_t stride = 6) noexcept {
+                      std::int16_t stride = 6,
+                      std::uint8_t color = assets::palette::kFontBody) noexcept {
     const auto width = static_cast<std::int16_t>(
         text.empty() ? 0 : (text.size() - 1U) * static_cast<std::size_t>(stride) + 8U);
     pixel_twins::drawText(target, assets::kWizwardFont,
                           static_cast<std::int16_t>(center - width / 2), y, text,
-                          assets::palette::kFontBody, stride);
+                          color, stride);
 }
 
 PIXEL_TWINS_SRAM void drawTimer(pixel_twins::RenderTarget target,
-               std::uint32_t elapsedTicks, bool endless) noexcept {
+               std::uint32_t elapsedTicks, bool endless,
+               std::uint8_t endlessColor) noexcept {
     constexpr std::uint32_t kGameSeconds = 300;
     const auto elapsedSeconds = elapsedTicks / 60U;
     if (endless) {
-        char text[] = "00:00";
-        const auto minutes = std::min<std::uint32_t>(99U, elapsedSeconds / 60U);
-        text[0] = static_cast<char>('0' + minutes / 10U);
-        text[1] = static_cast<char>('0' + minutes % 10U);
-        text[3] = static_cast<char>('0' + (elapsedSeconds / 10U) % 6U);
-        text[4] = static_cast<char>('0' + elapsedSeconds % 10U);
-        drawCenteredText(target, text, 80, 24);
+        char text[12]{};
+        const auto duration = formatElapsedTicks(elapsedTicks, text);
+        const auto width = static_cast<std::int16_t>(
+            (duration.size() - 1U) * 6U + 8U);
+        pixel_twins::drawText(target, assets::kWizwardFont,
+            static_cast<std::int16_t>(80 - width / 2), 24,
+            duration, endlessColor, 6);
         return;
     }
     const auto remain = elapsedSeconds < kGameSeconds ? kGameSeconds - elapsedSeconds : 0U;
@@ -254,6 +266,7 @@ PIXEL_TWINS_SRAM void drawXpRecallCircle(pixel_twins::RenderTarget target,
                          const assets::GameAssets& assets,
                          const CameraState& camera,
                          const GameplayState& gameplay) noexcept {
+    if (gameplay.difficulty() == Difficulty::Endless) return;
     constexpr float kCenter = 50.5F * static_cast<float>(kWorldTileSize);
     pixel_twins::Sprite circle{};
     if (assets.makeSprite(assets::SpriteAssetId::PlazaRecallCircle32, 0, 0,
@@ -874,15 +887,11 @@ PIXEL_TWINS_SRAM void drawTitle(pixel_twins::Framebuffer& framebuffer,
     title.drawScreen(left);
     title.drawScreen(right);
     if (difficulty == Difficulty::Hard) {
-        pixel_twins::drawText(left, assets::kWizwardFont, 132, 5, "HARD",
-                              assets::palette::kFontBody, 6);
-        pixel_twins::drawText(right, assets::kWizwardFont, 132, 5, "HARD",
-                              assets::palette::kFontBody, 6);
+        pixel_twins::drawText(left, assets::kWizwardFont, 130, 5, "HARD", 3, 6);
+        pixel_twins::drawText(right, assets::kWizwardFont, 130, 5, "HARD", 3, 6);
     } else if (difficulty == Difficulty::Endless) {
-        pixel_twins::drawText(left, assets::kWizwardFont, 108, 5, "ENDLESS",
-                              assets::palette::kFontBody, 6);
-        pixel_twins::drawText(right, assets::kWizwardFont, 108, 5, "ENDLESS",
-                              assets::palette::kFontBody, 6);
+        pixel_twins::drawText(left, assets::kWizwardFont, 112, 5, "ENDLESS", 5, 6);
+        pixel_twins::drawText(right, assets::kWizwardFont, 112, 5, "ENDLESS", 5, 6);
     }
     if ((frame / 30U) % 2U == 0U) {
         drawCenteredText(left, "PUSH ANY BUTTON", 80, 98);
@@ -903,10 +912,10 @@ PIXEL_TWINS_SRAM void drawAttractRanking(
         pixel_twins::drawText(target, assets::kWizwardFont, endless ? 48 : 46, 3,
                               endless ? "ENDLESS TOP" : "TOP PLAYERS",
                               assets::palette::kRankingTitle, 6);
-        const auto firstRank = viewer * (endless ? 3U : 10U);
-        const auto nameX = static_cast<std::int16_t>(viewer == 0 ? 74 : 16);
-        const auto scoreX = static_cast<std::int16_t>(nameX + 70);
-        for (std::size_t index = 0; index < (endless ? 3U : 10U); ++index) {
+        const auto firstRank = viewer * 10U;
+        const auto nameX = static_cast<std::int16_t>(endless ? 4 : viewer == 0 ? 74 : 16);
+        const auto scoreX = static_cast<std::int16_t>(endless ? 102 : nameX + 70);
+        for (std::size_t index = 0; index < 10U; ++index) {
             const auto rank = firstRank + index;
             const auto hasEntry = rank < rankingCount;
             char name[7]{};
@@ -918,11 +927,12 @@ PIXEL_TWINS_SRAM void drawAttractRanking(
             name[5] = hasEntry ? rankings[rank].name[2] : '-';
             const auto focused = rank < 3U;
             const auto hard = hasEntry && rankings[rank].hard;
-            const auto color = static_cast<std::uint8_t>(hard
+            const auto color = static_cast<std::uint8_t>(endless
+                ? (focused ? 17U : 16U)
+                : hard
                 ? (focused ? 15U : 14U)
                 : (focused ? assets::palette::kHighlight : assets::palette::kFontBody));
-            const auto y = static_cast<std::int16_t>(
-                17 + index * (endless ? 18U : 9U));
+            const auto y = static_cast<std::int16_t>(17 + index * 9U);
             pixel_twins::drawText(target, assets::kWizwardFont, nameX, y,
                                   std::string_view(name, 6), color, 6);
             char scoreBuffer[12]{};
@@ -930,16 +940,12 @@ PIXEL_TWINS_SRAM void drawAttractRanking(
                 ? formatShortScore(rankings[rank].score, scoreBuffer)
                 : std::string_view("-----");
             drawRightAlignedText(target, score, scoreX, y, 6, color);
-            if (endless && hasEntry) {
-                const auto seconds = rankings[rank].survivalTicks / 60U;
-                char timeText[] = "TIME 00:00";
-                const auto minutes = std::min<std::uint32_t>(99U, seconds / 60U);
-                timeText[5] = static_cast<char>('0' + minutes / 10U);
-                timeText[6] = static_cast<char>('0' + minutes % 10U);
-                timeText[8] = static_cast<char>('0' + (seconds / 10U) % 6U);
-                timeText[9] = static_cast<char>('0' + seconds % 10U);
-                pixel_twins::drawText(target, assets::kWizwardFont, nameX, y + 9,
-                                      timeText, color, 6);
+            if (endless) {
+                char timeText[12]{};
+                const auto duration = hasEntry
+                    ? formatElapsedTicks(rankings[rank].survivalTicks, timeText)
+                    : std::string_view("--:--");
+                drawRightAlignedText(target, duration, 156, y, 6, color);
             }
         }
     }
@@ -989,6 +995,17 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     }
     for (const auto& effect : gameplay.impactEffects()) {
         if (!effect.active || effect.lifetimeTicks == 0) continue;
+        if (effect.type == ImpactEffectType::BossDeath) {
+            const auto progress = static_cast<float>(effect.ageTicks)
+                / static_cast<float>(effect.lifetimeTicks);
+            const auto radius = static_cast<std::uint16_t>(
+                std::round(23.0F + progress * 18.0F));
+            pixel_twins::drawCircle(target,
+                static_cast<std::int16_t>(std::round(effect.x - camera.x)),
+                static_cast<std::int16_t>(std::round(effect.y - camera.y)),
+                radius, assets::palette::kHighlight);
+            continue;
+        }
         auto asset = assets::SpriteAssetId::ImpactBurst1616x163fSheet;
         std::uint8_t frameCount = 3;
         std::int16_t halfSize = 8;
@@ -1020,6 +1037,8 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
             asset = assets::SpriteAssetId::WindImpact1616x163fSheet;
             break;
         case ImpactEffectType::Generic:
+            break;
+        case ImpactEffectType::BossDeath:
             break;
         }
         const auto animationFrame = static_cast<std::uint32_t>(std::min<std::uint16_t>(
@@ -1349,7 +1368,8 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     }
     char scoreBuffer[12]{};
     drawRightAlignedText(target, formatUnsigned(gameplay.score(viewer), scoreBuffer), 155, 5);
-    drawTimer(target, gameplay.elapsedTicks(), gameplay.difficulty() == Difficulty::Endless);
+    drawTimer(target, gameplay.elapsedTicks(), gameplay.difficulty() == Difficulty::Endless,
+              assets.endlessRankingColor(false));
     if (gameplay.bossCount() > 0) {
         constexpr std::int16_t kBossBarX = 42;
         constexpr std::int16_t kBossBarY = 14;
@@ -1405,6 +1425,8 @@ struct ResultRankingRow {
     std::uint8_t player = 0;
     bool pending = false;
     bool hard = false;
+    bool endless = false;
+    std::uint32_t survivalTicks = 0;
 };
 
 PIXEL_TWINS_SRAM void drawResultPanel(
@@ -1421,11 +1443,16 @@ PIXEL_TWINS_SRAM void drawResultPanel(
     std::size_t rankingCount,
     const std::array<RankingEntry, pixel_twins::kControllerCount>& entries) noexcept {
     const auto title = outcomeText(outcome);
+    const auto titleColor = outcome == GameplayOutcome::Clear
+        ? gameAssets.clearTitleColor()
+        : outcome == GameplayOutcome::TimeUp
+            ? gameAssets.timeUpTitleColor()
+            : gameAssets.gameOverTitleColor();
     if (resultTicks < kRankingResultDelayTicks) {
-        drawCenteredText(target, title, 80, 82);
+        drawCenteredText(target, title, 80, 82, 6, titleColor);
         return;
     }
-    drawCenteredText(target, title, 80, 5);
+    drawCenteredText(target, title, 80, 5, 6, titleColor);
     char playerText[] = "P1 RESULT";
     playerText[1] = static_cast<char>('1' + viewer);
     pixel_twins::drawText(target, assets::kWizwardFont, 5, 18, playerText,
@@ -1448,18 +1475,16 @@ PIXEL_TWINS_SRAM void drawResultPanel(
     char xpText[12]{};
     drawRightAlignedText(target, formatUnsigned(gameplay.score(viewer), scoreText), 78, 29);
     if (gameplay.difficulty() == Difficulty::Endless) {
-        const auto seconds = gameplay.elapsedTicks() / 60U;
-        char elapsedText[] = "00:00";
-        const auto minutes = std::min<std::uint32_t>(99U, seconds / 60U);
-        elapsedText[0] = static_cast<char>('0' + minutes / 10U);
-        elapsedText[1] = static_cast<char>('0' + minutes % 10U);
-        elapsedText[3] = static_cast<char>('0' + (seconds / 10U) % 6U);
-        elapsedText[4] = static_cast<char>('0' + seconds % 10U);
-        drawRightAlignedText(target, elapsedText, 78, 38);
+        char elapsedText[12]{};
+        drawRightAlignedText(target,
+            formatElapsedTicks(gameplay.elapsedTicks(), elapsedText), 78, 38);
     } else {
-        drawRightAlignedText(target, formatUnsigned(timeBonuses[viewer], bonusText), 78, 38);
-        pixel_twins::drawText(target, assets::kWizwardFont, 42, 38, "+",
-                              assets::palette::kFontBody, 6);
+        char valueText[12]{};
+        const auto value = formatUnsigned(timeBonuses[viewer], valueText);
+        bonusText[0] = '+';
+        std::copy(value.begin(), value.end(), bonusText + 1);
+        drawRightAlignedText(target,
+            std::string_view(bonusText, value.size() + 1U), 78, 38);
     }
     drawRightAlignedText(target, formatUnsigned(finalScores[viewer], totalText), 78, 47);
     drawRightAlignedText(target, formatUnsigned(gameplay.killCount(viewer), killsText), 78, 70);
@@ -1469,18 +1494,24 @@ PIXEL_TWINS_SRAM void drawResultPanel(
     std::size_t boardCount = 0;
     for (std::size_t index = 0; index < rankingCount; ++index) {
         board[boardCount++] = {rankings[index].name, rankings[index].score,
-                               rankings[index].player, false, rankings[index].hard};
+                               rankings[index].player, false, rankings[index].hard,
+                               rankings[index].endless, rankings[index].survivalTicks};
     }
     for (std::size_t player = 0; player < entries.size(); ++player) {
         if (!entries[player].active || entries[player].submitted) continue;
         board[boardCount++] = {entries[player].name, finalScores[player],
                                static_cast<std::uint8_t>(player), true,
-                               gameplay.difficulty() == Difficulty::Hard};
+                               gameplay.difficulty() == Difficulty::Hard,
+                               gameplay.difficulty() == Difficulty::Endless,
+                               gameplay.elapsedTicks()};
     }
     for (std::size_t index = 1; index < boardCount; ++index) {
         const auto row = board[index];
         auto destination = index;
-        while (destination > 0 && board[destination - 1U].score < row.score) {
+        while (destination > 0
+            && (board[destination - 1U].score < row.score
+                || (row.endless && board[destination - 1U].score == row.score
+                    && board[destination - 1U].survivalTicks < row.survivalTicks))) {
             board[destination] = board[destination - 1U];
             --destination;
         }
@@ -1508,10 +1539,12 @@ PIXEL_TWINS_SRAM void drawResultPanel(
         char rankScore[12]{};
         const auto score = formatShortScore(board[rank].score, rankScore);
         const auto focused = rank == focusRank && entries[viewer].active;
-        const auto color = board[rank].hard
-            ? gameAssets.hardRankingColor(focused)
-            : static_cast<std::uint8_t>(focused ? assets::palette::kHighlight
-                                                : assets::palette::kFontBody);
+        const auto color = board[rank].endless
+            ? gameAssets.endlessRankingColor(focused)
+            : board[rank].hard
+                ? gameAssets.hardRankingColor(focused)
+                : static_cast<std::uint8_t>(focused ? assets::palette::kHighlight
+                                                    : assets::palette::kFontBody);
         pixel_twins::drawText(target, assets::kWizwardFont, 84, y,
                               std::string_view(rowText, 6), color, 6);
         drawRightAlignedText(target, score, 154, y, 6, color);

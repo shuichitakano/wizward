@@ -3,7 +3,7 @@
   "name": "wizward-attract",
   "palette": {
     "asset_range": [
-      16,
+      18,
       254
     ],
     "sample_pixels": 1000000,
@@ -34,6 +34,16 @@
         "index": 15,
         "name": "hard_ranking_focus",
         "color": "#ffb08f"
+      },
+      {
+        "index": 16,
+        "name": "endless_ranking",
+        "color": "#70e6a0"
+      },
+      {
+        "index": 17,
+        "name": "endless_ranking_focus",
+        "color": "#b4ffd0"
       }
     ],
     "targets": []
