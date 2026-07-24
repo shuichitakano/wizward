@@ -27,6 +27,7 @@ enum class Scene : std::uint8_t {
 enum class AudioEvent : std::uint8_t {
     None,
     PlayField,
+    PlayEndless,
     PlayBoss,
     PlayVictory,
     PlayNameEntry,
@@ -50,6 +51,8 @@ struct RankingRecord {
     std::uint8_t player = 0;
     bool cleared = false;
     bool hard = false;
+    bool endless = false;
+    std::uint32_t survivalTicks = 0;
 };
 
 struct RankingEntry {
@@ -128,8 +131,14 @@ private:
     std::array<std::uint32_t, pixel_twins::kControllerCount> timeBonuses_{};
     std::array<std::uint32_t, pixel_twins::kControllerCount> finalScores_{};
     std::array<RankingRecord, kRankingLimit> rankings_{};
+    std::array<RankingRecord, kRankingLimit> endlessRankings_{};
     std::array<RankingEntry, pixel_twins::kControllerCount> rankingEntries_{};
     std::size_t rankingCount_ = 0;
+    std::size_t endlessRankingCount_ = 0;
+    std::array<std::array<char, 3>, pixel_twins::kControllerCount> lastNames_{{
+        {{'A', 'A', 'A'}}, {{'A', 'A', 'A'}},
+    }};
+    std::uint32_t rankingIdleTicks_ = 0;
     std::uint16_t resultContinueTicks_ = 0;
     GameplayOutcome resultOutcome_ = GameplayOutcome::Running;
 };

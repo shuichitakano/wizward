@@ -46,6 +46,7 @@ struct WorldMap {
     std::array<std::uint8_t, kMapTileCount> tiles{};
     std::array<std::uint8_t, 128> patternCollisionShapes{};
     std::array<SealCell, 3> seals{};
+    std::uint8_t sealCount = 3;
     std::uint32_t seed = 0;
 
     [[nodiscard]] std::uint8_t tile(std::uint16_t x, std::uint16_t y) const noexcept;
@@ -74,7 +75,8 @@ public:
         std::uint32_t seed,
         const pixel_twins::BackgroundAssetPackView& assets,
         TerrainWorkspace& workspace,
-        WorldMap& result) const noexcept;
+        WorldMap& result,
+        bool endless = false) const noexcept;
 };
 
 } // namespace wizward::world

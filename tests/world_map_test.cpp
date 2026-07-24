@@ -102,6 +102,12 @@ int main() {
     wizward::world::WorldMap different;
     assert(generator.generate(54321, assets.background(), workspace, different));
     assert(first.tiles != different.tiles);
+    wizward::world::WorldMap endless;
+    assert(generator.generate(12345, assets.background(), workspace, endless, true));
+    assert(endless.sealCount == 0U);
+    assert(endless.circleIsWalkable(50.5F * wizward::world::kMapTileSize,
+                                    50.5F * wizward::world::kMapTileSize, 8.0F));
+    assert(endless.tiles != first.tiles);
     for (std::uint32_t seed = 1; seed <= 16; ++seed) {
         wizward::world::WorldMap generated;
         assert(generator.generate(seed * 2654435761U, assets.background(), workspace, generated));

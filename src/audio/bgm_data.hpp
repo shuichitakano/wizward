@@ -11,6 +11,7 @@ extern const pixel_twins::Sequence kField;
 extern const pixel_twins::Sequence kBoss;
 extern const pixel_twins::Sequence kVictory;
 extern const pixel_twins::Sequence kNameEntry;
+extern const pixel_twins::Sequence kEndless;
 
 } // namespace audio
 } // namespace wizward

@@ -124,8 +124,12 @@ int main() {
     assert(attractGame.gameplay().player(1).fireLevel == 2U);
     const auto demoStart = pressedController(1, ControllerButton::choiceRight);
     const auto demoStartResult = attractGame.processInput(demoStart);
-    assert(demoStartResult.audio == AudioEvent::PlayField);
-    assert(demoStartResult.playStartSfx);
+    assert(demoStartResult.audio == AudioEvent::StopBgm);
+    assert(!demoStartResult.playStartSfx);
+    assert(attractGame.scene() == Scene::Title);
+    const auto titleStartResult = attractGame.processInput(demoStart);
+    assert(titleStartResult.audio == AudioEvent::PlayField);
+    assert(titleStartResult.playStartSfx);
     assert(attractGame.scene() == Scene::Gameplay);
 
     assert(attractGame.initialize(Scene::Title, 0x24681357U));

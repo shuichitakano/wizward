@@ -176,8 +176,10 @@ int main() {
     }
     gameplay.tick(controllersWith(0, 0), map);
     assert(gameplay.enemyCount() == wizward::game::kMaximumEnemies);
+    // 通常モードは90体で頭打ちなので、ENDLESS用の予備スロットまで
+    // 手動で埋めた場合は新規スポーンを行わない。
     assert(std::count_if(gameplay.enemies().begin(), gameplay.enemies().end(),
-        [](const auto& enemy) { return enemy.active && enemy.bornTicks > 0; }) == 2);
+        [](const auto& enemy) { return enemy.active && enemy.bornTicks > 0; }) == 0);
 
     const auto stopped = controllersWith(1000, -1000);
     gameplay.tick(stopped, map);
@@ -398,8 +400,8 @@ int main() {
         grantPerk(gameplay, map, wizward::game::Perk::Fire);
     }
     const auto fireIndex = static_cast<std::size_t>(wizward::game::Perk::Fire);
-    assert(gameplay.player(1).fireLevel == 1);
-    assert(gameplay.player(1).linkedUpgradeTenths[fireIndex] == 2);
+    assert(gameplay.player(1).fireLevel == 2);
+    assert(gameplay.player(1).linkedUpgradeTenths[fireIndex] == 0);
 
     gameplay.reset(map);
     gameplay.grantXp(0, 7);

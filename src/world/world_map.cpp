@@ -570,7 +570,7 @@ void WorldMap::draw(pixel_twins::RenderTarget target,
 bool WorldMap::activateSeal(
     std::uint8_t sealIndex,
     const pixel_twins::BackgroundAssetPackView& assets) noexcept {
-    if (sealIndex >= seals.size()) {
+    if (sealIndex >= sealCount) {
         return false;
     }
     return putObject(*this,
@@ -583,8 +583,8 @@ bool WorldMap::activateSeal(
 
 bool WorldMap::resetSeals(const pixel_twins::BackgroundAssetPackView& assets) noexcept {
     bool result = true;
-    for (const auto& seal : seals) {
-        result = putObject(*this, seal.x, seal.y, BakedObjectId::SealInactivePlaza,
+    for (std::uint8_t index = 0; index < sealCount; ++index) {
+        result = putObject(*this, seals[index].x, seals[index].y, BakedObjectId::SealInactivePlaza,
                            true, assets) && result;
     }
     return result;
@@ -594,7 +594,8 @@ bool MapGenerator::generate(
     std::uint32_t seed,
     const pixel_twins::BackgroundAssetPackView& assets,
     TerrainWorkspace& workspace,
-    WorldMap& result) const noexcept {
+    WorldMap& result,
+    bool endless) const noexcept {
     if (!assets.valid() || assets.patternCount() > 128
         || assets.terrainCount() != 6 || assets.variantsPerTerrain() != 4
         || assets.boundaryCount() != 6 || assets.masksPerBoundary() != 16
@@ -603,6 +604,7 @@ bool MapGenerator::generate(
     }
     workspace.fill(TerrainId::Water);
     result.seed = seed;
+    result.sealCount = endless ? 0U : 3U;
     result.patternCollisionShapes.fill(kCollisionShapeNone);
     for (std::uint8_t variant = 0; variant < 4; ++variant) {
         std::uint8_t pattern = 0;
@@ -770,6 +772,65 @@ bool MapGenerator::generate(
     normalizeTerrain(workspace, result.tiles);
     resolveTerrainJunctions(workspace, result.tiles);
 
+    if (endless) {
+        workspace.fill(TerrainId::Water);
+        constexpr MapPoint kEndlessCenter{50.5F, 50.5F};
+        const auto islandRadius = seededRange(9101U, 17.34375F, 19.53125F, seed);
+        for (std::uint16_t y = 0; y < kMapRows; ++y) {
+            for (std::uint16_t x = 0; x < kMapColumns; ++x) {
+                const MapPoint point{static_cast<float>(x) + 0.5F,
+                                     static_cast<float>(y) + 0.5F};
+                const auto angle = std::atan2(point.y - kEndlessCenter.y,
+                                              point.x - kEndlessCenter.x);
+                const auto edge = islandRadius
+                    + std::sin(angle * 5.0F + phase) * 1.1F
+                    + edgeNoise(x / 2U, y / 2U, 9203U, seed) * 1.4F;
+                if (std::hypot(point.x - kEndlessCenter.x,
+                               point.y - kEndlessCenter.y) <= edge) {
+                    workspace.set(x, y, TerrainId::Grass);
+                }
+            }
+        }
+        for (std::uint16_t y = 0; y < kMapRows; ++y) {
+            for (std::uint16_t x = 0; x < kMapColumns; ++x) {
+                if (workspace.get(x, y) != TerrainId::Grass) continue;
+                bool coast = false;
+                for (std::int32_t oy = -2; oy <= 2 && !coast; ++oy) {
+                    for (std::int32_t ox = -2; ox <= 2; ++ox) {
+                        coast = terrainAt(workspace, static_cast<std::int32_t>(x) + ox,
+                                          static_cast<std::int32_t>(y) + oy)
+                            == TerrainId::Water;
+                        if (coast) break;
+                    }
+                }
+                if (coast) workspace.set(x, y, TerrainId::Sand);
+            }
+        }
+        std::array<MapPoint, 7> ring{};
+        const auto ringPhase = seededRange(9301U, 0.0F, 6.2831853F, seed);
+        for (std::uint8_t index = 0; index < ring.size(); ++index) {
+            const auto angle = ringPhase + static_cast<float>(index) * 6.2831853F / 7.0F;
+            const auto radius = seededRange(9401U + index * 17U, 8.75F, 14.21875F, seed);
+            ring[index] = {kEndlessCenter.x + std::cos(angle) * radius,
+                           kEndlessCenter.y + std::sin(angle) * radius};
+        }
+        const auto paintRoad = [&](MapPoint from, MapPoint to) noexcept {
+            paintSegment(workspace, from, to, 1.40625F, TerrainId::Grass, true);
+            paintSegment(workspace, from, to, 0.84375F, TerrainId::Dirt, true);
+            paintSegment(workspace, from, to, 0.375F, TerrainId::Road, true);
+        };
+        for (std::uint8_t index = 0; index < ring.size(); ++index) {
+            paintRoad(ring[index], ring[(index + 1U) % ring.size()]);
+        }
+        paintRoad(ring[0], ring[3]);
+        paintRoad(ring[1], ring[5]);
+        paintRoad(ring[2], ring[6]);
+        paintEllipse(workspace, kEndlessCenter, 2.375F, 2.375F, TerrainId::Grass, seed);
+        smoothTerrain(workspace, result.tiles);
+        resolveTerrainJunctions(workspace, result.tiles);
+        normalizeTerrain(workspace, result.tiles);
+    }
+
     for (std::uint16_t y = 0; y < kMapRows; ++y) {
         for (std::uint16_t x = 0; x < kMapColumns; ++x) {
             std::uint8_t pattern = 0;
@@ -785,9 +846,11 @@ bool MapGenerator::generate(
         }
     }
 
-    for (const auto seal : result.seals) {
-        if (!putObject(result, seal.x, seal.y, BakedObjectId::SealInactivePlaza, true, assets)) {
-            return false;
+    if (!endless) {
+        for (const auto seal : result.seals) {
+            if (!putObject(result, seal.x, seal.y, BakedObjectId::SealInactivePlaza, true, assets)) {
+                return false;
+            }
         }
     }
     std::array<bool, 128> objectPatterns{};
@@ -801,6 +864,7 @@ bool MapGenerator::generate(
         {{0, 3}}, {{-2, 2}}, {{-3, 0}}, {{-2, -2}},
     }};
     for (const auto offset : kPedestals) {
+        if (endless) break;
         const auto x = static_cast<std::uint16_t>(50 + offset[0]);
         const auto y = static_cast<std::uint16_t>(50 + offset[1]);
         if (!plainTerrain(workspace, x, y, TerrainId::Plaza)) continue;

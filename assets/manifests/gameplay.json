@@ -210,17 +210,17 @@
       "adopted_from": "assets/attack_sprites_selected/downscaled/familiar_impact_12_12x12_3f_sheet.png"
     },
     {
-      "id": "attack_sprites_selected__downscaled__familiar_pink_16_16x16_20f_sheet",
+      "id": "attack_sprites_selected__downscaled__familiar_pink_18_18x18_20f_sheet",
       "kind": "sprite",
       "pack_kind": "sprite",
       "frame": {
-        "width": 16,
-        "height": 16
+        "width": 18,
+        "height": 18
       },
-      "source": "../source/gameplay/attack_sprites_selected/downscaled/familiar_pink_16_16x16_20f_sheet.png",
+      "source": "../source/gameplay/attack_sprites_selected/downscaled/familiar_pink_18_18x18_20f_sheet.png",
       "alpha_threshold": 0,
       "palette_weight": 4,
-      "adopted_from": "assets/attack_sprites_selected/downscaled/familiar_pink_16_16x16_20f_sheet.png"
+      "adopted_from": "assets/attack_sprites_selected/downscaled/familiar_pink_18_18x18_20f_sheet.png"
     },
     {
       "id": "attack_sprites_selected__downscaled__familiar_projectile_6_6x6_1f_sheet",
@@ -431,17 +431,17 @@
       "adopted_from": "assets/enemy_projectiles_selected/downscaled/archer_arrow_12x4_16dir_12x12_16f_sheet.png"
     },
     {
-      "id": "enemy_projectiles_selected__downscaled__enemy_magic_orb_8_8x8_3f_sheet",
+      "id": "enemy_projectiles_selected__downscaled__enemy_magic_oval_projectile_16_16x16_8f_sheet",
       "kind": "sprite",
       "pack_kind": "sprite",
       "frame": {
-        "width": 8,
-        "height": 8
+        "width": 16,
+        "height": 16
       },
-      "source": "../source/gameplay/enemy_projectiles_selected/downscaled/enemy_magic_orb_8_8x8_3f_sheet.png",
+      "source": "../source/gameplay/enemy_projectiles_selected/downscaled/enemy_magic_oval_projectile_16_16x16_8f_sheet.png",
       "alpha_threshold": 0,
       "palette_weight": 4,
-      "adopted_from": "assets/enemy_projectiles_selected/downscaled/enemy_magic_orb_8_8x8_3f_sheet.png"
+      "adopted_from": "assets/enemy_projectiles_selected/downscaled/enemy_magic_oval_projectile_16_16x16_8f_sheet.png"
     },
     {
       "id": "enemy_sprites_selected__downscaled__bat_enemy_lineless_death_18x18_3f_sheet",

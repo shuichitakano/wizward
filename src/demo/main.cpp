@@ -51,6 +51,7 @@ bool applyAudioEvent(wizward::game::AudioEvent event,
     switch (event) {
     case wizward::game::AudioEvent::None: return true;
     case wizward::game::AudioEvent::PlayField: return player.playBgm(wizward::audio::kField);
+    case wizward::game::AudioEvent::PlayEndless: return player.playBgm(wizward::audio::kEndless);
     case wizward::game::AudioEvent::PlayBoss: return player.playBgm(wizward::audio::kBoss);
     case wizward::game::AudioEvent::PlayVictory: return player.playBgm(wizward::audio::kVictory);
     case wizward::game::AudioEvent::PlayNameEntry: return player.playBgm(wizward::audio::kNameEntry);
@@ -117,9 +118,13 @@ bool applyUpdate(const wizward::game::UpdateResult& result,
 
 void updateDifficultyTitle(pixel_twins::sdl::Presenter& presenter,
                            wizward::game::Difficulty difficulty) noexcept {
-    presenter.setTitle(difficulty == wizward::game::Difficulty::Hard
-        ? "Wizward  [HARD]  F1:NORMAL F2:HARD"
-        : "Wizward  [NORMAL]  F1:NORMAL F2:HARD");
+    if (difficulty == wizward::game::Difficulty::Hard) {
+        presenter.setTitle("Wizward  [HARD]  F1:NORMAL F2:HARD F3:ENDLESS");
+    } else if (difficulty == wizward::game::Difficulty::Endless) {
+        presenter.setTitle("Wizward  [ENDLESS]  F1:NORMAL F2:HARD F3:ENDLESS");
+    } else {
+        presenter.setTitle("Wizward  [NORMAL]  F1:NORMAL F2:HARD F3:ENDLESS");
+    }
 }
 
 // RP2350版と同様に、大きなゲーム状態をスタックへ置かない。
@@ -131,8 +136,10 @@ int main(int argc, char** argv) {
     const auto once = hasArgument(argc, argv, "--once");
     const auto initialScene = hasArgument(argc, argv, "--gameplay")
         ? wizward::game::Scene::Gameplay : wizward::game::Scene::Title;
-    const auto difficulty = hasArgument(argc, argv, "--hard")
-        ? wizward::game::Difficulty::Hard : wizward::game::Difficulty::Easy;
+    const auto difficulty = hasArgument(argc, argv, "--endless")
+        ? wizward::game::Difficulty::Endless
+        : hasArgument(argc, argv, "--hard")
+            ? wizward::game::Difficulty::Hard : wizward::game::Difficulty::Easy;
     if (!game.initialize(initialScene, mapSeed(argc, argv), difficulty)) {
         std::fputs("Wizwardアセットまたはマップの初期化に失敗しました\n", stderr);
         return 1;
@@ -143,7 +150,8 @@ int main(int argc, char** argv) {
     pixel_twins::AudioSystem audioSystem;
     pixel_twins::sdl::AudioPlayer audioPlayer(audioSystem);
     if (initialScene == wizward::game::Scene::Gameplay
-        && !audioPlayer.playBgm(wizward::audio::kField)) return 1;
+        && !audioPlayer.playBgm(difficulty == wizward::game::Difficulty::Endless
+            ? wizward::audio::kEndless : wizward::audio::kField)) return 1;
     pixel_twins::Controllers controllers;
     updateDifficultyTitle(presenter, game.difficulty());
     auto previousTime = std::chrono::steady_clock::now();
@@ -151,9 +159,11 @@ int main(int argc, char** argv) {
     std::uint32_t presentedFrames = 0;
     while (presenter.processEvents(&controllerInput)) {
         const auto functionKey = controllerInput.takeFunctionKeyPress();
-        if (functionKey == 1U || functionKey == 2U) {
+        if (functionKey >= 1U && functionKey <= 3U) {
             const auto selected = functionKey == 1U
-                ? wizward::game::Difficulty::Easy : wizward::game::Difficulty::Hard;
+                ? wizward::game::Difficulty::Easy
+                : functionKey == 2U ? wizward::game::Difficulty::Hard
+                                    : wizward::game::Difficulty::Endless;
             if (game.setDifficulty(selected)) updateDifficultyTitle(presenter, selected);
         }
         const auto frameStart = std::chrono::steady_clock::now();

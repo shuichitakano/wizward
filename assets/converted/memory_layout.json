@@ -4,10 +4,10 @@
   "rp2350_sram_bytes": 532480,
   "asset_sram": {
     "background_pixels": 125952,
-    "sprite_metadata": 5752,
-    "sprite_pixels": 167209,
+    "sprite_metadata": 5792,
+    "sprite_pixels": 169315,
     "font_glyphs": 1710,
-    "total": 300623
+    "total": 302769
   },
   "flash_only": {
     "background_metadata": 164,
@@ -24,9 +24,9 @@
     "tilemap": 10000,
     "active_palette": 768,
     "terrain_generation_workspace": 5000,
-    "steady_total_including_assets": 388191,
-    "generation_peak_including_assets": 393191,
-    "remaining_at_generation_peak_before_code_stack_audio_game_state": 139289
+    "steady_total_including_assets": 390337,
+    "generation_peak_including_assets": 395337,
+    "remaining_at_generation_peak_before_code_stack_audio_game_state": 137143
   },
   "note": "SRAM初期値はFlashにもロードイメージを持つ"
 }

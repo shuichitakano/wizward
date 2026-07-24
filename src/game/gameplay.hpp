@@ -13,6 +13,7 @@ namespace wizward::game {
 enum class Difficulty : std::uint8_t {
     Easy,
     Hard,
+    Endless,
 };
 
 struct BalanceProfile {
@@ -25,15 +26,19 @@ struct BalanceProfile {
 };
 
 [[nodiscard]] constexpr BalanceProfile balanceProfile(Difficulty difficulty) noexcept {
-    return difficulty == Difficulty::Hard
-        ? BalanceProfile{30, 100, 100, 100, 100, 100}
-        : BalanceProfile{40, 80, 75, 67, 130, 75};
+    if (difficulty == Difficulty::Hard) {
+        return {30, 100, 100, 100, 100, 100};
+    }
+    if (difficulty == Difficulty::Endless) {
+        return {40, 80, 80, 67, 120, 75};
+    }
+    return {40, 80, 75, 67, 130, 75};
 }
 
 inline constexpr std::int32_t kWorldTileSize = 32;
 inline constexpr float kPlayerRadius = 5.0F;
 inline constexpr float kPlayerCollisionRadius = 8.0F;
-inline constexpr std::size_t kMaximumEnemies = 90;
+inline constexpr std::size_t kMaximumEnemies = 170;
 inline constexpr std::size_t kMaximumPlayerBullets = 128;
 inline constexpr std::size_t kMaximumXpGems = 256;
 inline constexpr std::size_t kMaximumWindSlashes = 8;
@@ -201,6 +206,7 @@ struct PlayerState {
     float bombEffectY = 0.0F;
     std::uint32_t bombEffectSeed = 0;
     std::uint8_t xpRecallEffectTicks = 0;
+    std::uint16_t xpRecallAiCooldownTicks = 0;
     bool xpRecallInside = false;
     bool sharePending = false;
     Perk sharePerk = Perk::Light;
@@ -210,6 +216,7 @@ struct PlayerState {
     float aiDesiredDirectionY = 1.0F;
     std::uint8_t aiDecisionTicks = 0;
     std::uint8_t aiStuckTicks = 0;
+    std::uint8_t aiBlockedTicks = 0;
     std::int8_t aiTurnSign = 1;
     bool aiHoldingFormation = false;
 };
@@ -247,6 +254,7 @@ struct EnemyState {
     Facing facing = Facing::South;
     bool moving = false;
     bool active = false;
+    bool endlessScaled = false;
 };
 
 struct EnemyBulletState {
@@ -398,6 +406,7 @@ public:
     [[nodiscard]] bool bossSpawned() const noexcept { return bossSpawned_; }
     [[nodiscard]] std::uint16_t bossIntroTicks() const noexcept { return bossIntroTicks_; }
     [[nodiscard]] const EnemyState* boss() const noexcept;
+    [[nodiscard]] std::size_t bossCount() const noexcept;
     [[nodiscard]] bool clearSequenceActive() const noexcept { return clearSequenceTicks_ > 0; }
     [[nodiscard]] std::uint16_t clearSequenceTicks() const noexcept { return clearSequenceTicks_; }
     [[nodiscard]] float clearX() const noexcept { return clearX_; }
@@ -425,6 +434,9 @@ private:
     std::uint32_t randomState_ = 1;
     std::uint16_t spawnCooldownTicks_ = 0;
     std::uint16_t swarmCooldownTicks_ = 0;
+    std::uint32_t nextEndlessBossTicks_ = 5U * 60U * 60U;
+    std::uint32_t endlessSpawnPauseTicks_ = 0;
+    std::uint8_t endlessBossWave_ = 0;
     std::uint32_t elapsedTicks_ = 0;
     std::array<std::uint32_t, pixel_twins::kControllerCount> scores_{};
     std::array<std::uint32_t, pixel_twins::kControllerCount> killCounts_{};

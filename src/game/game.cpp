@@ -170,9 +170,19 @@ PIXEL_TWINS_SRAM void drawCenteredText(pixel_twins::RenderTarget target,
 }
 
 PIXEL_TWINS_SRAM void drawTimer(pixel_twins::RenderTarget target,
-               std::uint32_t elapsedTicks) noexcept {
+               std::uint32_t elapsedTicks, bool endless) noexcept {
     constexpr std::uint32_t kGameSeconds = 300;
     const auto elapsedSeconds = elapsedTicks / 60U;
+    if (endless) {
+        char text[] = "00:00";
+        const auto minutes = std::min<std::uint32_t>(99U, elapsedSeconds / 60U);
+        text[0] = static_cast<char>('0' + minutes / 10U);
+        text[1] = static_cast<char>('0' + minutes % 10U);
+        text[3] = static_cast<char>('0' + (elapsedSeconds / 10U) % 6U);
+        text[4] = static_cast<char>('0' + elapsedSeconds % 10U);
+        drawCenteredText(target, text, 80, 24);
+        return;
+    }
     const auto remain = elapsedSeconds < kGameSeconds ? kGameSeconds - elapsedSeconds : 0U;
     const auto elapsedMinute = elapsedSeconds / 60U;
     const auto sinceMinute = elapsedSeconds - elapsedMinute * 60U;
@@ -214,11 +224,13 @@ PIXEL_TWINS_SRAM void drawMiniMap(pixel_twins::RenderTarget target,
     }
     pixel_twins::drawRectangle(target, kX, kY, kSize, kSize,
                                assets::palette::kMinimapBorder);
-    pixel_twins::fillRectangle(target,
-        static_cast<std::int16_t>(kX + 50U * kSize / world::kMapColumns),
-        static_cast<std::int16_t>(kY + 50U * kSize / world::kMapRows), 2, 2,
-        assets::palette::kMinimapLandmark);
-    for (std::size_t index = 0; index < map.seals.size(); ++index) {
+    if (gameplay.difficulty() != Difficulty::Endless) {
+        pixel_twins::fillRectangle(target,
+            static_cast<std::int16_t>(kX + 50U * kSize / world::kMapColumns),
+            static_cast<std::int16_t>(kY + 50U * kSize / world::kMapRows), 2, 2,
+            assets::palette::kMinimapLandmark);
+    }
+    for (std::size_t index = 0; index < map.sealCount; ++index) {
         const auto& seal = map.seals[index];
         const auto x = static_cast<std::int16_t>(kX + seal.x * kSize / world::kMapColumns);
         const auto y = static_cast<std::int16_t>(kY + seal.y * kSize / world::kMapRows);
@@ -298,7 +310,7 @@ PIXEL_TWINS_SRAM void drawActiveSeals(pixel_twins::RenderTarget target,
         assets::palette::kSealPaleCyan, assets::palette::kSealCyan,
         assets::palette::kEffectWarm, 255}};
     const auto elapsed = static_cast<float>(gameplay.elapsedTicks()) / 60.0F;
-    for (std::size_t sealIndex = 0; sealIndex < map.seals.size(); ++sealIndex) {
+    for (std::size_t sealIndex = 0; sealIndex < map.sealCount; ++sealIndex) {
         const auto& state = gameplay.seal(sealIndex);
         if (!state.active) continue;
         const auto x = static_cast<std::int16_t>(std::round(
@@ -866,6 +878,11 @@ PIXEL_TWINS_SRAM void drawTitle(pixel_twins::Framebuffer& framebuffer,
                               assets::palette::kFontBody, 6);
         pixel_twins::drawText(right, assets::kWizwardFont, 132, 5, "HARD",
                               assets::palette::kFontBody, 6);
+    } else if (difficulty == Difficulty::Endless) {
+        pixel_twins::drawText(left, assets::kWizwardFont, 108, 5, "ENDLESS",
+                              assets::palette::kFontBody, 6);
+        pixel_twins::drawText(right, assets::kWizwardFont, 108, 5, "ENDLESS",
+                              assets::palette::kFontBody, 6);
     }
     if ((frame / 30U) % 2U == 0U) {
         drawCenteredText(left, "PUSH ANY BUTTON", 80, 98);
@@ -877,17 +894,19 @@ PIXEL_TWINS_SRAM void drawAttractRanking(
     pixel_twins::Framebuffer& framebuffer,
     const assets::TitleAssets& title,
     const std::array<RankingRecord, kRankingLimit>& rankings,
-    std::size_t rankingCount) noexcept {
+    std::size_t rankingCount,
+    bool endless) noexcept {
     for (std::size_t viewer = 0; viewer < pixel_twins::kControllerCount; ++viewer) {
         const auto screen = viewer == 0 ? pixel_twins::Screen::Left : pixel_twins::Screen::Right;
         auto target = pixel_twins::makeRenderTarget(framebuffer.drawBuffer(), screen);
         title.drawAttractScreen(target, viewer);
-        pixel_twins::drawText(target, assets::kWizwardFont, 46, 3, "TOP PLAYERS",
+        pixel_twins::drawText(target, assets::kWizwardFont, endless ? 48 : 46, 3,
+                              endless ? "ENDLESS TOP" : "TOP PLAYERS",
                               assets::palette::kRankingTitle, 6);
-        const auto firstRank = viewer * 10U;
+        const auto firstRank = viewer * (endless ? 3U : 10U);
         const auto nameX = static_cast<std::int16_t>(viewer == 0 ? 74 : 16);
         const auto scoreX = static_cast<std::int16_t>(nameX + 70);
-        for (std::size_t index = 0; index < 10U; ++index) {
+        for (std::size_t index = 0; index < (endless ? 3U : 10U); ++index) {
             const auto rank = firstRank + index;
             const auto hasEntry = rank < rankingCount;
             char name[7]{};
@@ -902,7 +921,8 @@ PIXEL_TWINS_SRAM void drawAttractRanking(
             const auto color = static_cast<std::uint8_t>(hard
                 ? (focused ? 15U : 14U)
                 : (focused ? assets::palette::kHighlight : assets::palette::kFontBody));
-            const auto y = static_cast<std::int16_t>(17 + index * 9U);
+            const auto y = static_cast<std::int16_t>(
+                17 + index * (endless ? 18U : 9U));
             pixel_twins::drawText(target, assets::kWizwardFont, nameX, y,
                                   std::string_view(name, 6), color, 6);
             char scoreBuffer[12]{};
@@ -910,6 +930,17 @@ PIXEL_TWINS_SRAM void drawAttractRanking(
                 ? formatShortScore(rankings[rank].score, scoreBuffer)
                 : std::string_view("-----");
             drawRightAlignedText(target, score, scoreX, y, 6, color);
+            if (endless && hasEntry) {
+                const auto seconds = rankings[rank].survivalTicks / 60U;
+                char timeText[] = "TIME 00:00";
+                const auto minutes = std::min<std::uint32_t>(99U, seconds / 60U);
+                timeText[5] = static_cast<char>('0' + minutes / 10U);
+                timeText[6] = static_cast<char>('0' + minutes % 10U);
+                timeText[8] = static_cast<char>('0' + (seconds / 10U) % 6U);
+                timeText[9] = static_cast<char>('0' + seconds % 10U);
+                pixel_twins::drawText(target, assets::kWizwardFont, nameX, y + 9,
+                                      timeText, color, 6);
+            }
         }
     }
 }
@@ -1141,10 +1172,11 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        static_cast<std::int16_t>(bullet.x - camera.x - 8.0F),
                        static_cast<std::int16_t>(bullet.y - camera.y - 8.0F), bullet.y - camera.y);
         } else {
-            queueAsset(spriteBuckets, assets, assets::SpriteAssetId::EnemyMagicOrb88x83fSheet,
-                       frame / 7U,
-                       static_cast<std::int16_t>(bullet.x - camera.x - 4.0F),
-                       static_cast<std::int16_t>(bullet.y - camera.y - 4.0F), bullet.y - camera.y);
+            queueAsset(spriteBuckets, assets,
+                       assets::SpriteAssetId::EnemyMagicOvalProjectile1616x168fSheet,
+                       frame / 2U,
+                       static_cast<std::int16_t>(bullet.x - camera.x - 8.0F),
+                       static_cast<std::int16_t>(bullet.y - camera.y - 8.0F), bullet.y - camera.y);
         }
     }
     for (const auto& slash : gameplay.windSlashes()) {
@@ -1197,10 +1229,10 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
         if (player.hp <= 0) continue;
         for (const auto& familiar : player.familiars) {
             if (!familiar.active) continue;
-            queueAsset(spriteBuckets, assets, assets::SpriteAssetId::FamiliarPink1616x1620fSheet,
+            queueAsset(spriteBuckets, assets, assets::SpriteAssetId::FamiliarPink1818x1820fSheet,
                        frame / 7U,
-                       static_cast<std::int16_t>(familiar.x - camera.x - 8.0F),
-                       static_cast<std::int16_t>(familiar.y - camera.y - 11.0F),
+                       static_cast<std::int16_t>(familiar.x - camera.x - 9.0F),
+                       static_cast<std::int16_t>(familiar.y - camera.y - 12.0F),
                        familiar.y - camera.y, fourDirectionRow(familiar.facing));
         }
     }
@@ -1317,8 +1349,8 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     }
     char scoreBuffer[12]{};
     drawRightAlignedText(target, formatUnsigned(gameplay.score(viewer), scoreBuffer), 155, 5);
-    drawTimer(target, gameplay.elapsedTicks());
-    if (const auto* boss = gameplay.boss()) {
+    drawTimer(target, gameplay.elapsedTicks(), gameplay.difficulty() == Difficulty::Endless);
+    if (gameplay.bossCount() > 0) {
         constexpr std::int16_t kBossBarX = 42;
         constexpr std::int16_t kBossBarY = 14;
         constexpr std::uint16_t kBossBarWidth = 78;
@@ -1326,8 +1358,16 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                                    assets::palette::kGaugeDark);
         pixel_twins::fillRectangle(target, kBossBarX + 1, kBossBarY + 1,
                                    kBossBarWidth - 2U, 4, assets::palette::kBossGaugeEmpty);
+        auto totalHp = std::int32_t{0};
+        auto totalMaxHp = std::int32_t{0};
+        for (const auto& enemy : gameplay.enemies()) {
+            if (!enemy.active || enemy.kind != EnemyKind::Boss) continue;
+            totalHp += std::max<std::int16_t>(0, enemy.hp);
+            totalMaxHp += enemy.maxHp;
+        }
         const auto fill = static_cast<std::uint16_t>(std::clamp<std::int32_t>(
-            static_cast<std::int32_t>(kBossBarWidth - 2U) * boss->hp / std::max<std::int16_t>(1, boss->maxHp),
+            static_cast<std::int32_t>(kBossBarWidth - 2U) * totalHp
+                / std::max<std::int32_t>(1, totalMaxHp),
             0, kBossBarWidth - 2U));
         if (fill > 0) {
             pixel_twins::fillRectangle(target, kBossBarX + 1, kBossBarY + 1, fill, 4,
@@ -1407,9 +1447,20 @@ PIXEL_TWINS_SRAM void drawResultPanel(
     char killsText[12]{};
     char xpText[12]{};
     drawRightAlignedText(target, formatUnsigned(gameplay.score(viewer), scoreText), 78, 29);
-    drawRightAlignedText(target, formatUnsigned(timeBonuses[viewer], bonusText), 78, 38);
-    pixel_twins::drawText(target, assets::kWizwardFont, 42, 38, "+",
-                          assets::palette::kFontBody, 6);
+    if (gameplay.difficulty() == Difficulty::Endless) {
+        const auto seconds = gameplay.elapsedTicks() / 60U;
+        char elapsedText[] = "00:00";
+        const auto minutes = std::min<std::uint32_t>(99U, seconds / 60U);
+        elapsedText[0] = static_cast<char>('0' + minutes / 10U);
+        elapsedText[1] = static_cast<char>('0' + minutes % 10U);
+        elapsedText[3] = static_cast<char>('0' + (seconds / 10U) % 6U);
+        elapsedText[4] = static_cast<char>('0' + seconds % 10U);
+        drawRightAlignedText(target, elapsedText, 78, 38);
+    } else {
+        drawRightAlignedText(target, formatUnsigned(timeBonuses[viewer], bonusText), 78, 38);
+        pixel_twins::drawText(target, assets::kWizwardFont, 42, 38, "+",
+                              assets::palette::kFontBody, 6);
+    }
     drawRightAlignedText(target, formatUnsigned(finalScores[viewer], totalText), 78, 47);
     drawRightAlignedText(target, formatUnsigned(gameplay.killCount(viewer), killsText), 78, 70);
     drawRightAlignedText(target, formatUnsigned(gameplay.xpEarned(viewer), xpText), 78, 79);
@@ -1492,7 +1543,8 @@ bool Game::initialize(Scene initialScene, std::uint32_t mapSeed,
     mapSeedState_ = mapSeed != 0U ? mapSeed : 1U;
     difficulty_ = difficulty;
     if (!gameAssets_.initialize() || !titleAssets_.initialize()
-        || !mapGenerator.generate(mapSeedState_, gameAssets_.background(), terrainWorkspace_, worldMap_)) {
+        || !mapGenerator.generate(mapSeedState_, gameAssets_.background(), terrainWorkspace_, worldMap_,
+                                  difficulty_ == Difficulty::Endless)) {
         return false;
     }
     if (initialScene == Scene::AttractDemo) gameplay_.resetAttract(worldMap_, difficulty_);
@@ -1516,7 +1568,8 @@ UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
         mapSeedState_ = mapSeedState_ * 1664525U + 1013904223U;
         world::MapGenerator mapGenerator;
         if (!mapGenerator.generate(mapSeedState_, gameAssets_.background(),
-                                   terrainWorkspace_, worldMap_)) {
+                                   terrainWorkspace_, worldMap_,
+                                   difficulty_ == Difficulty::Endless)) {
             return {AudioEvent::StopBgm, playStartSfx, false};
         }
         if (scene_ == Scene::AttractDemo) gameplay_.resetAttract(worldMap_, difficulty_);
@@ -1529,7 +1582,10 @@ UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
             ? titleAssets_.applyAttractPalette(framebuffer_)
             : gameAssets_.applyPalette(framebuffer_);
     AudioEvent audio = AudioEvent::StopBgm;
-    if (scene_ == Scene::Gameplay) audio = AudioEvent::PlayField;
+    if (scene_ == Scene::Gameplay) {
+        audio = difficulty_ == Difficulty::Endless
+            ? AudioEvent::PlayEndless : AudioEvent::PlayField;
+    }
     if (scene_ == Scene::Result && resultOutcome_ == GameplayOutcome::Clear) {
         audio = AudioEvent::PlayVictory;
     }
@@ -1537,8 +1593,13 @@ UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
 }
 
 UpdateResult Game::processInput(const pixel_twins::Controllers& controllers) noexcept {
-    if (scene_ == Scene::Title || scene_ == Scene::AttractRanking
-        || scene_ == Scene::AttractDemo) {
+    if (scene_ == Scene::AttractRanking || scene_ == Scene::AttractDemo) {
+        for (std::size_t index = 0; index < pixel_twins::kControllerCount; ++index) {
+            if (controllers[index].pressed != 0) return changeScene(Scene::Title, false);
+        }
+        return {};
+    }
+    if (scene_ == Scene::Title) {
         for (std::uint8_t index = 0; index < pixel_twins::kControllerCount; ++index) {
             if (controllers[index].pressed == 0) continue;
             startingPlayer_ = index;
@@ -1549,6 +1610,11 @@ UpdateResult Game::processInput(const pixel_twins::Controllers& controllers) noe
     if (scene_ == Scene::Result) {
         if (sceneFrame_ < kRankingResultDelayTicks) return {};
         const auto hadPendingRanking = hasPendingRanking();
+        if (hadPendingRanking) {
+            for (std::size_t index = 0; index < pixel_twins::kControllerCount; ++index) {
+                if (controllers[index].pressed != 0) rankingIdleTicks_ = 0;
+            }
+        }
         updateRankingInput(controllers);
         if (hadPendingRanking) {
             for (std::size_t index = 0; index < pixel_twins::kControllerCount; ++index) {
@@ -1592,7 +1658,7 @@ UpdateResult Game::tick(const pixel_twins::Controllers& controllers) noexcept {
             tickResult.audio = AudioEvent::PlayBoss;
         }
         if (!clearBefore && gameplay_.clearSequenceActive()) tickResult.audio = AudioEvent::StopBgm;
-        for (std::uint8_t index = 0; index < worldMap_.seals.size(); ++index) {
+        for (std::uint8_t index = 0; index < worldMap_.sealCount; ++index) {
             if (gameplay_.seal(index).active) {
                 (void)worldMap_.activateSeal(index, gameAssets_.background());
             }
@@ -1613,7 +1679,7 @@ UpdateResult Game::tick(const pixel_twins::Controllers& controllers) noexcept {
         gameplay_.tick(controllers, worldMap_);
         UpdateResult result{};
         copySfxCues(gameplay_, result);
-        for (std::uint8_t index = 0; index < worldMap_.seals.size(); ++index) {
+        for (std::uint8_t index = 0; index < worldMap_.sealCount; ++index) {
             if (gameplay_.seal(index).active) {
                 (void)worldMap_.activateSeal(index, gameAssets_.background());
             }
@@ -1644,13 +1710,16 @@ UpdateResult Game::tick(const pixel_twins::Controllers& controllers) noexcept {
             ++sceneFrame_;
             return {AudioEvent::PlayNameEntry};
         }
-        if (hasPendingRanking()
-            && sceneFrame_ >= kRankingResultDelayTicks + kRankingInputTimeoutTicks) {
+        if (hasPendingRanking() && ++rankingIdleTicks_ >= kRankingInputTimeoutTicks) {
             for (std::size_t player = 0; player < rankingEntries_.size(); ++player) {
                 if (rankingEntries_[player].active && !rankingEntries_[player].submitted) {
                     submitRanking(player);
                 }
             }
+            auto result = changeScene(Scene::Title, false);
+            ++frame_;
+            ++sceneFrame_;
+            return result;
         }
         if (hasPendingRanking()) {
             resultContinueTicks_ = 0;
@@ -1675,8 +1744,10 @@ void Game::finalizeResult() noexcept {
         ? 300U * 60U - gameplay_.elapsedTicks() : 0U;
     const auto remainingSeconds = (remainingTicks + 59U) / 60U;
     const auto bonus = resultOutcome_ == GameplayOutcome::Clear
+        && difficulty_ != Difficulty::Endless
         ? remainingSeconds * kTimeBonusPerSecond : 0U;
     rankingEntries_.fill({});
+    rankingIdleTicks_ = 0;
     for (std::size_t player = 0; player < finalScores_.size(); ++player) {
         const auto eligible = gameplay_.playerIsManual(player);
         timeBonuses_[player] = eligible ? bonus : 0U;
@@ -1685,8 +1756,15 @@ void Game::finalizeResult() noexcept {
     for (std::size_t player = 0; player < finalScores_.size(); ++player) {
         if (!gameplay_.playerIsManual(player) || finalScores_[player] == 0) continue;
         std::size_t rank = 0;
-        for (std::size_t index = 0; index < rankingCount_; ++index) {
-            if (rankings_[index].score >= finalScores_[player]) ++rank;
+        const auto& records = difficulty_ == Difficulty::Endless
+            ? endlessRankings_ : rankings_;
+        const auto recordCount = difficulty_ == Difficulty::Endless
+            ? endlessRankingCount_ : rankingCount_;
+        for (std::size_t index = 0; index < recordCount; ++index) {
+            if (records[index].score > finalScores_[player]
+                || (difficulty_ == Difficulty::Endless
+                    && records[index].score == finalScores_[player]
+                    && records[index].survivalTicks >= gameplay_.elapsedTicks())) ++rank;
         }
         for (std::size_t other = 0; other < player; ++other) {
             if (finalScores_[other] >= finalScores_[player]) ++rank;
@@ -1697,6 +1775,7 @@ void Game::finalizeResult() noexcept {
         if (rank >= kRankingLimit) continue;
         rankingEntries_[player].active = true;
         rankingEntries_[player].rank = static_cast<std::uint8_t>(rank);
+        rankingEntries_[player].name = lastNames_[player];
     }
 }
 
@@ -1715,14 +1794,23 @@ void Game::submitRanking(std::size_t player) noexcept {
     record.player = static_cast<std::uint8_t>(player);
     record.cleared = resultOutcome_ == GameplayOutcome::Clear;
     record.hard = difficulty_ == Difficulty::Hard;
+    record.endless = difficulty_ == Difficulty::Endless;
+    record.survivalTicks = gameplay_.elapsedTicks();
+    lastNames_[player] = record.name;
+    auto& records = record.endless ? endlessRankings_ : rankings_;
+    auto& recordCount = record.endless ? endlessRankingCount_ : rankingCount_;
     auto insertAt = std::size_t{0};
-    while (insertAt < rankingCount_ && rankings_[insertAt].score >= record.score) ++insertAt;
-    const auto newCount = std::min(kRankingLimit, rankingCount_ + 1U);
+    while (insertAt < recordCount
+        && (records[insertAt].score > record.score
+            || (records[insertAt].score == record.score
+                && (!record.endless
+                    || records[insertAt].survivalTicks >= record.survivalTicks)))) ++insertAt;
+    const auto newCount = std::min(kRankingLimit, recordCount + 1U);
     for (auto index = newCount; index > insertAt + 1U; --index) {
-        rankings_[index - 1U] = rankings_[index - 2U];
+        records[index - 1U] = records[index - 2U];
     }
-    if (insertAt < kRankingLimit) rankings_[insertAt] = record;
-    rankingCount_ = newCount;
+    if (insertAt < kRankingLimit) records[insertAt] = record;
+    recordCount = newCount;
     entry.submitted = true;
 }
 
@@ -1757,7 +1845,10 @@ void Game::render() noexcept {
     if (scene_ == Scene::Title) {
         drawTitle(framebuffer_, titleAssets_, frame_, difficulty_);
     } else if (scene_ == Scene::AttractRanking) {
-        drawAttractRanking(framebuffer_, titleAssets_, rankings_, rankingCount_);
+        const auto endless = difficulty_ == Difficulty::Endless;
+        drawAttractRanking(framebuffer_, titleAssets_,
+                           endless ? endlessRankings_ : rankings_,
+                           endless ? endlessRankingCount_ : rankingCount_, endless);
     } else if (scene_ == Scene::AttractDemo) {
         const auto left = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Left);
         const auto right = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Right);
@@ -1783,10 +1874,13 @@ void Game::render() noexcept {
                           spriteBuckets_, frame_, 0, false);
         drawGameplayPanel(right, worldMap_, gameAssets_, gameplay_.camera(1), gameplay_,
                           spriteBuckets_, frame_, 1, false);
+        const auto endless = difficulty_ == Difficulty::Endless;
+        const auto& records = endless ? endlessRankings_ : rankings_;
+        const auto recordCount = endless ? endlessRankingCount_ : rankingCount_;
         drawResultPanel(left, gameAssets_, gameplay_, resultOutcome_, sceneFrame_, resultContinueTicks_, 0,
-                        timeBonuses_, finalScores_, rankings_, rankingCount_, rankingEntries_);
+                        timeBonuses_, finalScores_, records, recordCount, rankingEntries_);
         drawResultPanel(right, gameAssets_, gameplay_, resultOutcome_, sceneFrame_, resultContinueTicks_, 1,
-                        timeBonuses_, finalScores_, rankings_, rankingCount_, rankingEntries_);
+                        timeBonuses_, finalScores_, records, recordCount, rankingEntries_);
     }
     framebuffer_.flip();
 }

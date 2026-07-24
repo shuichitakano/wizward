@@ -56,6 +56,7 @@ add_custom_command(
 add_library(wizward_core
     src/audio/audio_assets.cpp
     src/audio/bgm_data.cpp
+    src/audio/endless_bgm_data.cpp
     src/audio/sfx_data.cpp
     src/assets/game_assets.cpp
     src/assets/title_assets.cpp
