@@ -52,22 +52,25 @@ constexpr float kEnemySwarmMinimumRange = 120.0F;
 constexpr float kEnemySwarmMaximumRange = 200.0F;
 // Broad-phase queries pad by the largest radius assigned in makeEnemyState().
 constexpr float kMaximumEnemyRadius = 20.0F;
-constexpr std::int32_t kEnemyGridCellSize = 128;
-constexpr std::size_t kEnemyGridColumns =
-    (world::kMapColumns * kWorldTileSize + kEnemyGridCellSize - 1) / kEnemyGridCellSize;
-constexpr std::size_t kEnemyGridRows =
-    (world::kMapRows * kWorldTileSize + kEnemyGridCellSize - 1) / kEnemyGridCellSize;
-constexpr std::size_t kEnemyGridCellCount = kEnemyGridColumns * kEnemyGridRows;
-constexpr std::int16_t kInvalidEnemyIndex = -1;
+// Broad-phase queries pad by the largest radius assigned in spawnEnemyBullet().
+constexpr float kMaximumEnemyBulletRadius = 6.0F;
+constexpr std::int32_t kSpatialGridCellSize = 128;
+constexpr std::size_t kSpatialGridColumns =
+    (world::kMapColumns * kWorldTileSize + kSpatialGridCellSize - 1) / kSpatialGridCellSize;
+constexpr std::size_t kSpatialGridRows =
+    (world::kMapRows * kWorldTileSize + kSpatialGridCellSize - 1) / kSpatialGridCellSize;
+constexpr std::size_t kSpatialGridCellCount = kSpatialGridColumns * kSpatialGridRows;
+constexpr std::int16_t kInvalidSpatialIndex = -1;
 
-class EnemySpatialGrid {
+template <std::size_t MaximumItems>
+class SpatialGrid {
 public:
-    void rebuild(const std::array<EnemyState, kMaximumEnemies>& enemies) noexcept {
-        heads_.fill(kInvalidEnemyIndex);
-        next_.fill(kInvalidEnemyIndex);
-        for (std::size_t reverse = enemies.size(); reverse-- > 0;) {
-            if (!enemies[reverse].active) continue;
-            const auto cell = cellIndex(enemies[reverse].x, enemies[reverse].y);
+    template <typename Item>
+    void rebuild(const std::array<Item, MaximumItems>& items) noexcept {
+        heads_.fill(kInvalidSpatialIndex);
+        for (std::size_t reverse = items.size(); reverse-- > 0;) {
+            if (!items[reverse].active) continue;
+            const auto cell = cellIndex(items[reverse].x, items[reverse].y);
             next_[reverse] = heads_[cell];
             heads_[cell] = static_cast<std::int16_t>(reverse);
         }
@@ -75,16 +78,16 @@ public:
 
     template <typename Visitor>
     void forEachCandidate(float x, float y, float radius, Visitor&& visitor) const noexcept {
-        const auto minColumn = gridCoordinate(x - radius, kEnemyGridColumns);
-        const auto maxColumn = gridCoordinate(x + radius, kEnemyGridColumns);
-        const auto minRow = gridCoordinate(y - radius, kEnemyGridRows);
-        const auto maxRow = gridCoordinate(y + radius, kEnemyGridRows);
+        const auto minColumn = gridCoordinate(x - radius, kSpatialGridColumns);
+        const auto maxColumn = gridCoordinate(x + radius, kSpatialGridColumns);
+        const auto minRow = gridCoordinate(y - radius, kSpatialGridRows);
+        const auto maxRow = gridCoordinate(y + radius, kSpatialGridRows);
         for (auto row = minRow; row <= maxRow; ++row) {
             for (auto column = minColumn; column <= maxColumn; ++column) {
-                auto enemyIndex = heads_[row * kEnemyGridColumns + column];
-                while (enemyIndex != kInvalidEnemyIndex) {
-                    visitor(static_cast<std::size_t>(enemyIndex));
-                    enemyIndex = next_[static_cast<std::size_t>(enemyIndex)];
+                auto itemIndex = heads_[row * kSpatialGridColumns + column];
+                while (itemIndex != kInvalidSpatialIndex) {
+                    visitor(static_cast<std::size_t>(itemIndex));
+                    itemIndex = next_[static_cast<std::size_t>(itemIndex)];
                 }
             }
         }
@@ -93,18 +96,21 @@ public:
 private:
     static std::size_t gridCoordinate(float position, std::size_t limit) noexcept {
         const auto coordinate =
-            static_cast<std::int32_t>(std::max(0.0F, position)) / kEnemyGridCellSize;
+            static_cast<std::int32_t>(std::max(0.0F, position)) / kSpatialGridCellSize;
         return std::min(static_cast<std::size_t>(coordinate), limit - 1U);
     }
 
     static std::size_t cellIndex(float x, float y) noexcept {
-        return gridCoordinate(y, kEnemyGridRows) * kEnemyGridColumns
-            + gridCoordinate(x, kEnemyGridColumns);
+        return gridCoordinate(y, kSpatialGridRows) * kSpatialGridColumns
+            + gridCoordinate(x, kSpatialGridColumns);
     }
 
-    std::array<std::int16_t, kEnemyGridCellCount> heads_;
-    std::array<std::int16_t, kMaximumEnemies> next_;
+    std::array<std::int16_t, kSpatialGridCellCount> heads_;
+    std::array<std::int16_t, MaximumItems> next_;
 };
+
+using EnemySpatialGrid = SpatialGrid<kMaximumEnemies>;
+using EnemyBulletSpatialGrid = SpatialGrid<kMaximumEnemyBullets>;
 
 struct AttackStats {
     std::uint8_t count;
@@ -787,7 +793,7 @@ bool spawnEnemyBullet(std::array<EnemyBulletState, kMaximumEnemyBullets>& bullet
     slot->velocityX = directionX * speed;
     slot->velocityY = directionY * speed;
     slot->radius = type == EnemyBulletType::Arrow ? 2.0F
-        : type == EnemyBulletType::BossFire ? 6.0F : 4.0F;
+        : type == EnemyBulletType::BossFire ? kMaximumEnemyBulletRadius : 4.0F;
     slot->remainingTicks = type == EnemyBulletType::Arrow ? 132
         : type == EnemyBulletType::BossFire ? 210 : 192;
     slot->ageTicks = 0;
@@ -975,7 +981,7 @@ void fireBossRadial(EnemyState& enemy,
             slot->y = enemy.y - 12.0F;
             slot->velocityX = std::cos(angle) * (124.0F / 60.0F);
             slot->velocityY = std::sin(angle) * (124.0F / 60.0F);
-            slot->radius = 6.0F;
+            slot->radius = kMaximumEnemyBulletRadius;
             slot->remainingTicks = 210;
             slot->launchDelayTicks = static_cast<std::uint16_t>(chain * 5U);
             slot->damage = 8;
@@ -1267,6 +1273,7 @@ void damageOrbs(PlayerState& player, std::uint8_t owner,
                 std::array<EnemyState, kMaximumEnemies>& enemies,
                 const EnemySpatialGrid& enemyGrid,
                 std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
+                const EnemyBulletSpatialGrid& enemyBulletGrid,
                 std::array<XpGemState, kMaximumXpGems>& xpGems,
                 std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
                 std::array<std::uint32_t, pixel_twins::kControllerCount>& killCounts,
@@ -1276,11 +1283,16 @@ void damageOrbs(PlayerState& player, std::uint8_t owner,
         const auto angle = player.orbAngle + static_cast<float>(orbIndex) * kTau / stats.count;
         const auto x = player.x + std::cos(angle) * stats.speed;
         const auto y = player.y + std::sin(angle) * stats.speed;
-        for (auto& bullet : enemyBullets) {
-            if (!bullet.active || bullet.type != EnemyBulletType::Arrow) continue;
-            const auto range = 6.0F + bullet.radius;
-            if (squaredDistance(x, y, bullet.x, bullet.y) <= range * range) bullet.active = false;
-        }
+        enemyBulletGrid.forEachCandidate(
+            x, y, 6.0F + kMaximumEnemyBulletRadius,
+            [&](std::size_t bulletIndex) {
+                auto& bullet = enemyBullets[bulletIndex];
+                if (!bullet.active || bullet.type != EnemyBulletType::Arrow) return;
+                const auto range = 6.0F + bullet.radius;
+                if (squaredDistance(x, y, bullet.x, bullet.y) <= range * range) {
+                    bullet.active = false;
+                }
+            });
         enemyGrid.forEachCandidate(x, y, 4.0F + kMaximumEnemyRadius,
                                   [&](std::size_t enemyIndex) {
             auto& enemy = enemies[enemyIndex];
@@ -1298,7 +1310,8 @@ void updateFamiliars(PlayerState& player, std::uint8_t owner,
                      std::array<EnemyState, kMaximumEnemies>& enemies,
                      const EnemySpatialGrid& enemyGrid,
                      std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
-                     std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets) noexcept {
+                     std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
+                     const EnemyBulletSpatialGrid& enemyBulletGrid) noexcept {
     if (player.familiarLevel == 0) {
         for (auto& familiar : player.familiars) familiar.active = false;
         return;
@@ -1352,14 +1365,18 @@ void updateFamiliars(PlayerState& player, std::uint8_t owner,
             familiar.y += dy * step;
             familiar.facing = facingFor(dx, dy);
         }
-        for (auto& bullet : enemyBullets) {
-            if (!bullet.active || (bullet.type != EnemyBulletType::Arrow
-                && bullet.type != EnemyBulletType::Magic)) continue;
-            const auto range = 8.0F + bullet.radius;
-            if (squaredDistance(familiar.x, familiar.y, bullet.x, bullet.y) <= range * range) {
-                bullet.active = false;
-            }
-        }
+        enemyBulletGrid.forEachCandidate(
+            familiar.x, familiar.y, 8.0F + kMaximumEnemyBulletRadius,
+            [&](std::size_t bulletIndex) {
+                auto& bullet = enemyBullets[bulletIndex];
+                if (!bullet.active || (bullet.type != EnemyBulletType::Arrow
+                    && bullet.type != EnemyBulletType::Magic)) return;
+                const auto range = 8.0F + bullet.radius;
+                if (squaredDistance(familiar.x, familiar.y, bullet.x, bullet.y)
+                    <= range * range) {
+                    bullet.active = false;
+                }
+            });
     }
     if (player.familiarCooldownTicks > 0) return;
     bool fired = false;
@@ -1385,6 +1402,7 @@ void processBombs(std::array<PlayerState, pixel_twins::kControllerCount>& player
                   std::array<EnemyState, kMaximumEnemies>& enemies,
                   const EnemySpatialGrid& enemyGrid,
                   std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
+                  const EnemyBulletSpatialGrid& enemyBulletGrid,
                   std::array<XpGemState, kMaximumXpGems>& xpGems,
                   std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
                   std::array<std::uint32_t, pixel_twins::kControllerCount>& killCounts,
@@ -1413,14 +1431,18 @@ void processBombs(std::array<PlayerState, pixel_twins::kControllerCount>& player
                           killCounts);
             }
         });
-        for (auto& bullet : enemyBullets) {
-            if (!bullet.active || (bullet.type != EnemyBulletType::Arrow
-                && bullet.type != EnemyBulletType::Magic)) continue;
-            const auto range = kRadius + bullet.radius;
-            if (squaredDistance(player.x, player.y, bullet.x, bullet.y) <= range * range) {
-                bullet.active = false;
-            }
-        }
+        enemyBulletGrid.forEachCandidate(
+            player.x, player.y, kRadius + kMaximumEnemyBulletRadius,
+            [&](std::size_t bulletIndex) {
+                auto& bullet = enemyBullets[bulletIndex];
+                if (!bullet.active || (bullet.type != EnemyBulletType::Arrow
+                    && bullet.type != EnemyBulletType::Magic)) return;
+                const auto range = kRadius + bullet.radius;
+                if (squaredDistance(player.x, player.y, bullet.x, bullet.y)
+                    <= range * range) {
+                    bullet.active = false;
+                }
+            });
     }
 }
 
@@ -1428,6 +1450,7 @@ void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets
                    std::array<EnemyState, kMaximumEnemies>& enemies,
                    const EnemySpatialGrid& enemyGrid,
                    std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
+                   const EnemyBulletSpatialGrid& enemyBulletGrid,
                    std::array<XpGemState, kMaximumXpGems>& xpGems,
                    std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
                    std::array<std::uint32_t, pixel_twins::kControllerCount>& killCounts,
@@ -1450,13 +1473,17 @@ void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets
         }
         bullet.x += bullet.velocityX;
         bullet.y += bullet.velocityY;
-        for (auto& enemyBullet : enemyBullets) {
-            if (!enemyBullet.active || enemyBullet.type != EnemyBulletType::Arrow) continue;
-            const auto range = bullet.radius + 3.0F + enemyBullet.radius;
-            if (squaredDistance(bullet.x, bullet.y, enemyBullet.x, enemyBullet.y) <= range * range) {
-                enemyBullet.active = false;
-            }
-        }
+        enemyBulletGrid.forEachCandidate(
+            bullet.x, bullet.y, bullet.radius + 3.0F + kMaximumEnemyBulletRadius,
+            [&](std::size_t enemyBulletIndex) {
+                auto& enemyBullet = enemyBullets[enemyBulletIndex];
+                if (!enemyBullet.active || enemyBullet.type != EnemyBulletType::Arrow) return;
+                const auto range = bullet.radius + 3.0F + enemyBullet.radius;
+                if (squaredDistance(bullet.x, bullet.y, enemyBullet.x, enemyBullet.y)
+                    <= range * range) {
+                    enemyBullet.active = false;
+                }
+            });
         if (bullet.remainingTicks > 0) --bullet.remainingTicks;
         if (bullet.remainingTicks == 0 || bullet.x < 0.0F || bullet.y < 0.0F
             || bullet.x >= kMapPixelWidth || bullet.y >= kMapPixelHeight) {
@@ -1502,6 +1529,7 @@ void updateWindSlashes(std::array<WindSlashState, kMaximumWindSlashes>& slashes,
                        std::array<EnemyState, kMaximumEnemies>& enemies,
                        const EnemySpatialGrid& enemyGrid,
                        std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
+                       const EnemyBulletSpatialGrid& enemyBulletGrid,
                        std::array<XpGemState, kMaximumXpGems>& xpGems,
                        std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
                        std::array<std::uint32_t, pixel_twins::kControllerCount>& killCounts,
@@ -1515,13 +1543,17 @@ void updateWindSlashes(std::array<WindSlashState, kMaximumWindSlashes>& slashes,
             continue;
         }
         const auto& owner = players[slash.owner];
-        for (auto& bullet : enemyBullets) {
-            if (!bullet.active || bullet.type != EnemyBulletType::Arrow) continue;
-            const auto range = slash.outerRadius + bullet.radius;
-            if (squaredDistance(owner.x, owner.y, bullet.x, bullet.y) <= range * range) {
-                bullet.active = false;
-            }
-        }
+        enemyBulletGrid.forEachCandidate(
+            owner.x, owner.y, slash.outerRadius + kMaximumEnemyBulletRadius,
+            [&](std::size_t bulletIndex) {
+                auto& bullet = enemyBullets[bulletIndex];
+                if (!bullet.active || bullet.type != EnemyBulletType::Arrow) return;
+                const auto range = slash.outerRadius + bullet.radius;
+                if (squaredDistance(owner.x, owner.y, bullet.x, bullet.y)
+                    <= range * range) {
+                    bullet.active = false;
+                }
+            });
         for (auto& cooldown : slash.hitCooldownTicks) {
             if (cooldown > 0) --cooldown;
         }
@@ -2569,11 +2601,13 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
                 map, randomState_, balance);
     EnemySpatialGrid enemyGrid;
     enemyGrid.rebuild(enemies_);
+    EnemyBulletSpatialGrid enemyBulletGrid;
+    enemyBulletGrid.rebuild(enemyBullets_);
     for (std::size_t index = 0; index < players_.size(); ++index) {
         auto& player = players_[index];
         if (player.hp > 0) {
             updateFamiliars(player, static_cast<std::uint8_t>(index), enemies_, enemyGrid,
-                            bullets_, enemyBullets_);
+                            bullets_, enemyBullets_, enemyBulletGrid);
         }
         if (player.hp > 0 && player.lightCooldownTicks == 0
             && fireLight(player, static_cast<std::uint8_t>(index), enemies_, enemyGrid,
@@ -2610,16 +2644,17 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         }
         if (player.hp > 0 && player.orbLevel > 0 && player.orbCooldownTicks == 0) {
             damageOrbs(player, static_cast<std::uint8_t>(index), enemies_, enemyGrid,
-                       enemyBullets_, xpGems_, scores_, killCounts_, impactEffects_);
+                       enemyBullets_, enemyBulletGrid, xpGems_, scores_, killCounts_,
+                       impactEffects_);
             player.orbCooldownTicks = 10;
         }
     }
-    processBombs(players_, enemies_, enemyGrid, enemyBullets_, xpGems_, scores_,
-                 killCounts_, randomState_);
-    updateBullets(bullets_, enemies_, enemyGrid, enemyBullets_, xpGems_, scores_,
-                  killCounts_, impactEffects_);
-    updateWindSlashes(windSlashes_, players_, enemies_, enemyGrid, enemyBullets_, xpGems_,
-                      scores_, killCounts_, impactEffects_);
+    processBombs(players_, enemies_, enemyGrid, enemyBullets_, enemyBulletGrid, xpGems_,
+                 scores_, killCounts_, randomState_);
+    updateBullets(bullets_, enemies_, enemyGrid, enemyBullets_, enemyBulletGrid, xpGems_,
+                  scores_, killCounts_, impactEffects_);
+    updateWindSlashes(windSlashes_, players_, enemies_, enemyGrid, enemyBullets_,
+                      enemyBulletGrid, xpGems_, scores_, killCounts_, impactEffects_);
     updateThunderStrikes(thunderStrikes_);
     updateEnemyBullets(enemyBullets_, players_, balance);
     const auto xpRecallStarted = difficulty_ == Difficulty::Endless
