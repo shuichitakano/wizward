@@ -254,6 +254,8 @@ struct EnemyState {
     std::uint16_t deathTicks = 0;
     std::uint8_t xpValue = 2;
     std::uint8_t volleyIndex = 0;
+    std::uint8_t targetPlayerIndex = 0xff;
+    std::int8_t orbitSign = 1;
     EnemyKind kind = EnemyKind::Imp;
     Facing facing = Facing::South;
     bool moving = false;
@@ -438,6 +440,7 @@ private:
     std::uint32_t randomState_ = 1;
     std::uint16_t spawnCooldownTicks_ = 0;
     std::uint16_t swarmCooldownTicks_ = 0;
+    bool wispSwarmTriggered_ = false;
     std::uint32_t nextEndlessBossTicks_ = 5U * 60U * 60U;
     std::uint32_t endlessSpawnPauseTicks_ = 0;
     std::uint8_t endlessBossWave_ = 0;

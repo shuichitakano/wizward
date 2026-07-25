@@ -307,6 +307,18 @@ int main() {
     }
     assert(!gameplay.player(0).choosingPerk);
 
+    gameplay.reset(map);
+    gameplay.grantXp(0, 15);
+    const auto currentPack = gameplay.player(0).perkChoices;
+    gameplay.grantXp(0, 21);
+    assert(gameplay.player(0).pendingPerkChoices == 2);
+    assert(gameplay.player(0).perkChoices == currentPack);
+    gameplay.tick(controllersWith(0, 0,
+        pixel_twins::buttonMask(pixel_twins::ControllerButton::choiceUp)), map);
+    assert(gameplay.player(0).pendingPerkChoices == 1);
+    assert(gameplay.player(0).choosingPerk);
+
+    gameplay.reset(map);
     gameplay.grantXp(1, 15);
     gameplay.tick(controllersWith(0, 0), map);
     assert(!gameplay.player(1).choosingPerk);
@@ -344,10 +356,10 @@ int main() {
     assert(hasPerkEffect(gameplay, wizward::game::PerkEffectType::HpUp));
 
     gameplay.reset(map);
-    for (int level = 0; level < 9; ++level) {
+    for (int level = 0; level < 5; ++level) {
         grantPerk(gameplay, map, wizward::game::Perk::Fire);
     }
-    assert(gameplay.player(0).fireLevel == 9);
+    assert(gameplay.player(0).fireLevel == 5);
     gameplay.grantXp(0, wizward::game::xpNeededForLevel(gameplay.player(0).level));
     assert(std::find(gameplay.player(0).perkChoices.begin(),
                      gameplay.player(0).perkChoices.end(),
@@ -366,15 +378,11 @@ int main() {
     }};
     for (const auto perk : permanentPerks) {
         const auto maximum = perk == wizward::game::Perk::Speed
-            || perk == wizward::game::Perk::MaxHp ? 4 : 9;
+            || perk == wizward::game::Perk::MaxHp ? 4 : 5;
         while (perkLevel(gameplay.player(0), perk) < maximum) {
             grantPerk(gameplay, upgradeCapMap, perk);
         }
     }
-    gameplay.tick(controllersWith(0, 0), upgradeCapMap);
-    assert(std::count_if(gameplay.player(0).familiars.begin(),
-                         gameplay.player(0).familiars.end(),
-                         [](const auto& familiar) { return familiar.active; }) == 4);
     assert(gameplay.xpNeeded(0) == 330U);
     gameplay.grantXp(0, 330);
     assert(gameplay.player(0).postMaxLevelUps == 1U);
@@ -386,6 +394,15 @@ int main() {
                 || perk == wizward::game::Perk::Bomb;
         }));
 
+    gameplay.reset(upgradeCapMap, 0, wizward::game::Difficulty::Endless);
+    while (gameplay.player(0).familiarLevel < 9) {
+        grantPerk(gameplay, upgradeCapMap, wizward::game::Perk::Familiar);
+    }
+    gameplay.tick(controllersWith(0, 0), upgradeCapMap);
+    assert(std::count_if(gameplay.player(0).familiars.begin(),
+                         gameplay.player(0).familiars.end(),
+                         [](const auto& familiar) { return familiar.active; }) == 4);
+
     gameplay.reset(map);
     const auto magePlayer = gameplay.player(0);
     assert(gameplay.addEnemy(magePlayer.x + 100.0F, magePlayer.y,
@@ -395,6 +412,31 @@ int main() {
     gameplay.tick(idle, map);
     assert(std::hypot(gameplay.enemies()[0].x - gameplay.enemies()[1].x,
                       gameplay.enemies()[0].y - gameplay.enemies()[1].y) > 0.01F);
+
+    gameplay.reset(map);
+    const auto wispPlayer = gameplay.player(0);
+    assert(gameplay.addEnemy(wispPlayer.x + 100.0F, wispPlayer.y,
+                             wizward::game::EnemyKind::Wisp));
+    assert(gameplay.enemies()[0].radius == 5.0F);
+    assert(gameplay.enemies()[0].hp == 30);
+    assert(gameplay.enemies()[0].xpValue == 4);
+
+    wizward::world::WorldMap wispScheduleMap;
+    wispScheduleMap.tiles.fill(wizward::world::kCollisionBit);
+    gameplay.reset(wispScheduleMap, 0, wizward::game::Difficulty::Easy);
+    for (int tick = 0; tick < 150 * 60; ++tick) {
+        gameplay.tick(idle, wispScheduleMap);
+    }
+    assert(std::count_if(gameplay.enemies().begin(), gameplay.enemies().end(),
+        [](const auto& enemy) {
+            return enemy.active && enemy.kind == wizward::game::EnemyKind::Wisp;
+        }) >= 8);
+    assert(std::all_of(gameplay.enemies().begin(), gameplay.enemies().end(),
+        [](const auto& enemy) {
+            return !enemy.active || enemy.kind != wizward::game::EnemyKind::Wisp
+                || (enemy.targetPlayerIndex < 2
+                    && (enemy.orbitSign == -1 || enemy.orbitSign == 1));
+        }));
 
     gameplay.reset(map);
     grantPerk(gameplay, map, wizward::game::Perk::Fire);
@@ -505,7 +547,12 @@ int main() {
     wizward::world::WorldMap blockedMap;
     blockedMap.tiles.fill(wizward::world::kCollisionBit);
     gameplay.reset(blockedMap);
-    for (int frame = 0; frame < 300 * 60; ++frame) gameplay.tick(idle, blockedMap);
+    for (int frame = 0; frame < 300 * 60; ++frame) {
+        // WISPs intentionally ignore blocked terrain, so keep one player alive
+        // while exercising the full five-minute timeout path.
+        const_cast<wizward::game::PlayerState&>(gameplay.player(0)).hp = 30000;
+        gameplay.tick(idle, blockedMap);
+    }
     assert(gameplay.outcome() == wizward::game::GameplayOutcome::TimeUp);
     return 0;
 }
