@@ -50,6 +50,61 @@ constexpr float kEnemySpawnMinimumRange = 88.0F;
 constexpr float kEnemySpawnMaximumRange = 220.0F;
 constexpr float kEnemySwarmMinimumRange = 120.0F;
 constexpr float kEnemySwarmMaximumRange = 200.0F;
+// Broad-phase queries pad by the largest radius assigned in makeEnemyState().
+constexpr float kMaximumEnemyRadius = 20.0F;
+constexpr std::int32_t kEnemyGridCellSize = 128;
+constexpr std::size_t kEnemyGridColumns =
+    (world::kMapColumns * kWorldTileSize + kEnemyGridCellSize - 1) / kEnemyGridCellSize;
+constexpr std::size_t kEnemyGridRows =
+    (world::kMapRows * kWorldTileSize + kEnemyGridCellSize - 1) / kEnemyGridCellSize;
+constexpr std::size_t kEnemyGridCellCount = kEnemyGridColumns * kEnemyGridRows;
+constexpr std::int16_t kInvalidEnemyIndex = -1;
+
+class EnemySpatialGrid {
+public:
+    void rebuild(const std::array<EnemyState, kMaximumEnemies>& enemies) noexcept {
+        heads_.fill(kInvalidEnemyIndex);
+        next_.fill(kInvalidEnemyIndex);
+        for (std::size_t reverse = enemies.size(); reverse-- > 0;) {
+            if (!enemies[reverse].active) continue;
+            const auto cell = cellIndex(enemies[reverse].x, enemies[reverse].y);
+            next_[reverse] = heads_[cell];
+            heads_[cell] = static_cast<std::int16_t>(reverse);
+        }
+    }
+
+    template <typename Visitor>
+    void forEachCandidate(float x, float y, float radius, Visitor&& visitor) const noexcept {
+        const auto minColumn = gridCoordinate(x - radius, kEnemyGridColumns);
+        const auto maxColumn = gridCoordinate(x + radius, kEnemyGridColumns);
+        const auto minRow = gridCoordinate(y - radius, kEnemyGridRows);
+        const auto maxRow = gridCoordinate(y + radius, kEnemyGridRows);
+        for (auto row = minRow; row <= maxRow; ++row) {
+            for (auto column = minColumn; column <= maxColumn; ++column) {
+                auto enemyIndex = heads_[row * kEnemyGridColumns + column];
+                while (enemyIndex != kInvalidEnemyIndex) {
+                    visitor(static_cast<std::size_t>(enemyIndex));
+                    enemyIndex = next_[static_cast<std::size_t>(enemyIndex)];
+                }
+            }
+        }
+    }
+
+private:
+    static std::size_t gridCoordinate(float position, std::size_t limit) noexcept {
+        const auto coordinate =
+            static_cast<std::int32_t>(std::max(0.0F, position)) / kEnemyGridCellSize;
+        return std::min(static_cast<std::size_t>(coordinate), limit - 1U);
+    }
+
+    static std::size_t cellIndex(float x, float y) noexcept {
+        return gridCoordinate(y, kEnemyGridRows) * kEnemyGridColumns
+            + gridCoordinate(x, kEnemyGridColumns);
+    }
+
+    std::array<std::int16_t, kEnemyGridCellCount> heads_;
+    std::array<std::int16_t, kMaximumEnemies> next_;
+};
 
 struct AttackStats {
     std::uint8_t count;
@@ -671,17 +726,22 @@ void moveAttractPlayer(
 }
 
 EnemyState* nearestEnemy(std::array<EnemyState, kMaximumEnemies>& enemies,
+                         const EnemySpatialGrid& enemyGrid,
                          float x, float y, float range) noexcept {
     EnemyState* nearest = nullptr;
     auto nearestSquared = range * range;
-    for (auto& enemy : enemies) {
-        if (!enemy.active || enemy.bornTicks > 0 || enemy.spawnDelayTicks > 0) continue;
+    std::size_t nearestIndex = 0;
+    enemyGrid.forEachCandidate(x, y, range, [&](std::size_t enemyIndex) {
+        auto& enemy = enemies[enemyIndex];
+        if (!enemy.active || enemy.bornTicks > 0 || enemy.spawnDelayTicks > 0) return;
         const auto candidate = squaredDistance(x, y, enemy.x, enemy.y);
-        if (candidate <= nearestSquared) {
+        if (candidate < nearestSquared
+            || (candidate == nearestSquared && (nearest == nullptr || enemyIndex > nearestIndex))) {
             nearestSquared = candidate;
             nearest = &enemy;
+            nearestIndex = enemyIndex;
         }
-    }
+    });
     return nearest;
 }
 
@@ -873,7 +933,10 @@ EnemyState makeEnemyState(EnemyKind kind, float x, float y,
             std::round((0.6F + randomUnit(randomState) * 0.8F) * 60.0F));
         break;
     case EnemyKind::Boss:
-        enemy.radius = 20.0F; enemy.hp = 900; enemy.xpValue = 0; enemy.speedPerTick = 24.0F / 60.0F;
+        enemy.radius = kMaximumEnemyRadius;
+        enemy.hp = 900;
+        enemy.xpValue = 0;
+        enemy.speedPerTick = 24.0F / 60.0F;
         enemy.attackCooldownTicks = 72;
         break;
     }
@@ -1104,9 +1167,10 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
 bool fireLight(PlayerState& player,
                std::uint8_t owner,
                std::array<EnemyState, kMaximumEnemies>& enemies,
+               const EnemySpatialGrid& enemyGrid,
                std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
                std::array<ImpactEffectState, kMaximumImpactEffects>& impacts) noexcept {
-    auto* target = nearestEnemy(enemies, player.x, player.y, kLightSeekRange);
+    auto* target = nearestEnemy(enemies, enemyGrid, player.x, player.y, kLightSeekRange);
     if (target == nullptr) return false;
     auto dx = target->x - player.x;
     auto dy = target->y - player.y;
@@ -1168,6 +1232,7 @@ void spawnThunder(PlayerState& player, std::uint8_t owner,
                   std::uint32_t& randomState,
                   std::array<ThunderStrikeState, kMaximumThunderStrikes>& strikes,
                   std::array<EnemyState, kMaximumEnemies>& enemies,
+                  const EnemySpatialGrid& enemyGrid,
                   std::array<XpGemState, kMaximumXpGems>& xpGems,
                   std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
                   std::array<std::uint32_t, pixel_twins::kControllerCount>& killCounts) noexcept {
@@ -1186,18 +1251,21 @@ void spawnThunder(PlayerState& player, std::uint8_t owner,
         slot->remainingTicks = 20;
         slot->ageTicks = 0;
         slot->active = true;
-        for (auto& enemy : enemies) {
-            if (!enemy.active) continue;
+        enemyGrid.forEachCandidate(slot->x, slot->y, slot->radius + kMaximumEnemyRadius,
+                                  [&](std::size_t enemyIndex) {
+            auto& enemy = enemies[enemyIndex];
+            if (!enemy.active) return;
             const auto range = slot->radius + enemy.radius;
-            if (squaredDistance(slot->x, slot->y, enemy.x, enemy.y) > range * range) continue;
+            if (squaredDistance(slot->x, slot->y, enemy.x, enemy.y) > range * range) return;
             enemy.hp = static_cast<std::int16_t>(enemy.hp - stats.damage);
             if (enemy.hp <= 0) killEnemy(enemy, owner, xpGems, scores, killCounts);
-        }
+        });
     }
 }
 
 void damageOrbs(PlayerState& player, std::uint8_t owner,
                 std::array<EnemyState, kMaximumEnemies>& enemies,
+                const EnemySpatialGrid& enemyGrid,
                 std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                 std::array<XpGemState, kMaximumXpGems>& xpGems,
                 std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
@@ -1213,19 +1281,22 @@ void damageOrbs(PlayerState& player, std::uint8_t owner,
             const auto range = 6.0F + bullet.radius;
             if (squaredDistance(x, y, bullet.x, bullet.y) <= range * range) bullet.active = false;
         }
-        for (auto& enemy : enemies) {
-            if (!enemy.active) continue;
+        enemyGrid.forEachCandidate(x, y, 4.0F + kMaximumEnemyRadius,
+                                  [&](std::size_t enemyIndex) {
+            auto& enemy = enemies[enemyIndex];
+            if (!enemy.active) return;
             const auto range = enemy.radius + 4.0F;
-            if (squaredDistance(x, y, enemy.x, enemy.y) >= range * range) continue;
+            if (squaredDistance(x, y, enemy.x, enemy.y) >= range * range) return;
             enemy.hp = static_cast<std::int16_t>(enemy.hp - stats.damage);
             spawnImpact(impacts, ImpactEffectType::Orb, enemy.x, enemy.y);
             if (enemy.hp <= 0) killEnemy(enemy, owner, xpGems, scores, killCounts);
-        }
+        });
     }
 }
 
 void updateFamiliars(PlayerState& player, std::uint8_t owner,
                      std::array<EnemyState, kMaximumEnemies>& enemies,
+                     const EnemySpatialGrid& enemyGrid,
                      std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
                      std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets) noexcept {
     if (player.familiarLevel == 0) {
@@ -1264,7 +1335,7 @@ void updateFamiliars(PlayerState& player, std::uint8_t owner,
         auto targetX = homeX;
         auto targetY = homeY;
         const auto seekRange = 95.0F + static_cast<float>(player.familiarLevel / 3U) * 25.0F;
-        if (auto* target = nearestEnemy(enemies, homeX, homeY, seekRange)) {
+        if (auto* target = nearestEnemy(enemies, enemyGrid, homeX, homeY, seekRange)) {
             auto dx = target->x - homeX;
             auto dy = target->y - homeY;
             normalize(dx, dy);
@@ -1295,7 +1366,7 @@ void updateFamiliars(PlayerState& player, std::uint8_t owner,
     const auto fireRange = 135.0F + static_cast<float>(player.familiarLevel / 3U) * 25.0F;
     for (auto& familiar : player.familiars) {
         if (!familiar.active) continue;
-        auto* target = nearestEnemy(enemies, familiar.x, familiar.y, fireRange);
+        auto* target = nearestEnemy(enemies, enemyGrid, familiar.x, familiar.y, fireRange);
         if (target == nullptr) continue;
         auto dx = target->x - familiar.x;
         auto dy = target->y - familiar.y;
@@ -1312,6 +1383,7 @@ void updateFamiliars(PlayerState& player, std::uint8_t owner,
 
 void processBombs(std::array<PlayerState, pixel_twins::kControllerCount>& players,
                   std::array<EnemyState, kMaximumEnemies>& enemies,
+                  const EnemySpatialGrid& enemyGrid,
                   std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                   std::array<XpGemState, kMaximumXpGems>& xpGems,
                   std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
@@ -1328,17 +1400,19 @@ void processBombs(std::array<PlayerState, pixel_twins::kControllerCount>& player
         player.bombEffectY = player.y;
         player.bombEffectSeed = randomState
             ^ (static_cast<std::uint32_t>(playerIndex) + 1U) * 2246822519U;
-        for (auto& enemy : enemies) {
-            if (!enemy.active || enemy.bornTicks > 0) continue;
+        enemyGrid.forEachCandidate(player.x, player.y, kRadius + kMaximumEnemyRadius,
+                                   [&](std::size_t enemyIndex) {
+            auto& enemy = enemies[enemyIndex];
+            if (!enemy.active || enemy.bornTicks > 0) return;
             const auto range = kRadius + enemy.radius;
-            if (squaredDistance(player.x, player.y, enemy.x, enemy.y) > range * range) continue;
+            if (squaredDistance(player.x, player.y, enemy.x, enemy.y) > range * range) return;
             enemy.hp = enemy.kind == EnemyKind::Boss
                 ? static_cast<std::int16_t>(enemy.hp - 300) : 0;
             if (enemy.hp <= 0) {
                 killEnemy(enemy, static_cast<std::uint8_t>(playerIndex), xpGems, scores,
                           killCounts);
             }
-        }
+        });
         for (auto& bullet : enemyBullets) {
             if (!bullet.active || (bullet.type != EnemyBulletType::Arrow
                 && bullet.type != EnemyBulletType::Magic)) continue;
@@ -1352,6 +1426,7 @@ void processBombs(std::array<PlayerState, pixel_twins::kControllerCount>& player
 
 void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
                    std::array<EnemyState, kMaximumEnemies>& enemies,
+                   const EnemySpatialGrid& enemyGrid,
                    std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                    std::array<XpGemState, kMaximumXpGems>& xpGems,
                    std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
@@ -1361,16 +1436,17 @@ void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets
         if (!bullet.active) continue;
         ++bullet.ageTicks;
         if (bullet.type == PlayerAttack::Light && bullet.ageTicks >= 10) {
-          if (auto* target = nearestEnemy(enemies, bullet.x, bullet.y, kLightHomingRange)) {
-            auto dx = target->x - bullet.x;
-            auto dy = target->y - bullet.y;
-            normalize(dx, dy);
-            bullet.velocityX = bullet.velocityX * 0.92F + dx * bullet.speed * 0.08F;
-            bullet.velocityY = bullet.velocityY * 0.92F + dy * bullet.speed * 0.08F;
-            normalize(bullet.velocityX, bullet.velocityY);
-            bullet.velocityX *= bullet.speed;
-            bullet.velocityY *= bullet.speed;
-          }
+            if (auto* target = nearestEnemy(
+                    enemies, enemyGrid, bullet.x, bullet.y, kLightHomingRange)) {
+                auto dx = target->x - bullet.x;
+                auto dy = target->y - bullet.y;
+                normalize(dx, dy);
+                bullet.velocityX = bullet.velocityX * 0.92F + dx * bullet.speed * 0.08F;
+                bullet.velocityY = bullet.velocityY * 0.92F + dy * bullet.speed * 0.08F;
+                normalize(bullet.velocityX, bullet.velocityY);
+                bullet.velocityX *= bullet.speed;
+                bullet.velocityY *= bullet.speed;
+            }
         }
         bullet.x += bullet.velocityX;
         bullet.y += bullet.velocityY;
@@ -1387,23 +1463,36 @@ void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets
             bullet.active = false;
             continue;
         }
-        for (auto& enemy : enemies) {
-            if (!enemy.active) continue;
-            const auto hitRange = enemy.radius + bullet.radius;
-            if (squaredDistance(bullet.x, bullet.y, enemy.x, enemy.y) < hitRange * hitRange) {
-                enemy.hp = static_cast<std::int16_t>(enemy.hp - bullet.damage);
-                if (bullet.type == PlayerAttack::Ice) enemy.slowTicks = std::max<std::uint16_t>(enemy.slowTicks, 102);
-                auto impactType = ImpactEffectType::Light;
-                if (bullet.type == PlayerAttack::Fire) impactType = ImpactEffectType::Fire;
-                else if (bullet.type == PlayerAttack::Ice) impactType = ImpactEffectType::Ice;
-                else if (bullet.type == PlayerAttack::Familiar) impactType = ImpactEffectType::Familiar;
-                spawnImpact(impacts, impactType, bullet.x, bullet.y - 10.0F);
-                if (enemy.hp <= 0) {
-                    killEnemy(enemy, bullet.owner, xpGems, scores, killCounts);
+        EnemyState* hitEnemy = nullptr;
+        auto hitEnemyIndex = enemies.size();
+        enemyGrid.forEachCandidate(
+            bullet.x, bullet.y, bullet.radius + kMaximumEnemyRadius,
+            [&](std::size_t enemyIndex) {
+                auto& enemy = enemies[enemyIndex];
+                if (!enemy.active || enemyIndex >= hitEnemyIndex) return;
+                const auto hitRange = enemy.radius + bullet.radius;
+                if (squaredDistance(bullet.x, bullet.y, enemy.x, enemy.y)
+                    < hitRange * hitRange) {
+                    hitEnemy = &enemy;
+                    hitEnemyIndex = enemyIndex;
                 }
-                bullet.active = false;
-                break;
+            });
+        if (hitEnemy != nullptr) {
+            hitEnemy->hp = static_cast<std::int16_t>(hitEnemy->hp - bullet.damage);
+            if (bullet.type == PlayerAttack::Ice) {
+                hitEnemy->slowTicks = std::max<std::uint16_t>(hitEnemy->slowTicks, 102);
             }
+            auto impactType = ImpactEffectType::Light;
+            if (bullet.type == PlayerAttack::Fire) impactType = ImpactEffectType::Fire;
+            else if (bullet.type == PlayerAttack::Ice) impactType = ImpactEffectType::Ice;
+            else if (bullet.type == PlayerAttack::Familiar) {
+                impactType = ImpactEffectType::Familiar;
+            }
+            spawnImpact(impacts, impactType, bullet.x, bullet.y - 10.0F);
+            if (hitEnemy->hp <= 0) {
+                killEnemy(*hitEnemy, bullet.owner, xpGems, scores, killCounts);
+            }
+            bullet.active = false;
         }
     }
 }
@@ -1411,6 +1500,7 @@ void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets
 void updateWindSlashes(std::array<WindSlashState, kMaximumWindSlashes>& slashes,
                        std::array<PlayerState, pixel_twins::kControllerCount>& players,
                        std::array<EnemyState, kMaximumEnemies>& enemies,
+                       const EnemySpatialGrid& enemyGrid,
                        std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                        std::array<XpGemState, kMaximumXpGems>& xpGems,
                        std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
@@ -1432,41 +1522,49 @@ void updateWindSlashes(std::array<WindSlashState, kMaximumWindSlashes>& slashes,
                 bullet.active = false;
             }
         }
-        for (std::size_t enemyIndex = 0; enemyIndex < enemies.size(); ++enemyIndex) {
-            if (slash.hitCooldownTicks[enemyIndex] > 0) --slash.hitCooldownTicks[enemyIndex];
-            auto& enemy = enemies[enemyIndex];
-            if (!enemy.active || slash.hitCooldownTicks[enemyIndex] > 0) continue;
-            const auto distanceSquared = squaredDistance(owner.x, owner.y, enemy.x, enemy.y);
-            const auto inner = std::max(0.0F, slash.innerRadius - enemy.radius);
-            const auto outer = slash.outerRadius + enemy.radius;
-            auto hit = distanceSquared >= inner * inner && distanceSquared <= outer * outer;
-            if (!hit) {
-                const auto progress = std::clamp(
-                    static_cast<float>(slash.ageTicks) / 28.0F, 0.0F, 1.0F);
-                const auto sweep = progress * kTau * 1.175F;
-                const auto cutterRadius = (slash.innerRadius + slash.outerRadius) * 0.5F;
-                const auto linkRange = enemy.radius + kWindLinkHitRadius;
-                for (std::uint8_t blade = 0; blade < slash.bladeCount; ++blade) {
-                    const auto angle = slash.startAngle
-                        + static_cast<float>(blade) * kTau
-                            / static_cast<float>(slash.bladeCount)
-                        + sweep;
-                    const auto cutterX = owner.x + std::cos(angle) * cutterRadius;
-                    const auto cutterY = owner.y + std::sin(angle) * cutterRadius;
-                    if (squaredDistanceToSegment(
-                            enemy.x, enemy.y, owner.x, owner.y, cutterX, cutterY)
-                        <= linkRange * linkRange) {
-                        hit = true;
-                        break;
+        for (auto& cooldown : slash.hitCooldownTicks) {
+            if (cooldown > 0) --cooldown;
+        }
+        enemyGrid.forEachCandidate(
+            owner.x, owner.y, slash.outerRadius + kMaximumEnemyRadius,
+            [&](std::size_t enemyIndex) {
+                auto& enemy = enemies[enemyIndex];
+                if (!enemy.active || slash.hitCooldownTicks[enemyIndex] > 0) return;
+                const auto distanceSquared =
+                    squaredDistance(owner.x, owner.y, enemy.x, enemy.y);
+                const auto inner = std::max(0.0F, slash.innerRadius - enemy.radius);
+                const auto outer = slash.outerRadius + enemy.radius;
+                auto hit = distanceSquared >= inner * inner && distanceSquared <= outer * outer;
+                if (!hit) {
+                    const auto progress = std::clamp(
+                        static_cast<float>(slash.ageTicks) / 28.0F, 0.0F, 1.0F);
+                    const auto sweep = progress * kTau * 1.175F;
+                    const auto cutterRadius =
+                        (slash.innerRadius + slash.outerRadius) * 0.5F;
+                    const auto linkRange = enemy.radius + kWindLinkHitRadius;
+                    for (std::uint8_t blade = 0; blade < slash.bladeCount; ++blade) {
+                        const auto angle = slash.startAngle
+                            + static_cast<float>(blade) * kTau
+                                / static_cast<float>(slash.bladeCount)
+                            + sweep;
+                        const auto cutterX = owner.x + std::cos(angle) * cutterRadius;
+                        const auto cutterY = owner.y + std::sin(angle) * cutterRadius;
+                        if (squaredDistanceToSegment(
+                                enemy.x, enemy.y, owner.x, owner.y, cutterX, cutterY)
+                            <= linkRange * linkRange) {
+                            hit = true;
+                            break;
+                        }
                     }
                 }
-            }
-            if (!hit) continue;
-            enemy.hp = static_cast<std::int16_t>(enemy.hp - slash.damage);
-            slash.hitCooldownTicks[enemyIndex] = 7;
-            spawnImpact(impacts, ImpactEffectType::Wind, enemy.x, enemy.y);
-            if (enemy.hp <= 0) killEnemy(enemy, slash.owner, xpGems, scores, killCounts);
-        }
+                if (!hit) return;
+                enemy.hp = static_cast<std::int16_t>(enemy.hp - slash.damage);
+                slash.hitCooldownTicks[enemyIndex] = 7;
+                spawnImpact(impacts, ImpactEffectType::Wind, enemy.x, enemy.y);
+                if (enemy.hp <= 0) {
+                    killEnemy(enemy, slash.owner, xpGems, scores, killCounts);
+                }
+            });
     }
 }
 
@@ -2469,15 +2567,17 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
     }
     moveEnemies(enemies_, players_, enemyBullets_, xpGems_, scores_, killCounts_,
                 map, randomState_, balance);
+    EnemySpatialGrid enemyGrid;
+    enemyGrid.rebuild(enemies_);
     for (std::size_t index = 0; index < players_.size(); ++index) {
         auto& player = players_[index];
         if (player.hp > 0) {
-            updateFamiliars(player, static_cast<std::uint8_t>(index), enemies_, bullets_,
-                            enemyBullets_);
+            updateFamiliars(player, static_cast<std::uint8_t>(index), enemies_, enemyGrid,
+                            bullets_, enemyBullets_);
         }
         if (player.hp > 0 && player.lightCooldownTicks == 0
-            && fireLight(player, static_cast<std::uint8_t>(index), enemies_, bullets_,
-                         impactEffects_)) {
+            && fireLight(player, static_cast<std::uint8_t>(index), enemies_, enemyGrid,
+                         bullets_, impactEffects_)) {
             player.lightCooldownTicks = cooldownTicks(0.52F, 0.035F, player.lightLevel, 0.18F);
         }
         if (player.hp > 0 && player.fireLevel > 0 && player.fireCooldownTicks == 0) {
@@ -2493,7 +2593,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         }
         if (player.hp > 0 && player.thunderLevel > 0 && player.thunderCooldownTicks == 0) {
             spawnThunder(player, static_cast<std::uint8_t>(index), randomState_, thunderStrikes_,
-                         enemies_, xpGems_, scores_, killCounts_);
+                         enemies_, enemyGrid, xpGems_, scores_, killCounts_);
             player.thunderCooldownTicks = cooldownTicks(1.05F, 0.045F, player.thunderLevel, 0.45F);
         }
         if (player.hp > 0 && player.iceLevel > 0 && player.iceCooldownTicks == 0) {
@@ -2509,15 +2609,17 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
             if (fired) player.iceCooldownTicks = cooldownTicks(1.25F, 0.05F, player.iceLevel, 0.55F);
         }
         if (player.hp > 0 && player.orbLevel > 0 && player.orbCooldownTicks == 0) {
-            damageOrbs(player, static_cast<std::uint8_t>(index), enemies_, enemyBullets_,
-                       xpGems_, scores_, killCounts_, impactEffects_);
+            damageOrbs(player, static_cast<std::uint8_t>(index), enemies_, enemyGrid,
+                       enemyBullets_, xpGems_, scores_, killCounts_, impactEffects_);
             player.orbCooldownTicks = 10;
         }
     }
-    processBombs(players_, enemies_, enemyBullets_, xpGems_, scores_, killCounts_, randomState_);
-    updateBullets(bullets_, enemies_, enemyBullets_, xpGems_, scores_, killCounts_, impactEffects_);
-    updateWindSlashes(windSlashes_, players_, enemies_, enemyBullets_, xpGems_, scores_,
-                      killCounts_, impactEffects_);
+    processBombs(players_, enemies_, enemyGrid, enemyBullets_, xpGems_, scores_,
+                 killCounts_, randomState_);
+    updateBullets(bullets_, enemies_, enemyGrid, enemyBullets_, xpGems_, scores_,
+                  killCounts_, impactEffects_);
+    updateWindSlashes(windSlashes_, players_, enemies_, enemyGrid, enemyBullets_, xpGems_,
+                      scores_, killCounts_, impactEffects_);
     updateThunderStrikes(thunderStrikes_);
     updateEnemyBullets(enemyBullets_, players_, balance);
     const auto xpRecallStarted = difficulty_ == Difficulty::Endless
