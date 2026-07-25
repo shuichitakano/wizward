@@ -46,7 +46,7 @@ inline constexpr std::size_t kMaximumThunderStrikes = 16;
 inline constexpr std::size_t kMaximumImpactEffects = 64;
 inline constexpr std::size_t kMaximumPerkEffects = 8;
 inline constexpr std::size_t kMaximumEnemyBullets = 128;
-inline constexpr std::size_t kMaximumFamiliarsPerPlayer = 3;
+inline constexpr std::size_t kMaximumFamiliarsPerPlayer = 4;
 inline constexpr std::size_t kMaximumSfxCuesPerTick = 16;
 
 enum class SfxId : std::uint8_t {

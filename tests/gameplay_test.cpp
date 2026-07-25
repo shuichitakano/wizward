@@ -371,6 +371,10 @@ int main() {
             grantPerk(gameplay, upgradeCapMap, perk);
         }
     }
+    gameplay.tick(controllersWith(0, 0), upgradeCapMap);
+    assert(std::count_if(gameplay.player(0).familiars.begin(),
+                         gameplay.player(0).familiars.end(),
+                         [](const auto& familiar) { return familiar.active; }) == 4);
     assert(gameplay.xpNeeded(0) == 330U);
     gameplay.grantXp(0, 330);
     assert(gameplay.player(0).postMaxLevelUps == 1U);
