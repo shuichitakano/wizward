@@ -179,8 +179,10 @@ struct PlayerState {
     std::uint16_t iceCooldownTicks = 0;
     std::uint16_t orbCooldownTicks = 0;
     std::uint16_t familiarCooldownTicks = 0;
-    std::uint16_t xp = 0;
+    std::uint32_t xp = 0;
     std::uint8_t level = 1;
+    std::uint16_t postMaxLevelUps = 0;
+    std::uint32_t postMaxXpNeeded = 0;
     std::uint8_t pendingPerkChoices = 0;
     std::uint8_t lightLevel = 1;
     std::uint8_t fireLevel = 0;
@@ -390,7 +392,7 @@ public:
     [[nodiscard]] std::uint32_t elapsedTicks() const noexcept { return elapsedTicks_; }
     [[nodiscard]] GameplayOutcome outcome() const noexcept { return outcome_; }
     [[nodiscard]] Difficulty difficulty() const noexcept { return difficulty_; }
-    [[nodiscard]] std::uint16_t xpNeeded(std::uint8_t level) const noexcept;
+    [[nodiscard]] std::uint32_t xpNeeded(std::size_t playerIndex) const noexcept;
     [[nodiscard]] std::uint32_t score(std::size_t playerIndex) const noexcept {
         return manualPlayers_[playerIndex] ? scores_[playerIndex] : 0U;
     }

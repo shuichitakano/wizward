@@ -344,6 +344,55 @@ int main() {
     assert(hasPerkEffect(gameplay, wizward::game::PerkEffectType::HpUp));
 
     gameplay.reset(map);
+    for (int level = 0; level < 9; ++level) {
+        grantPerk(gameplay, map, wizward::game::Perk::Fire);
+    }
+    assert(gameplay.player(0).fireLevel == 9);
+    gameplay.grantXp(0, wizward::game::xpNeededForLevel(gameplay.player(0).level));
+    assert(std::find(gameplay.player(0).perkChoices.begin(),
+                     gameplay.player(0).perkChoices.end(),
+                     wizward::game::Perk::Fire)
+           == gameplay.player(0).perkChoices.end());
+
+    wizward::world::WorldMap upgradeCapMap;
+    upgradeCapMap.tiles.fill(wizward::world::kCollisionBit);
+    gameplay.reset(upgradeCapMap);
+    constexpr std::array<wizward::game::Perk, 9> permanentPerks{{
+        wizward::game::Perk::Light, wizward::game::Perk::Fire,
+        wizward::game::Perk::Wind, wizward::game::Perk::Thunder,
+        wizward::game::Perk::Ice, wizward::game::Perk::Orb,
+        wizward::game::Perk::Familiar, wizward::game::Perk::Speed,
+        wizward::game::Perk::MaxHp,
+    }};
+    for (const auto perk : permanentPerks) {
+        const auto maximum = perk == wizward::game::Perk::Speed
+            || perk == wizward::game::Perk::MaxHp ? 4 : 9;
+        while (perkLevel(gameplay.player(0), perk) < maximum) {
+            grantPerk(gameplay, upgradeCapMap, perk);
+        }
+    }
+    assert(gameplay.xpNeeded(0) == 330U);
+    gameplay.grantXp(0, 330);
+    assert(gameplay.player(0).postMaxLevelUps == 1U);
+    assert(gameplay.xpNeeded(0) == 363U);
+    assert(std::all_of(gameplay.player(0).perkChoices.begin(),
+                       gameplay.player(0).perkChoices.end(),
+        [](const auto perk) {
+            return perk == wizward::game::Perk::Heal
+                || perk == wizward::game::Perk::Bomb;
+        }));
+
+    gameplay.reset(map);
+    const auto magePlayer = gameplay.player(0);
+    assert(gameplay.addEnemy(magePlayer.x + 100.0F, magePlayer.y,
+                             wizward::game::EnemyKind::Mage));
+    assert(gameplay.addEnemy(magePlayer.x + 100.0F, magePlayer.y,
+                             wizward::game::EnemyKind::Mage));
+    gameplay.tick(idle, map);
+    assert(std::hypot(gameplay.enemies()[0].x - gameplay.enemies()[1].x,
+                      gameplay.enemies()[0].y - gameplay.enemies()[1].y) > 0.01F);
+
+    gameplay.reset(map);
     grantPerk(gameplay, map, wizward::game::Perk::Fire);
     assert(hasPerkEffect(gameplay, wizward::game::PerkEffectType::Upgrade));
     grantPerk(gameplay, map, wizward::game::Perk::Wind);

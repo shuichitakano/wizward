@@ -30,6 +30,10 @@ constexpr std::uint16_t kContactInvulnerabilityTicks = 39;
 constexpr std::int16_t kEnemyContactCounterMinimumDamage = 4;
 constexpr std::uint16_t kEnemyContactStunTicks = 30;
 constexpr float kEnemyContactKnockback = 14.0F;
+constexpr float kMageSeparationRange = 28.0F;
+constexpr float kMageSeparationWeight = 2.0F;
+constexpr float kMageSeparationMaximumSpeed = 1.6F;
+constexpr float kWindLinkHitRadius = 4.0F;
 constexpr std::uint16_t kLightLifetimeTicks = 75;
 
 std::int16_t scaledValue(std::int16_t value, std::uint8_t percent) noexcept {
@@ -198,6 +202,18 @@ float squaredDistance(float x1, float y1, float x2, float y2) noexcept {
     return dx * dx + dy * dy;
 }
 
+float squaredDistanceToSegment(float x, float y, float startX, float startY,
+                               float endX, float endY) noexcept {
+    const auto segmentX = endX - startX;
+    const auto segmentY = endY - startY;
+    const auto lengthSquared = segmentX * segmentX + segmentY * segmentY;
+    const auto t = lengthSquared > 0.0F
+        ? std::clamp(((x - startX) * segmentX + (y - startY) * segmentY)
+                     / lengthSquared, 0.0F, 1.0F)
+        : 0.0F;
+    return squaredDistance(x, y, startX + segmentX * t, startY + segmentY * t);
+}
+
 void normalize(float& x, float& y) noexcept {
     const auto length = std::sqrt(x * x + y * y);
     if (length <= 0.0F) return;
@@ -336,14 +352,18 @@ float aiMoveScore(
     const std::array<EnemyState, kMaximumEnemies>& enemies,
     const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
     bool rescuing, float moved, float lookahead) noexcept {
-    auto score = aiDangerAt(x, y, enemies, enemyBullets) * (rescuing ? 0.24F : 1.0F);
+    auto score = rescuing ? 0.0F : aiDangerAt(x, y, enemies, enemyBullets);
     score += std::sqrt(squaredDistance(x, y, targetX, targetY))
         * (rescuing ? 1.8F : 0.45F);
-    const auto linkDistance = std::sqrt(squaredDistance(x, y, leader.x, leader.y));
-    if (linkDistance > 100.0F) score += (linkDistance - 100.0F) * 0.8F;
-    if (linkDistance > 125.0F) score += (linkDistance - 125.0F) * 6.0F;
-    if (linkDistance > kLinkRange) score += 1000.0F + (linkDistance - kLinkRange) * 20.0F;
-    score += aiViewPenalty(x, y, leader);
+    if (!rescuing) {
+        const auto linkDistance = std::sqrt(squaredDistance(x, y, leader.x, leader.y));
+        if (linkDistance > 100.0F) score += (linkDistance - 100.0F) * 0.8F;
+        if (linkDistance > 125.0F) score += (linkDistance - 125.0F) * 6.0F;
+        if (linkDistance > kLinkRange) {
+            score += 1000.0F + (linkDistance - kLinkRange) * 20.0F;
+        }
+        score += aiViewPenalty(x, y, leader);
+    }
     score += std::max(0.0F, lookahead - moved) * 8.0F;
     if (moved > 0.05F) {
         auto directionX = x - player.x;
@@ -390,7 +410,8 @@ float moveAiPlayerSmart(
     auto towardX = targetX - player.x;
     auto towardY = targetY - player.y;
     normalize(towardX, towardY);
-    const auto currentDanger = aiDangerAt(player.x, player.y, enemies, enemyBullets);
+    const auto currentDanger = rescuing
+        ? 0.0F : aiDangerAt(player.x, player.y, enemies, enemyBullets);
     const auto urgent = currentDanger > 350.0F;
     const auto evading = currentDanger >= 80.0F;
     if (player.aiDecisionTicks > 0) --player.aiDecisionTicks;
@@ -437,7 +458,8 @@ float moveAiPlayerSmart(
             bestDirectionX = directionX;
             bestDirectionY = directionY;
         }
-        const auto switchMargin = urgent ? 3.0F : (evading ? 10.0F : 18.0F);
+        const auto switchMargin = rescuing
+            ? 2.0F : (urgent ? 3.0F : (evading ? 10.0F : 18.0F));
         if (retained && retainedScore <= bestScore + switchMargin) {
             player.aiDesiredDirectionX = retainedDirectionX;
             player.aiDesiredDirectionY = retainedDirectionY;
@@ -445,10 +467,10 @@ float moveAiPlayerSmart(
             player.aiDesiredDirectionX = bestDirectionX;
             player.aiDesiredDirectionY = bestDirectionY;
         }
-        player.aiDecisionTicks = urgent ? 4U : (evading ? 11U : 21U);
+        player.aiDecisionTicks = rescuing ? 7U : (urgent ? 4U : (evading ? 11U : 21U));
     }
-    const auto maximumTurn = urgent ? 14.0F / 60.0F
-        : (evading ? 8.0F / 60.0F : 5.0F / 60.0F);
+    const auto maximumTurn = rescuing ? 12.0F / 60.0F
+        : urgent ? 14.0F / 60.0F : (evading ? 8.0F / 60.0F : 5.0F / 60.0F);
     const auto currentAngle = std::atan2(player.aiDirectionY, player.aiDirectionX);
     const auto desiredAngle = std::atan2(
         player.aiDesiredDirectionY, player.aiDesiredDirectionX);
@@ -500,7 +522,7 @@ void followAiPartner(PlayerState& player, std::size_t playerIndex,
     const auto distance = std::sqrt(squaredDistance(player.x, player.y, formationX, formationY));
     const auto stopDistance = rescuing ? kPlayerRadius * 2.0F + 6.0F : 8.0F;
     const auto currentDanger = aiDangerAt(player.x, player.y, enemies, enemyBullets);
-    const auto shouldEvade = currentDanger >= 80.0F;
+    const auto shouldEvade = !rescuing && currentDanger >= 80.0F;
     if (rescuing && distance <= stopDistance) {
         player.moving = false;
         return;
@@ -531,14 +553,40 @@ void followAiPartner(PlayerState& player, std::size_t playerIndex,
             player.aiStuckTicks = 12U;
         }
         if (player.aiBlockedTicks >= 36U) {
-            for (std::uint8_t index = 0; index < 16U; ++index) {
-                const auto angle = static_cast<float>(index) * kTau / 16.0F;
-                const auto x = player.x + std::cos(angle) * 32.0F;
-                const auto y = player.y + std::sin(angle) * 32.0F;
-                if (!playerPositionIsWalkable(map, x, y)) continue;
-                player.x = x;
-                player.y = y;
-                break;
+            auto bestScore = std::numeric_limits<float>::max();
+            auto bestX = player.x;
+            auto bestY = player.y;
+            auto found = false;
+            for (float radius = 4.0F; radius <= 32.0F && !found; radius += 4.0F) {
+                for (std::uint8_t index = 0; index < 24U; ++index) {
+                    const auto angle = static_cast<float>(index) * kTau / 24.0F;
+                    const auto x = player.x + std::cos(angle) * radius;
+                    const auto y = player.y + std::sin(angle) * radius;
+                    if (!playerPositionIsWalkable(map, x, y)) continue;
+                    const auto score = std::sqrt(squaredDistance(
+                        x, y, formationX, formationY))
+                        + (rescuing ? 0.0F
+                            : aiDangerAt(x, y, enemies, enemyBullets) * 0.03F)
+                        + radius * 0.15F;
+                    if (score >= bestScore) continue;
+                    bestScore = score;
+                    bestX = x;
+                    bestY = y;
+                    found = true;
+                }
+            }
+            if (found) {
+                auto escapedX = bestX - player.x;
+                auto escapedY = bestY - player.y;
+                player.x = bestX;
+                player.y = bestY;
+                normalize(escapedX, escapedY);
+                player.aiDirectionX = escapedX;
+                player.aiDirectionY = escapedY;
+                player.aiDesiredDirectionX = escapedX;
+                player.aiDesiredDirectionY = escapedY;
+                player.facing = facingFor(escapedX, escapedY);
+                player.aiDecisionTicks = 0;
             }
             player.aiBlockedTicks = 0;
         }
@@ -874,6 +922,31 @@ void fireBossRadial(EnemyState& enemy,
     }
 }
 
+std::array<float, 2> mageSeparation(
+    const EnemyState& enemy,
+    const std::array<EnemyState, kMaximumEnemies>& enemies) noexcept {
+    std::array<float, 2> separation{};
+    for (const auto& other : enemies) {
+        if (&other == &enemy || !other.active || other.kind != EnemyKind::Mage
+            || other.hp <= 0 || other.bornTicks > 0 || other.spawnDelayTicks > 0) {
+            continue;
+        }
+        const auto dx = enemy.x - other.x;
+        const auto dy = enemy.y - other.y;
+        const auto gap = std::sqrt(dx * dx + dy * dy);
+        if (gap >= kMageSeparationRange) continue;
+        const auto weight = 1.0F - gap / kMageSeparationRange;
+        if (gap > 0.001F) {
+            separation[0] += dx / gap * weight;
+            separation[1] += dy / gap * weight;
+        } else {
+            separation[0] += std::cos(enemy.phase) * weight;
+            separation[1] += std::sin(enemy.phase) * weight;
+        }
+    }
+    return separation;
+}
+
 void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
                  std::array<PlayerState, pixel_twins::kControllerCount>& players,
                  std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
@@ -934,28 +1007,48 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
                 const auto waveX = std::sin(enemy.phase) * (42.0F / 60.0F);
                 const auto waveY = std::sin(enemy.phase * 1.3F) * (42.0F / 60.0F);
                 moveActor(enemy, dx * speed - dy * waveX, dy * speed + dx * waveY, map);
-            } else if (enemy.kind == EnemyKind::Archer || enemy.kind == EnemyKind::Mage) {
-                const auto nearRange = enemy.kind == EnemyKind::Archer ? 72.0F : 85.0F;
-                const auto farRange = enemy.kind == EnemyKind::Archer ? 105.0F : 135.0F;
+            } else if (enemy.kind == EnemyKind::Archer) {
+                constexpr float nearRange = 72.0F;
+                constexpr float farRange = 105.0F;
                 if (targetDistance < nearRange) moveActor(enemy, -dx * speed, -dy * speed, map);
                 else if (targetDistance > farRange) moveActor(enemy, dx * speed, dy * speed, map);
-                const auto shotRange = enemy.kind == EnemyKind::Archer ? 150.0F : 165.0F;
-                if (enemy.attackCooldownTicks == 0 && targetDistance < shotRange) {
-                    if (enemy.kind == EnemyKind::Archer) {
-                        constexpr float kStep = kTau / 16.0F;
-                        const auto angle = std::round(std::atan2(dy, dx) / kStep) * kStep;
-                        dx = std::cos(angle);
-                        dy = std::sin(angle);
-                        enemy.facing = facingFor(dx, dy);
-                        enemy.attackAnimationTicks = 20;
-                    }
+                if (enemy.attackCooldownTicks == 0 && targetDistance < 150.0F) {
+                    constexpr float kStep = kTau / 16.0F;
+                    const auto angle = std::round(std::atan2(dy, dx) / kStep) * kStep;
+                    dx = std::cos(angle);
+                    dy = std::sin(angle);
+                    enemy.facing = facingFor(dx, dy);
+                    enemy.attackAnimationTicks = 20;
                     (void)spawnEnemyBullet(enemyBullets, enemy,
-                        enemy.kind == EnemyKind::Archer
-                            ? EnemyBulletType::Arrow : EnemyBulletType::Magic,
-                        dx, dy);
-                    const auto base = enemy.kind == EnemyKind::Archer ? 2.2F : 1.9F;
+                                           EnemyBulletType::Arrow, dx, dy);
                     enemy.attackCooldownTicks = static_cast<std::uint16_t>(
-                        std::round((base + randomUnit(randomState) * 0.9F) * 60.0F));
+                        std::round((2.2F + randomUnit(randomState) * 0.9F) * 60.0F));
+                }
+            } else if (enemy.kind == EnemyKind::Mage) {
+                auto moveX = 0.0F;
+                auto moveY = 0.0F;
+                if (targetDistance < 85.0F) {
+                    moveX -= dx * speed;
+                    moveY -= dy * speed;
+                } else if (targetDistance > 135.0F) {
+                    moveX += dx * speed;
+                    moveY += dy * speed;
+                }
+                const auto separation = mageSeparation(enemy, enemies);
+                moveX += separation[0] * speed * kMageSeparationWeight;
+                moveY += separation[1] * speed * kMageSeparationWeight;
+                const auto moveSpeed = std::sqrt(moveX * moveX + moveY * moveY);
+                const auto maximumSpeed = speed * kMageSeparationMaximumSpeed;
+                if (moveSpeed > maximumSpeed) {
+                    moveX = moveX / moveSpeed * maximumSpeed;
+                    moveY = moveY / moveSpeed * maximumSpeed;
+                }
+                moveActor(enemy, moveX, moveY, map);
+                if (enemy.attackCooldownTicks == 0 && targetDistance < 165.0F) {
+                    (void)spawnEnemyBullet(enemyBullets, enemy,
+                                           EnemyBulletType::Magic, dx, dy);
+                    enemy.attackCooldownTicks = static_cast<std::uint16_t>(
+                        std::round((1.9F + randomUnit(randomState) * 0.9F) * 60.0F));
                 }
             } else {
                 moveActor(enemy, dx * speed, dy * speed, map);
@@ -1346,7 +1439,29 @@ void updateWindSlashes(std::array<WindSlashState, kMaximumWindSlashes>& slashes,
             const auto distanceSquared = squaredDistance(owner.x, owner.y, enemy.x, enemy.y);
             const auto inner = std::max(0.0F, slash.innerRadius - enemy.radius);
             const auto outer = slash.outerRadius + enemy.radius;
-            if (distanceSquared < inner * inner || distanceSquared > outer * outer) continue;
+            auto hit = distanceSquared >= inner * inner && distanceSquared <= outer * outer;
+            if (!hit) {
+                const auto progress = std::clamp(
+                    static_cast<float>(slash.ageTicks) / 28.0F, 0.0F, 1.0F);
+                const auto sweep = progress * kTau * 1.175F;
+                const auto cutterRadius = (slash.innerRadius + slash.outerRadius) * 0.5F;
+                const auto linkRange = enemy.radius + kWindLinkHitRadius;
+                for (std::uint8_t blade = 0; blade < slash.bladeCount; ++blade) {
+                    const auto angle = slash.startAngle
+                        + static_cast<float>(blade) * kTau
+                            / static_cast<float>(slash.bladeCount)
+                        + sweep;
+                    const auto cutterX = owner.x + std::cos(angle) * cutterRadius;
+                    const auto cutterY = owner.y + std::sin(angle) * cutterRadius;
+                    if (squaredDistanceToSegment(
+                            enemy.x, enemy.y, owner.x, owner.y, cutterX, cutterY)
+                        <= linkRange * linkRange) {
+                        hit = true;
+                        break;
+                    }
+                }
+            }
+            if (!hit) continue;
             enemy.hp = static_cast<std::int16_t>(enemy.hp - slash.damage);
             slash.hitCooldownTicks[enemyIndex] = 7;
             spawnImpact(impacts, ImpactEffectType::Wind, enemy.x, enemy.y);
@@ -1432,6 +1547,81 @@ std::uint8_t perkLevel(const PlayerState& player, Perk perk) noexcept {
     return 0;
 }
 
+std::uint8_t perkMaximum(Perk perk) noexcept {
+    if (perk == Perk::Speed || perk == Perk::MaxHp) return 4;
+    if (perk == Perk::Heal || perk == Perk::Bomb) return 0;
+    return 9;
+}
+
+bool allPermanentUpgradesMaxed(const PlayerState& player) noexcept {
+    for (std::uint8_t value = static_cast<std::uint8_t>(Perk::Light);
+         value <= static_cast<std::uint8_t>(Perk::MaxHp); ++value) {
+        const auto perk = static_cast<Perk>(value);
+        const auto index = static_cast<std::size_t>(perk);
+        const auto totalTenths = static_cast<std::uint16_t>(perkLevel(player, perk)) * 10U
+            + player.linkedUpgradeTenths[index];
+        if (totalTenths < static_cast<std::uint16_t>(perkMaximum(perk)) * 10U) return false;
+    }
+    return true;
+}
+
+std::uint32_t xpNeededForPlayer(const PlayerState& player, Difficulty difficulty) noexcept {
+    const auto base = static_cast<double>(xpNeededForLevel(player.level, difficulty));
+    if (!allPermanentUpgradesMaxed(player)) return static_cast<std::uint32_t>(base);
+    if (player.postMaxXpNeeded != 0) return player.postMaxXpNeeded;
+    const auto scaled = base * std::pow(1.1, static_cast<double>(player.postMaxLevelUps) + 1.0);
+    if (scaled >= static_cast<double>(std::numeric_limits<std::uint32_t>::max())) {
+        return std::numeric_limits<std::uint32_t>::max();
+    }
+    return static_cast<std::uint32_t>(std::round(scaled));
+}
+
+bool applyUpgradeTenths(PlayerState& player, Perk perk, std::uint8_t amountTenths) noexcept {
+    const auto maximum = perkMaximum(perk);
+    const auto index = static_cast<std::size_t>(perk);
+    if (maximum == 0 || index >= player.linkedUpgradeTenths.size()) return false;
+    const auto current = static_cast<std::uint16_t>(perkLevel(player, perk)) * 10U
+        + player.linkedUpgradeTenths[index];
+    const auto next = std::min<std::uint16_t>(
+        static_cast<std::uint16_t>(maximum) * 10U,
+        static_cast<std::uint16_t>(current + amountTenths));
+    const auto applied = static_cast<std::uint8_t>(next - current);
+    if (applied == 0) return false;
+
+    auto& fraction = player.linkedUpgradeTenths[index];
+    fraction = static_cast<std::uint8_t>(next % 10U);
+    const auto level = static_cast<std::uint8_t>(next / 10U);
+    switch (perk) {
+    case Perk::Light: player.lightLevel = level; break;
+    case Perk::Fire: player.fireLevel = level; break;
+    case Perk::Wind: player.windLevel = level; break;
+    case Perk::Thunder: player.thunderLevel = level; break;
+    case Perk::Ice: player.iceLevel = level; break;
+    case Perk::Orb: player.orbLevel = level; break;
+    case Perk::Familiar: player.familiarLevel = level; break;
+    case Perk::Speed: player.speedLevel = level; break;
+    case Perk::MaxHp:
+        player.maxHpLevel = level;
+        player.linkedHpHalfUnits = static_cast<std::uint8_t>(
+            player.linkedHpHalfUnits + applied);
+        while (player.linkedHpHalfUnits >= 2U) {
+            player.linkedHpHalfUnits = static_cast<std::uint8_t>(
+                player.linkedHpHalfUnits - 2U);
+            player.maxHp = static_cast<std::int16_t>(
+                std::min<std::int32_t>(999, player.maxHp + 1));
+            player.hp = static_cast<std::int16_t>(
+                std::min<std::int32_t>(player.maxHp, player.hp + 1));
+        }
+        break;
+    case Perk::Heal:
+    case Perk::Bomb: return false;
+    }
+    if (player.postMaxXpNeeded == 0 && allPermanentUpgradesMaxed(player)) {
+        player.postMaxXpNeeded = 330;
+    }
+    return true;
+}
+
 void rollPerks(PlayerState& player, std::uint32_t& randomState, bool endless) noexcept {
     constexpr std::array<Perk, 11> kPool{{
         Perk::Light, Perk::Fire, Perk::Wind, Perk::Thunder, Perk::Ice,
@@ -1442,7 +1632,7 @@ void rollPerks(PlayerState& player, std::uint32_t& randomState, bool endless) no
     for (std::size_t slot = 0; slot < player.perkChoices.size(); ++slot) {
         unsigned total = 0;
         for (std::size_t index = 0; index < kPool.size(); ++index) {
-            const auto maximum = kPool[index] == Perk::Speed || kPool[index] == Perk::MaxHp ? 4U : 5U;
+            const auto maximum = perkMaximum(kPool[index]);
             const auto instant = kPool[index] == Perk::Heal || kPool[index] == Perk::Bomb;
             const auto capped = !instant && perkLevel(player, kPool[index]) >= maximum;
             if (!chosen[index] && !capped) total += kWeights[index];
@@ -1458,7 +1648,7 @@ void rollPerks(PlayerState& player, std::uint32_t& randomState, bool endless) no
         randomState = randomState * 1664525U + 1013904223U;
         auto pick = static_cast<unsigned>((randomState >> 16U) % total);
         for (std::size_t index = 0; index < kPool.size(); ++index) {
-            const auto maximum = kPool[index] == Perk::Speed || kPool[index] == Perk::MaxHp ? 4U : 5U;
+            const auto maximum = perkMaximum(kPool[index]);
             const auto instant = kPool[index] == Perk::Heal || kPool[index] == Perk::Bomb;
             const auto capped = !instant && perkLevel(player, kPool[index]) >= maximum;
             if (chosen[index] || capped) continue;
@@ -1483,14 +1673,25 @@ void gainXp(PlayerState& player, std::uint8_t owner, std::uint16_t amount,
             std::uint32_t& randomState,
             std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects,
             Difficulty difficulty) noexcept {
-    player.xp = static_cast<std::uint16_t>(player.xp + amount);
+    player.xp += amount;
     auto leveledUp = false;
-    while (player.xp >= xpNeededForLevel(player.level, difficulty)) {
-        player.xp = static_cast<std::uint16_t>(
-            player.xp - xpNeededForLevel(player.level, difficulty));
+    auto needed = xpNeededForPlayer(player, difficulty);
+    while (player.xp >= needed) {
+        const auto upgradesComplete = allPermanentUpgradesMaxed(player);
+        player.xp -= needed;
         if (player.level < 255) ++player.level;
+        if (upgradesComplete && player.postMaxLevelUps < 65535U) {
+            ++player.postMaxLevelUps;
+            const auto scaled = 300.0
+                * std::pow(1.1, static_cast<double>(player.postMaxLevelUps) + 1.0);
+            player.postMaxXpNeeded = scaled >=
+                    static_cast<double>(std::numeric_limits<std::uint32_t>::max())
+                ? std::numeric_limits<std::uint32_t>::max()
+                : static_cast<std::uint32_t>(std::round(scaled));
+        }
         if (player.pendingPerkChoices < 255) ++player.pendingPerkChoices;
         leveledUp = true;
+        needed = xpNeededForPlayer(player, difficulty);
     }
     if (leveledUp) spawnPerkEffect(perkEffects, PerkEffectType::LevelUp, owner, randomState);
     beginPerkChoice(player, randomState, difficulty == Difficulty::Endless);
@@ -1499,35 +1700,34 @@ void gainXp(PlayerState& player, std::uint8_t owner, std::uint16_t amount,
 void applyPerk(PlayerState& player, std::uint8_t owner, Perk perk,
                std::uint32_t& randomState,
                std::array<PerkEffectState, kMaximumPerkEffects>& perkEffects) noexcept {
+    auto applied = true;
     switch (perk) {
     case Perk::Light:
-        if (player.lightLevel < 255) ++player.lightLevel;
+        applied = applyUpgradeTenths(player, perk, 10);
         break;
     case Perk::Fire:
-        if (player.fireLevel < 255) ++player.fireLevel;
+        applied = applyUpgradeTenths(player, perk, 10);
         break;
     case Perk::Wind:
-        if (player.windLevel < 255) ++player.windLevel;
+        applied = applyUpgradeTenths(player, perk, 10);
         break;
     case Perk::Thunder:
-        if (player.thunderLevel < 255) ++player.thunderLevel;
+        applied = applyUpgradeTenths(player, perk, 10);
         break;
     case Perk::Ice:
-        if (player.iceLevel < 255) ++player.iceLevel;
+        applied = applyUpgradeTenths(player, perk, 10);
         break;
     case Perk::Orb:
-        if (player.orbLevel < 255) ++player.orbLevel;
+        applied = applyUpgradeTenths(player, perk, 10);
         break;
     case Perk::Familiar:
-        if (player.familiarLevel < 255) ++player.familiarLevel;
+        applied = applyUpgradeTenths(player, perk, 10);
         break;
     case Perk::Speed:
-        if (player.speedLevel < 255) ++player.speedLevel;
+        applied = applyUpgradeTenths(player, perk, 10);
         break;
     case Perk::MaxHp:
-        if (player.maxHpLevel < 255) ++player.maxHpLevel;
-        player.maxHp = static_cast<std::int16_t>(std::min<std::int32_t>(999, player.maxHp + 5));
-        player.hp = static_cast<std::int16_t>(std::min<std::int32_t>(player.maxHp, player.hp + 5));
+        applied = applyUpgradeTenths(player, perk, 10);
         break;
     case Perk::Heal:
         player.hp = player.maxHp;
@@ -1538,7 +1738,7 @@ void applyPerk(PlayerState& player, std::uint8_t owner, Perk perk,
     }
     const auto effect = perk == Perk::Heal ? PerkEffectType::Heal
         : perk == Perk::MaxHp ? PerkEffectType::HpUp : PerkEffectType::Upgrade;
-    spawnPerkEffect(perkEffects, effect, owner, randomState);
+    if (applied) spawnPerkEffect(perkEffects, effect, owner, randomState);
     player.sharePending = true;
     player.sharePerk = perk;
 }
@@ -1562,7 +1762,7 @@ void updateAutoPerkChoice(PlayerState& player,
     for (std::size_t index = 0; index < player.perkChoices.size(); ++index) {
         const auto perk = player.perkChoices[index];
         const auto level = perkLevel(player, perk);
-        const auto maximum = perk == Perk::Speed || perk == Perk::MaxHp ? 4U : 5U;
+        const auto maximum = perkMaximum(perk);
         const auto instant = perk == Perk::Heal || perk == Perk::Bomb;
         if (!instant && level >= maximum) continue;
         auto score = kWeights[static_cast<std::size_t>(perk)];
@@ -1592,35 +1792,8 @@ void updateAutoPerkChoice(PlayerState& player,
     beginPerkChoice(player, randomState, endless);
 }
 
-void applyLinkedUpgrade(PlayerState& player, Perk perk) noexcept {
-    const auto index = static_cast<std::size_t>(perk);
-    if (index >= player.linkedUpgradeTenths.size()) return;
-    auto& tenths = player.linkedUpgradeTenths[index];
-    tenths = static_cast<std::uint8_t>(tenths + 5U);
-    if (perk == Perk::MaxHp) {
-        player.linkedHpHalfUnits = static_cast<std::uint8_t>(player.linkedHpHalfUnits + 5U);
-        while (player.linkedHpHalfUnits >= 2U) {
-            player.linkedHpHalfUnits = static_cast<std::uint8_t>(player.linkedHpHalfUnits - 2U);
-            player.maxHp = static_cast<std::int16_t>(std::min<std::int32_t>(999, player.maxHp + 1));
-            player.hp = static_cast<std::int16_t>(std::min<std::int32_t>(player.maxHp, player.hp + 1));
-        }
-    }
-    while (tenths >= 10U) {
-        tenths = static_cast<std::uint8_t>(tenths - 10U);
-        switch (perk) {
-        case Perk::Light: if (player.lightLevel < 255) ++player.lightLevel; break;
-        case Perk::Fire: if (player.fireLevel < 255) ++player.fireLevel; break;
-        case Perk::Wind: if (player.windLevel < 255) ++player.windLevel; break;
-        case Perk::Thunder: if (player.thunderLevel < 255) ++player.thunderLevel; break;
-        case Perk::Ice: if (player.iceLevel < 255) ++player.iceLevel; break;
-        case Perk::Orb: if (player.orbLevel < 255) ++player.orbLevel; break;
-        case Perk::Familiar: if (player.familiarLevel < 255) ++player.familiarLevel; break;
-        case Perk::Speed: if (player.speedLevel < 255) ++player.speedLevel; break;
-        case Perk::MaxHp: if (player.maxHpLevel < 255) ++player.maxHpLevel; break;
-        case Perk::Heal:
-        case Perk::Bomb: break;
-        }
-    }
+bool applyLinkedUpgrade(PlayerState& player, Perk perk) noexcept {
+    return applyUpgradeTenths(player, perk, 5);
 }
 
 void processLinkShares(std::array<PlayerState, pixel_twins::kControllerCount>& players,
@@ -1637,11 +1810,12 @@ void processLinkShares(std::array<PlayerState, pixel_twins::kControllerCount>& p
             spawnPerkEffect(perkEffects, PerkEffectType::Heal,
                             static_cast<std::uint8_t>(1U - ownerIndex), randomState);
         } else if (owner.sharePerk != Perk::Bomb) {
-            applyLinkedUpgrade(partner, owner.sharePerk);
-            const auto effect = owner.sharePerk == Perk::MaxHp
-                ? PerkEffectType::HpUp : PerkEffectType::Upgrade;
-            spawnPerkEffect(perkEffects, effect,
-                            static_cast<std::uint8_t>(1U - ownerIndex), randomState);
+            if (applyLinkedUpgrade(partner, owner.sharePerk)) {
+                const auto effect = owner.sharePerk == Perk::MaxHp
+                    ? PerkEffectType::HpUp : PerkEffectType::Upgrade;
+                spawnPerkEffect(perkEffects, effect,
+                                static_cast<std::uint8_t>(1U - ownerIndex), randomState);
+            }
         }
     }
 }
@@ -2538,8 +2712,8 @@ std::uint16_t xpNeededForLevel(std::uint8_t level, Difficulty difficulty) noexce
     return static_cast<std::uint16_t>(std::clamp<std::uint64_t>(scaled, 1U, 300U));
 }
 
-std::uint16_t GameplayState::xpNeeded(std::uint8_t level) const noexcept {
-    return xpNeededForLevel(level, difficulty_);
+std::uint32_t GameplayState::xpNeeded(std::size_t playerIndex) const noexcept {
+    return xpNeededForPlayer(players_[playerIndex], difficulty_);
 }
 
 std::uint8_t directionRow8(float x, float y) noexcept {
