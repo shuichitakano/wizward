@@ -1384,7 +1384,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     }
     drawTimer(target, gameplay.elapsedTicks(), gameplay.difficulty() == Difficulty::Endless,
               assets.endlessRankingColor(false));
-    if (gameplay.bossCount() > 0) {
+    if (gameplay.difficulty() != Difficulty::Endless && gameplay.bossCount() > 0) {
         constexpr std::int16_t kBossBarX = 42;
         constexpr std::int16_t kBossBarY = 14;
         constexpr std::uint16_t kBossBarWidth = 78;

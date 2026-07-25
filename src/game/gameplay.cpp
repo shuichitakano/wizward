@@ -993,9 +993,24 @@ void fireBossRadial(EnemyState& enemy,
 
 std::array<float, 2> mageSeparation(
     const EnemyState& enemy,
-    const std::array<EnemyState, kMaximumEnemies>& enemies) noexcept {
+    const std::array<EnemyState, kMaximumEnemies>& enemies,
+    const EnemySpatialGrid& enemyGrid) noexcept {
     std::array<float, 2> separation{};
-    for (const auto& other : enemies) {
+    // Earlier enemies in the array may already have moved or received contact
+    // knockback, while the grid still contains their pre-move cell.
+    constexpr float kGridMotionPadding = kEnemyContactKnockback + 1.0F;
+    std::array<std::uint16_t, kMaximumEnemies> candidateIndices;
+    std::size_t candidateCount = 0;
+    enemyGrid.forEachCandidate(
+        enemy.x, enemy.y, kMageSeparationRange + kGridMotionPadding,
+        [&](std::size_t otherIndex) {
+            candidateIndices[candidateCount++] = static_cast<std::uint16_t>(otherIndex);
+        });
+    std::sort(candidateIndices.begin(),
+              candidateIndices.begin() + static_cast<std::ptrdiff_t>(candidateCount));
+    for (std::size_t candidate = 0; candidate < candidateCount; ++candidate) {
+        const auto otherIndex = candidateIndices[candidate];
+        const auto& other = enemies[otherIndex];
         if (&other == &enemy || !other.active || other.kind != EnemyKind::Mage
             || other.hp <= 0 || other.bornTicks > 0 || other.spawnDelayTicks > 0) {
             continue;
@@ -1017,6 +1032,7 @@ std::array<float, 2> mageSeparation(
 }
 
 void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
+                 const EnemySpatialGrid& enemyGrid,
                  std::array<PlayerState, pixel_twins::kControllerCount>& players,
                  std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                  std::array<XpGemState, kMaximumXpGems>& xpGems,
@@ -1103,7 +1119,7 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
                     moveX += dx * speed;
                     moveY += dy * speed;
                 }
-                const auto separation = mageSeparation(enemy, enemies);
+                const auto separation = mageSeparation(enemy, enemies, enemyGrid);
                 moveX += separation[0] * speed * kMageSeparationWeight;
                 moveY += separation[1] * speed * kMageSeparationWeight;
                 const auto moveSpeed = std::sqrt(moveX * moveX + moveY * moveY);
@@ -2597,9 +2613,10 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
                 ? 3.0F : 1.0F) * 60.0F
                 * balance.spawnIntervalPercent / 100.0F));
     }
-    moveEnemies(enemies_, players_, enemyBullets_, xpGems_, scores_, killCounts_,
-                map, randomState_, balance);
     EnemySpatialGrid enemyGrid;
+    enemyGrid.rebuild(enemies_);
+    moveEnemies(enemies_, enemyGrid, players_, enemyBullets_, xpGems_, scores_, killCounts_,
+                map, randomState_, balance);
     enemyGrid.rebuild(enemies_);
     EnemyBulletSpatialGrid enemyBulletGrid;
     enemyBulletGrid.rebuild(enemyBullets_);
