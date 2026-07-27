@@ -25,25 +25,38 @@ BGMのSnare、Hat、Percussionは、8声のBGM波形メモリ音源とは別の1
 
 ```sh
 PICO_SDK_PATH=/path/to/pico-sdk cmake -S rp2350 -B build-rp2350 \
-  -DPICO_BOARD=pico2 -DCMAKE_BUILD_TYPE=Release
+  -DPICO_BOARD=pico2 -DCMAKE_BUILD_TYPE=Release \
+  -DWIZWARD_PIXEL_TWINS_DIR=/path/to/pixel-twins
 cmake --build build-rp2350 --parallel
 ```
 
-`rp2350/main.cpp`は共通ゲームコア、全アセット、Pixel TwinsをRP2350用にリンクし、
-初期化と1フレームの共通描画までをビルド対象にします。ボード固有I/Oは未接続です。
+`rp2350/main.cpp`は共通ゲームコア、全アセット、Pixel TwinsをRP2350用にリンクします。
+core 0はゲーム更新と描画を担当し、core 1はPIO/DMA LEDドライバを連続駆動します。core 1が
+新しい表示バッファを受理して旧バッファを解放したことをackしてから、core 0が旧バッファを
+次の描画へ再利用します。これによりダブルフレームバッファを競合なく共有し、ゲーム描画中も
+PWM走査を止めません。
+
+LED転送完了を1tickの基準としてタイトル、ランキング、アトラクトデモを更新し、シーン変更時
+だけcore 1でLED用パレット変換テーブルを再生成します。USB入力とPCM DMAは未接続です。
+
+音声出力が未接続の段階では`WIZWARD_BUILD_AUDIO_DATA=OFF`として、BGM/SFX定数をFlashへ
+リンクしません。PCM DMA接続時にPixel Twinsの音声型と生成データを同期して有効化します。
 
 `Game`、`Controllers`、`AudioSystem`はスタックオーバーフローを避けるため静的領域に置きます。
-実行中の動的メモリ確保は追加しません。
+実行中の動的メモリ確保は追加しません。実機デバッガでは、core 0のゲーム更新とマップ生成が
+最大約7.1KiBのスタックを使うことを確認したため、core 0は8KiB、LED専用core 1は2KiBを
+予約します。core 1はSDKの自動予約を使わず、BSS上の独立した配列を
+`multicore_launch_core1_with_stack()`へ渡します。両コアを2KiBのままにするとcore 0が
+core 1のスタックを破壊します。
 
-初期スモークビルドのMAPでは、SRAMの`.data`が316,176バイト、`.bss`が
-93,216バイトです。ヒープ2,048バイトを含めた汎用SRAMの未使用領域は約110KiBです。
-これにはLED転送バッファとPCM DMAバッファを含みません。それらの方式は、この実測値を
-基準にトレードオフを比較してから決定します。
+LED統合後の実機ELFでは、SRAMの`.data`が337,864バイト、`.bss`が157,708バイトです。
+ヒープ2,048バイトの終端からcore 0スタック下限までの未使用領域は約25.8KiBです。
+これにはLED転送バッファと両コアのスタックを含み、PCM DMAバッファは含みません。
+PCM DMA方式はこの残容量を基準に決定します。
 
 ## 次の段階
 
-1. 実機ボードとLEDパネルの電気仕様を確定
-2. Pixel TwinsにLED転送データ生成とPIO/DMA転送を追加
-3. TinyUSBホスト入力を`ControllerSample`へ変換
-4. PCMブロックのDMA方式とバッファ数を決定後、音声出力を接続
-5. 実機でSRAM配置、最悪フレーム時間、DMAアンダーランを計測
+1. TinyUSBホスト入力を`ControllerSample`へ変換
+2. PCMブロックのDMA方式とバッファ数を決定後、音声出力を接続
+3. LED転送を完全割り込み駆動へ変更し、core 1の待機時間を他処理へ開放
+4. 実機でSRAM配置、最悪フレーム時間、DMAアンダーランを計測

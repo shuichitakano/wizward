@@ -633,7 +633,7 @@ PIXEL_TWINS_SRAM void queueAsset(pixel_twins::SpriteBuckets<Capacity, ExCapacity
     if (!assets.makeLoopingSprite(id, frame, directionRow, x, y, sprite)) return;
     constexpr float kSortMargin = 60.0F;
     const auto bucket = static_cast<std::uint16_t>(std::clamp(
-        static_cast<std::int32_t>(screenFootY + kSortMargin), 0,
+        static_cast<std::int32_t>(screenFootY + kSortMargin), std::int32_t{0},
         static_cast<std::int32_t>(pixel_twins::kBucketCount - 1U)));
     (void)buckets.addSprite(bucket, sprite);
 }
@@ -673,7 +673,7 @@ PIXEL_TWINS_SRAM void queueScaledAsset(
         source.sw, source.sh, source.p};
     constexpr float kSortMargin = 60.0F;
     const auto bucket = static_cast<std::uint16_t>(std::clamp(
-        static_cast<std::int32_t>(screenFootY + kSortMargin), 0,
+        static_cast<std::int32_t>(screenFootY + kSortMargin), std::int32_t{0},
         static_cast<std::int32_t>(pixel_twins::kBucketCount - 1U)));
     (void)buckets.addSpriteEx(bucket, sprite);
 }
@@ -1065,7 +1065,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
         const auto gemY = static_cast<std::int16_t>(gem.y - camera.y - 4.0F);
         constexpr float kSortMargin = 60.0F;
         const auto bucket = static_cast<std::uint16_t>(std::clamp(
-            static_cast<std::int32_t>(gem.y - camera.y + kSortMargin), 0,
+            static_cast<std::int32_t>(gem.y - camera.y + kSortMargin), std::int32_t{0},
             static_cast<std::int32_t>(pixel_twins::kBucketCount - 1U)));
         pixel_twins::Sprite sprite{};
         if (assets.makeXpGemSprite(gem.owner, gemX, gemY, sprite)) {

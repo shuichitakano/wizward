@@ -5,6 +5,7 @@ project(wizward VERSION 0.1.0 LANGUAGES CXX)
 option(WIZWARD_BUILD_TESTS "Wizwardのテストをビルドする" ON)
 option(WIZWARD_BUILD_APP "SDLによるmacOS版アプリをビルドする" OFF)
 option(WIZWARD_BUILD_DEMO "旧名。WIZWARD_BUILD_APPと同じ" OFF)
+option(WIZWARD_BUILD_AUDIO_DATA "BGMおよびSFX定数をビルドする" ON)
 set(WIZWARD_PIXEL_TWINS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/pixel-twins"
     CACHE PATH "Pixel Twinsソースディレクトリ")
 if(NOT EXISTS "${WIZWARD_PIXEL_TWINS_DIR}/CMakeLists.txt")
@@ -53,11 +54,7 @@ add_custom_command(
     VERBATIM
 )
 
-add_library(wizward_core
-    src/audio/audio_assets.cpp
-    src/audio/bgm_data.cpp
-    src/audio/endless_bgm_data.cpp
-    src/audio/sfx_data.cpp
+set(WIZWARD_CORE_SOURCES
     src/assets/game_assets.cpp
     src/assets/title_assets.cpp
     src/assets/wizward_font.cpp
@@ -66,6 +63,15 @@ add_library(wizward_core
     src/world/world_map.cpp
     "${WIZWARD_GENERATED_DIR}/embedded_assets.cpp"
 )
+if(WIZWARD_BUILD_AUDIO_DATA)
+    list(APPEND WIZWARD_CORE_SOURCES
+        src/audio/audio_assets.cpp
+        src/audio/bgm_data.cpp
+        src/audio/endless_bgm_data.cpp
+        src/audio/sfx_data.cpp
+    )
+endif()
+add_library(wizward_core ${WIZWARD_CORE_SOURCES})
 add_library(wizward::core ALIAS wizward_core)
 target_include_directories(wizward_core
     PUBLIC
