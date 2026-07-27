@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
 
+set(PICO_BOARD pico2 CACHE STRING "RP2350搭載ボード")
 if(NOT DEFINED ENV{PICO_SDK_PATH})
     message(FATAL_ERROR "PICO_SDK_PATHにPico SDKのパスを設定してください")
 endif()
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 
 project(wizward_rp2350 LANGUAGES C CXX ASM)
-set(PICO_BOARD pico2 CACHE STRING "RP2350搭載ボード")
 pico_sdk_init()
 
 set(WIZWARD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
