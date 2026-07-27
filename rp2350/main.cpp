@@ -1,6 +1,7 @@
 #include "game/game.hpp"
 
 #include "pixel_twins/rp2350/led_panel.hpp"
+#include "pixel_twins/rp2350/usb_controller.hpp"
 
 #include "pico/multicore.h"
 #include "pico/stdlib.h"
@@ -16,6 +17,7 @@ namespace {
 wizward::game::Game game;
 pixel_twins::Controllers controllers;
 pixel_twins::rp2350::LedPanelDriver ledPanel;
+pixel_twins::rp2350::UsbControllerInput usbControllers;
 alignas(8) std::array<std::uint32_t, 512> ledCoreStack{};
 
 std::atomic<const pixel_twins::PixelBuffer*> publishedBuffer{nullptr};
@@ -81,6 +83,11 @@ int main() {
     }
     game.render();
 
+    // USB2がDMA15を予約してから、LED側のDMAをcore 1で動的確保する。
+    if (!usbControllers.initialize()) {
+        while (true) tight_loop_contents();
+    }
+
     std::uint32_t frame = 1;
     publishedBuffer.store(
         &game.framebuffer().displayBuffer(), std::memory_order_relaxed);
@@ -88,15 +95,18 @@ int main() {
     multicore_launch_core1_with_stack(
         ledCoreMain, ledCoreStack.data(), sizeof(ledCoreStack));
     while (!ledCoreReady.load(std::memory_order_acquire)) {
+        usbControllers.task();
         tight_loop_contents();
     }
 
     auto paletteScene = game.scene();
 
     // core 1のLED転送完了を60Hz更新の基準とする。
-    // USB入力とPCM DMAは後続段階で接続する。
+    // USBホストはcore 0のフレーム待ち時間にも進める。
     while (true) {
         const auto frameStart = time_us_32();
+        usbControllers.task();
+        usbControllers.update(controllers);
         const auto inputResult = game.processInput(controllers);
         const auto tickResult = game.tick(controllers);
         if (!inputResult.succeeded || !tickResult.succeeded) {
@@ -116,6 +126,7 @@ int main() {
             &game.framebuffer().displayBuffer(), std::memory_order_relaxed);
         publishedFrame.store(frame, std::memory_order_release);
         while (consumedFrame.load(std::memory_order_acquire) != frame) {
+            usbControllers.task();
             tight_loop_contents();
         }
         const auto frameEnd = time_us_32();
