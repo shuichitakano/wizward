@@ -1807,7 +1807,7 @@ void rollPerks(PlayerState& player, std::uint32_t& randomState, bool endless) no
         Perk::Light, Perk::Fire, Perk::Wind, Perk::Thunder, Perk::Ice,
         Perk::Orb, Perk::Familiar, Perk::Speed, Perk::MaxHp, Perk::Heal, Perk::Bomb,
     }};
-    constexpr std::array<std::uint8_t, 11> kWeights{{5, 5, 4, 4, 4, 4, 4, 3, 3, 6, 3}};
+    constexpr std::array<std::uint8_t, 11> kWeights{{5, 5, 4, 4, 4, 4, 4, 3, 3, 3, 3}};
     std::array<bool, kPool.size()> chosen{};
     for (std::size_t slot = 0; slot < player.perkChoices.size(); ++slot) {
         unsigned total = 0;
