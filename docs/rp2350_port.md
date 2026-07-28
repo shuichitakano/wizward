@@ -37,7 +37,9 @@ core 0はゲーム更新と描画を担当し、core 1はPIO/DMA LEDドライバ
 PWM走査を止めません。
 
 LED転送完了を1tickの基準としてタイトル、ランキング、アトラクトデモを更新し、シーン変更時
-だけcore 1でLED用パレット変換テーブルを再生成します。USB入力とPCM DMAは未接続です。
+だけcore 1でLED用パレット変換テーブルを再生成します。Pico 2のオンボードLED（GPIO25）は
+30フレームごとに反転し、ゲームループが動いていることを示します。USB入力は接続済みで、
+PCM DMAは未接続です。
 
 音声出力が未接続の段階では`WIZWARD_BUILD_AUDIO_DATA=OFF`として、BGM/SFX定数をFlashへ
 リンクしません。PCM DMA接続時にPixel Twinsの音声型と生成データを同期して有効化します。

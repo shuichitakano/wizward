@@ -77,6 +77,10 @@ void ledCoreMain() noexcept {
 
 int main() {
     stdio_init_all();
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+    gpio_put(PICO_DEFAULT_LED_PIN, true);
+
     if (!game.initialize(wizward::game::Scene::Title, get_rand_32(),
                          readDifficultyDipSwitch())) {
         while (true) tight_loop_contents();
@@ -100,6 +104,9 @@ int main() {
     }
 
     auto paletteScene = game.scene();
+    constexpr std::uint32_t kHeartbeatFrames = 30;
+    std::uint32_t heartbeatFrame = 0;
+    bool heartbeatLed = true;
 
     // core 1のLED転送完了を60Hz更新の基準とする。
     // USBホストはcore 0のフレーム待ち時間にも進める。
@@ -135,5 +142,11 @@ int main() {
         latestRenderUs = renderEnd - updateEnd;
         latestFrameUs = frameEnd - frameStart;
         if (latestRenderUs > maximumRenderUs) maximumRenderUs = latestRenderUs;
+
+        if (++heartbeatFrame == kHeartbeatFrames) {
+            heartbeatFrame = 0;
+            heartbeatLed = !heartbeatLed;
+            gpio_put(PICO_DEFAULT_LED_PIN, heartbeatLed);
+        }
     }
 }
