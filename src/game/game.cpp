@@ -51,42 +51,6 @@ std::uint32_t perkIconFrame(Perk perk) noexcept {
     return static_cast<std::uint32_t>(perk);
 }
 
-enum class FaceButtonGlyph : std::uint8_t {
-    Square,
-    Triangle,
-    Circle,
-    Cross,
-};
-
-PIXEL_TWINS_SRAM void drawFaceButtonGlyph(pixel_twins::RenderTarget target,
-                                          std::int16_t x,
-                                          std::int16_t y,
-                                          FaceButtonGlyph glyph) noexcept {
-    constexpr pixel_twins::ColorIndex kColor = 255;
-    switch (glyph) {
-    case FaceButtonGlyph::Square:
-        pixel_twins::drawRectangle(target, x, y, 5, 5, kColor);
-        break;
-    case FaceButtonGlyph::Triangle:
-        // Draw a fixed 5x5 bitmap so line rasterization cannot make the
-        // two slopes asymmetrical.
-        pixel_twins::fillRectangle(target, x + 2, y, 1, 1, kColor);
-        pixel_twins::fillRectangle(target, x + 1, y + 1, 1, 2, kColor);
-        pixel_twins::fillRectangle(target, x + 3, y + 1, 1, 2, kColor);
-        pixel_twins::fillRectangle(target, x, y + 3, 1, 1, kColor);
-        pixel_twins::fillRectangle(target, x + 4, y + 3, 1, 1, kColor);
-        pixel_twins::fillRectangle(target, x, y + 4, 5, 1, kColor);
-        break;
-    case FaceButtonGlyph::Circle:
-        pixel_twins::drawCircle(target, x + 2, y + 2, 2, kColor);
-        break;
-    case FaceButtonGlyph::Cross:
-        pixel_twins::drawLine(target, x, y, x + 4, y + 4, kColor);
-        pixel_twins::drawLine(target, x + 4, y, x, y + 4, kColor);
-        break;
-    }
-}
-
 PIXEL_TWINS_SRAM void drawPerkChoices(pixel_twins::RenderTarget target,
                      const assets::GameAssets& assets,
                      const PlayerState& player) noexcept {
@@ -94,11 +58,9 @@ PIXEL_TWINS_SRAM void drawPerkChoices(pixel_twins::RenderTarget target,
         {{118, 92}}, {{132, 80}}, {{146, 92}}, {{132, 104}},
     }};
     constexpr std::array<std::uint8_t, 4> kPackIndices{{1, 0, 2, 3}};
-    constexpr std::array<FaceButtonGlyph, 4> kButtonGlyphs{{
-        FaceButtonGlyph::Square,
-        FaceButtonGlyph::Triangle,
-        FaceButtonGlyph::Circle,
-        FaceButtonGlyph::Cross,
+    // Reserved font codepoints 127..130: square, triangle, circle, cross.
+    constexpr std::array<std::uint8_t, 4> kButtonGlyphs{{
+        127, 128, 129, 130,
     }};
     if (player.choosingPerk) {
         for (std::size_t slot = 0; slot < kCenters.size(); ++slot) {
@@ -110,10 +72,10 @@ PIXEL_TWINS_SRAM void drawPerkChoices(pixel_twins::RenderTarget target,
                                          static_cast<std::int16_t>(kCenters[slot][1] - 8), sprite)) {
                 pixel_twins::drawSprite(target, sprite);
             }
-            drawFaceButtonGlyph(target,
-                                static_cast<std::int16_t>(kCenters[slot][0] - 14),
-                                static_cast<std::int16_t>(kCenters[slot][1] - 2),
-                                kButtonGlyphs[slot]);
+            pixel_twins::drawGlyph(target, assets::kWizwardFont,
+                                   static_cast<std::int16_t>(kCenters[slot][0] - 16),
+                                   static_cast<std::int16_t>(kCenters[slot][1] - 4),
+                                   kButtonGlyphs[slot], 255);
         }
     }
     if (player.perkFlashTicks > 0 && (player.perkFlashTicks / 3U) % 2U == 0U) {

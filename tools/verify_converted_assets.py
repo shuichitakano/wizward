@@ -15,6 +15,10 @@ from PIL import Image
 BG_HEADER_FORMAT = "<4sHHBBBBBBBBIIII"
 BG_HEADER_SIZE = struct.calcsize(BG_HEADER_FORMAT)
 
+LOCALLY_EXTENDED_ASSETS = {
+    "assets/fonts_selected/outlined_8x9_ascii.png",
+}
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -22,6 +26,24 @@ def _sha256(path: Path) -> str:
         for block in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def _verify_local_extension(original: Path, collected: Path) -> None:
+    with Image.open(original) as original_image, Image.open(collected) as collected_image:
+        if collected_image.width != original_image.width \
+                or collected_image.height < original_image.height:
+            raise ValueError(f"ローカル拡張画像の寸法が不正です: {collected}")
+        original_rgba = original_image.convert("RGBA")
+        collected_rgba = collected_image.convert("RGBA")
+        for glyph_index in range(95):
+            x = (glyph_index % 16) * 8
+            y = (glyph_index // 16) * 9
+            box = (x, y, x + 8, y + 9)
+            if list(original_rgba.crop(box).getdata()) \
+                    != list(collected_rgba.crop(box).getdata()):
+                raise ValueError(
+                    f"ローカル拡張画像の採用元グリフが変化しています: {collected}"
+                )
 
 
 def _verify_sprite_pack(output: Path, intermediate: dict, report_stem: str = "sprites") -> None:
@@ -181,7 +203,9 @@ def verify(prototype: Path, project: Path) -> int:
             relative = Path(reference).relative_to("assets")
             original = prototype / reference
             collected = project / "assets/source" / set_name / relative
-            if _sha256(original) != _sha256(collected):
+            if reference in LOCALLY_EXTENDED_ASSETS:
+                _verify_local_extension(original, collected)
+            elif _sha256(original) != _sha256(collected):
                 raise ValueError(f"収集画像が採用元と一致しません: {reference}")
             checked += 1
 

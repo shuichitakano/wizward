@@ -14,6 +14,12 @@ from typing import Dict, Iterable, List, Optional, Tuple
 IMAGE_REFERENCE_RE = re.compile(r'assets/[A-Za-z0-9_./-]+\.png')
 FRAME_RE = re.compile(r"(\d+)x(\d+)_\d+f")
 
+# These assets start from the prototype version but are maintained locally.
+# Preserve them when refreshing all other adopted assets.
+LOCAL_SOURCE_OVERRIDES = {
+    ("gameplay", "assets/fonts_selected/outlined_8x9_ascii.png"),
+}
+
 UI_RESERVED = [
     (2, "font_body", "#f1ead8"),
     (3, "player_1", "#ff7648"),
@@ -246,6 +252,13 @@ def _write_json(path: Path, value: object) -> None:
 
 
 def collect(prototype: Path, project: Path) -> Tuple[int, int, int]:
+    local_overrides = {}
+    for set_name, reference in LOCAL_SOURCE_OVERRIDES:
+        relative = Path(reference).relative_to("assets")
+        source = project / "assets" / "source" / set_name / relative
+        if source.is_file():
+            local_overrides[(set_name, reference)] = source.read_bytes()
+
     for set_name in ("gameplay", "title", "attract"):
         source_root = project / "assets" / "source" / set_name
         if source_root.exists():
@@ -263,6 +276,11 @@ def collect(prototype: Path, project: Path) -> Tuple[int, int, int]:
     gameplay = _copy_and_describe(prototype, project, gameplay_references, "gameplay")
     title = _copy_and_describe(prototype, project, title_references, "title")
     attract = _copy_and_describe(prototype, project, attract_references, "attract")
+    for (set_name, reference), contents in local_overrides.items():
+        relative = Path(reference).relative_to("assets")
+        destination = project / "assets" / "source" / set_name / relative
+        destination.write_bytes(contents)
+
     _write_json(
         project / "assets/manifests/gameplay.json",
         _converter_manifest("wizward-gameplay", gameplay, gameplay=True),

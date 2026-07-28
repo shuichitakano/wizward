@@ -29,6 +29,22 @@ def main() -> int:
     converter = pixel_twins / "tools" / "asset_converter"
     if not args.skip_collect:
         _run([sys.executable, "tools/collect_selected_assets.py"], project)
+    _run([
+        "uv", "run", str(pixel_twins / "tools/font_converter.py"),
+        str(project / "assets/source/gameplay/fonts_selected/outlined_8x9_ascii.png"),
+        "--header", str(project / "src/assets/wizward_font.hpp"),
+        "--source", str(project / "src/assets/wizward_font.cpp"),
+        "--symbol", "kWizwardFont",
+        "--namespace", "wizward::assets",
+        "--columns", "16",
+        "--first", "32",
+        "--count", "99",
+        "--fallback", "63",
+        "--outline-color", "#111315",
+        "--body-color", "#f1ead8",
+        "--outline-index", "1",
+        "--sram",
+    ], project)
     gameplay = project / "assets" / "converted" / "gameplay"
     title = project / "assets" / "converted" / "title"
     attract = project / "assets" / "converted" / "attract"

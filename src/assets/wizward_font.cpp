@@ -7,7 +7,7 @@ namespace wizward {
 namespace assets {
 namespace {
 
-PIXEL_TWINS_ASSET_SRAM const std::array<pixel_twins::Glyph, 95> kGlyphs{{
+PIXEL_TWINS_ASSET_SRAM const std::array<pixel_twins::Glyph, 99> kGlyphs{{
     pixel_twins::Glyph{{pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}}},
     pixel_twins::Glyph{{pixel_twins::GlyphRow{0x38, 0x00}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x38, 0x00}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x38, 0x00}}},
     pixel_twins::Glyph{{pixel_twins::GlyphRow{0x7c, 0x00}, pixel_twins::GlyphRow{0x54, 0x28}, pixel_twins::GlyphRow{0x54, 0x28}, pixel_twins::GlyphRow{0x54, 0x28}, pixel_twins::GlyphRow{0x7c, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}}},
@@ -102,13 +102,17 @@ PIXEL_TWINS_ASSET_SRAM const std::array<pixel_twins::Glyph, 95> kGlyphs{{
     pixel_twins::Glyph{{pixel_twins::GlyphRow{0x1c, 0x00}, pixel_twins::GlyphRow{0x34, 0x08}, pixel_twins::GlyphRow{0x2c, 0x10}, pixel_twins::GlyphRow{0x68, 0x10}, pixel_twins::GlyphRow{0x58, 0x20}, pixel_twins::GlyphRow{0x68, 0x10}, pixel_twins::GlyphRow{0x2c, 0x10}, pixel_twins::GlyphRow{0x34, 0x08}, pixel_twins::GlyphRow{0x1c, 0x00}}},
     pixel_twins::Glyph{{pixel_twins::GlyphRow{0x38, 0x00}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x38, 0x00}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x28, 0x10}, pixel_twins::GlyphRow{0x38, 0x00}}},
     pixel_twins::Glyph{{pixel_twins::GlyphRow{0x70, 0x00}, pixel_twins::GlyphRow{0x58, 0x20}, pixel_twins::GlyphRow{0x68, 0x10}, pixel_twins::GlyphRow{0x2c, 0x10}, pixel_twins::GlyphRow{0x34, 0x08}, pixel_twins::GlyphRow{0x2c, 0x10}, pixel_twins::GlyphRow{0x68, 0x10}, pixel_twins::GlyphRow{0x58, 0x20}, pixel_twins::GlyphRow{0x70, 0x00}}},
-    pixel_twins::Glyph{{pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x70, 0x00}, pixel_twins::GlyphRow{0xde, 0x20}, pixel_twins::GlyphRow{0xaa, 0x54}, pixel_twins::GlyphRow{0xf6, 0x08}, pixel_twins::GlyphRow{0x1c, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}}}
+    pixel_twins::Glyph{{pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x70, 0x00}, pixel_twins::GlyphRow{0xde, 0x20}, pixel_twins::GlyphRow{0xaa, 0x54}, pixel_twins::GlyphRow{0xf6, 0x08}, pixel_twins::GlyphRow{0x1c, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}}},
+    pixel_twins::Glyph{{pixel_twins::GlyphRow{0x38, 0x00}, pixel_twins::GlyphRow{0x44, 0x38}, pixel_twins::GlyphRow{0xba, 0x44}, pixel_twins::GlyphRow{0xaa, 0x54}, pixel_twins::GlyphRow{0xba, 0x44}, pixel_twins::GlyphRow{0x44, 0x38}, pixel_twins::GlyphRow{0x38, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}}},
+    pixel_twins::Glyph{{pixel_twins::GlyphRow{0x38, 0x00}, pixel_twins::GlyphRow{0x44, 0x38}, pixel_twins::GlyphRow{0x92, 0x6c}, pixel_twins::GlyphRow{0xaa, 0x54}, pixel_twins::GlyphRow{0xba, 0x44}, pixel_twins::GlyphRow{0x44, 0x38}, pixel_twins::GlyphRow{0x38, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}}},
+    pixel_twins::Glyph{{pixel_twins::GlyphRow{0x38, 0x00}, pixel_twins::GlyphRow{0x44, 0x38}, pixel_twins::GlyphRow{0x92, 0x6c}, pixel_twins::GlyphRow{0xaa, 0x54}, pixel_twins::GlyphRow{0x92, 0x6c}, pixel_twins::GlyphRow{0x44, 0x38}, pixel_twins::GlyphRow{0x38, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}}},
+    pixel_twins::Glyph{{pixel_twins::GlyphRow{0x38, 0x00}, pixel_twins::GlyphRow{0x44, 0x38}, pixel_twins::GlyphRow{0xaa, 0x54}, pixel_twins::GlyphRow{0x92, 0x6c}, pixel_twins::GlyphRow{0xaa, 0x54}, pixel_twins::GlyphRow{0x44, 0x38}, pixel_twins::GlyphRow{0x38, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}, pixel_twins::GlyphRow{0x00, 0x00}}}
 }};
 
 } // namespace
 
 const pixel_twins::BitmapFont kWizwardFont{
-    kGlyphs.data(), 32, 95, 63, 1
+    kGlyphs.data(), 32, 99, 63, 1
 };
 
 } // namespace assets

@@ -327,7 +327,7 @@
       ],
       "role": "reserved",
       "name": "transparent/background black",
-      "usage_pixels": 216366
+      "usage_pixels": 217370
     },
     {
       "index": 1,
@@ -349,7 +349,7 @@
       ],
       "role": "reserved",
       "name": "font_body",
-      "usage_pixels": 1149
+      "usage_pixels": 1210
     },
     {
       "index": 3,
@@ -1174,7 +1174,7 @@
       ],
       "role": "asset",
       "name": "",
-      "usage_pixels": 3120
+      "usage_pixels": 3207
     },
     {
       "index": 78,
@@ -3141,9 +3141,9 @@
     "reserved_entries": 15,
     "generated_asset_entries": 241,
     "palette_rgb888_bytes": 768,
-    "source_file_bytes": 452045,
-    "indexed_pixel_bytes": 462820,
-    "indexed_png_bytes": 274510
+    "source_file_bytes": 452749,
+    "indexed_pixel_bytes": 463972,
+    "indexed_png_bytes": 274562
   },
   "assets": [
     {
@@ -5914,7 +5914,7 @@
       "source": "../../source/gameplay/fonts_selected/outlined_8x9_ascii.png",
       "indexed_png": "assets/fonts_selected__outlined_8x9_ascii.png",
       "width": 128,
-      "height": 54,
+      "height": 63,
       "alpha_threshold": 0,
       "palette_weight": 4,
       "source_color_count": 2,
@@ -5925,14 +5925,14 @@
         77
       ],
       "index_usage": {
-        "0": 2761,
-        "2": 1124,
-        "77": 3027
+        "0": 3765,
+        "2": 1185,
+        "77": 3114
       },
       "quality": {
         "metric": "Euclidean distance in RGB888 (0..441.67)",
-        "opaque_pixels": 4151,
-        "transparent_pixels": 2761,
+        "opaque_pixels": 4299,
+        "transparent_pixels": 3765,
         "mean_rgb_distance": 0.0,
         "rms_rgb_distance": 0.0,
         "p95_rgb_distance": 0.0,
@@ -5941,9 +5941,9 @@
         "changed_pixel_ratio": 0.0
       },
       "sizes": {
-        "source_file_bytes": 1400,
-        "indexed_pixel_bytes": 6912,
-        "indexed_png_bytes": 1895
+        "source_file_bytes": 2104,
+        "indexed_pixel_bytes": 8064,
+        "indexed_png_bytes": 1947
       },
       "previews": {
         "source": "previews/fonts_selected__outlined_8x9_ascii-source.png",
