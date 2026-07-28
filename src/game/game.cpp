@@ -51,17 +51,50 @@ std::uint32_t perkIconFrame(Perk perk) noexcept {
     return static_cast<std::uint32_t>(perk);
 }
 
+enum class FaceButtonGlyph : std::uint8_t {
+    Square,
+    Triangle,
+    Circle,
+    Cross,
+};
+
+PIXEL_TWINS_SRAM void drawFaceButtonGlyph(pixel_twins::RenderTarget target,
+                                          std::int16_t x,
+                                          std::int16_t y,
+                                          FaceButtonGlyph glyph) noexcept {
+    constexpr pixel_twins::ColorIndex kColor = 255;
+    switch (glyph) {
+    case FaceButtonGlyph::Square:
+        pixel_twins::drawRectangle(target, x, y, 5, 5, kColor);
+        break;
+    case FaceButtonGlyph::Triangle:
+        pixel_twins::drawLine(target, x + 2, y, x, y + 4, kColor);
+        pixel_twins::drawLine(target, x, y + 4, x + 4, y + 4, kColor);
+        pixel_twins::drawLine(target, x + 4, y + 4, x + 2, y, kColor);
+        break;
+    case FaceButtonGlyph::Circle:
+        pixel_twins::drawCircle(target, x + 2, y + 2, 2, kColor);
+        break;
+    case FaceButtonGlyph::Cross:
+        pixel_twins::drawLine(target, x, y, x + 4, y + 4, kColor);
+        pixel_twins::drawLine(target, x + 4, y, x, y + 4, kColor);
+        break;
+    }
+}
+
 PIXEL_TWINS_SRAM void drawPerkChoices(pixel_twins::RenderTarget target,
                      const assets::GameAssets& assets,
-                     const PlayerState& player,
-                     std::size_t viewer) noexcept {
+                     const PlayerState& player) noexcept {
     constexpr std::array<std::array<std::int16_t, 2>, 4> kCenters{{
         {{118, 92}}, {{132, 80}}, {{146, 92}}, {{132, 104}},
     }};
     constexpr std::array<std::uint8_t, 4> kPackIndices{{1, 0, 2, 3}};
-    constexpr std::array<const char*, 4> kP1Labels{{"1", "2", "3", "4"}};
-    constexpr std::array<const char*, 4> kP2Labels{{"7", "8", "9", "0"}};
-    const auto& labels = viewer == 0 ? kP1Labels : kP2Labels;
+    constexpr std::array<FaceButtonGlyph, 4> kButtonGlyphs{{
+        FaceButtonGlyph::Square,
+        FaceButtonGlyph::Triangle,
+        FaceButtonGlyph::Circle,
+        FaceButtonGlyph::Cross,
+    }};
     if (player.choosingPerk) {
         for (std::size_t slot = 0; slot < kCenters.size(); ++slot) {
             const auto packIndex = kPackIndices[slot];
@@ -72,10 +105,10 @@ PIXEL_TWINS_SRAM void drawPerkChoices(pixel_twins::RenderTarget target,
                                          static_cast<std::int16_t>(kCenters[slot][1] - 8), sprite)) {
                 pixel_twins::drawSprite(target, sprite);
             }
-            pixel_twins::drawText(target, assets::kWizwardFont,
-                                  static_cast<std::int16_t>(kCenters[slot][0] - 10),
-                                  static_cast<std::int16_t>(kCenters[slot][1] - 8),
-                                  labels[slot], 255);
+            drawFaceButtonGlyph(target,
+                                static_cast<std::int16_t>(kCenters[slot][0] - 14),
+                                static_cast<std::int16_t>(kCenters[slot][1] - 2),
+                                kButtonGlyphs[slot]);
         }
     }
     if (player.perkFlashTicks > 0 && (player.perkFlashTicks / 3U) % 2U == 0U) {
@@ -1417,7 +1450,7 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
         drawCenteredText(target, "PUSH BUTTON TO JOIN", 80, 39);
     }
     drawWeaponLevels(target, assets, viewedPlayer);
-    drawPerkChoices(target, assets, viewedPlayer, viewer);
+    drawPerkChoices(target, assets, viewedPlayer);
     drawMiniMap(target, map, gameplay, viewer);
     drawOffscreenPartnerArrow(target, gameplay, camera, viewer);
     if (attractMode && (frame / 30U) % 2U == 0U) {
