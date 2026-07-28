@@ -970,7 +970,10 @@ PIXEL_TWINS_SRAM void drawTitle(pixel_twins::Framebuffer& framebuffer,
     auto right = pixel_twins::makeRenderTarget(framebuffer.drawBuffer(), pixel_twins::Screen::Right);
     title.drawScreen(left);
     title.drawScreen(right);
-    if (difficulty == Difficulty::Hard) {
+    if (difficulty == Difficulty::Easy) {
+        pixel_twins::drawText(left, assets::kWizwardFont, 118, 5, "NORMAL", 2, 6);
+        pixel_twins::drawText(right, assets::kWizwardFont, 118, 5, "NORMAL", 2, 6);
+    } else if (difficulty == Difficulty::Hard) {
         pixel_twins::drawText(left, assets::kWizwardFont, 130, 5, "HARD", 3, 6);
         pixel_twins::drawText(right, assets::kWizwardFont, 130, 5, "HARD", 3, 6);
     } else if (difficulty == Difficulty::Endless) {
@@ -981,6 +984,12 @@ PIXEL_TWINS_SRAM void drawTitle(pixel_twins::Framebuffer& framebuffer,
         drawCenteredText(left, "PUSH ANY BUTTON", 80, 98);
         drawCenteredText(right, "PUSH ANY BUTTON", 80, 98);
     }
+}
+
+constexpr Difficulty nextDifficulty(Difficulty difficulty) noexcept {
+    if (difficulty == Difficulty::Easy) return Difficulty::Hard;
+    if (difficulty == Difficulty::Hard) return Difficulty::Endless;
+    return Difficulty::Easy;
 }
 
 PIXEL_TWINS_SRAM void drawAttractRanking(
@@ -1728,6 +1737,16 @@ UpdateResult Game::processInput(const pixel_twins::Controllers& controllers) noe
         return {};
     }
     if (scene_ == Scene::Title) {
+        for (std::uint8_t index = 0; index < pixel_twins::kControllerCount; ++index) {
+            if (!controllers[index].isPressed(pixel_twins::ControllerButton::back)) {
+                continue;
+            }
+            difficulty_ = nextDifficulty(difficulty_);
+            UpdateResult result{};
+            result.sfxCues[0] = {SfxId::UiMove, index == 0 ? -0.32F : 0.32F};
+            result.sfxCueCount = 1;
+            return result;
+        }
         for (std::uint8_t index = 0; index < pixel_twins::kControllerCount; ++index) {
             if (controllers[index].pressed == 0) continue;
             startingPlayer_ = index;

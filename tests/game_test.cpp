@@ -88,6 +88,18 @@ int main() {
     assert(game.setDifficulty(wizward::game::Difficulty::Easy));
     const auto initialMapSeed = game.mapSeed();
     assert(game.scene() == Scene::Title);
+    const auto share = pressedController(0, ControllerButton::back);
+    auto modeResult = game.processInput(share);
+    assert(modeResult.succeeded);
+    assert(modeResult.sfxCueCount == 1);
+    assert(game.scene() == Scene::Title);
+    assert(game.difficulty() == wizward::game::Difficulty::Hard);
+    modeResult = game.processInput(share);
+    assert(game.scene() == Scene::Title);
+    assert(game.difficulty() == wizward::game::Difficulty::Endless);
+    modeResult = game.processInput(share);
+    assert(game.scene() == Scene::Title);
+    assert(game.difficulty() == wizward::game::Difficulty::Easy);
     game.render();
     const auto& titlePixels = game.framebuffer().displayBuffer();
     for (std::size_t y = 0; y < pixel_twins::kScreenHeight; ++y) {
