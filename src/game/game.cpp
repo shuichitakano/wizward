@@ -51,6 +51,82 @@ std::uint32_t perkIconFrame(Perk perk) noexcept {
     return static_cast<std::uint32_t>(perk);
 }
 
+std::uint8_t nearestPaletteColor(const pixel_twins::Palette& palette,
+                                 pixel_twins::Rgb target) noexcept {
+    auto best = std::uint8_t{2};
+    auto bestDistance = std::uint32_t{0xffffffffU};
+    for (std::uint16_t index = 2; index < 255; ++index) {
+        const auto& color = palette[index];
+        const auto dr = static_cast<std::int32_t>(color.r) - target.r;
+        const auto dg = static_cast<std::int32_t>(color.g) - target.g;
+        const auto db = static_cast<std::int32_t>(color.b) - target.b;
+        const auto distance = static_cast<std::uint32_t>(
+            dr * dr + dg * dg + db * db);
+        if (distance < bestDistance) {
+            best = static_cast<std::uint8_t>(index);
+            bestDistance = distance;
+        }
+    }
+    return best;
+}
+
+PIXEL_TWINS_SRAM void drawPerformanceOverlay(
+    pixel_twins::Framebuffer& framebuffer,
+    const PerformanceOverlay& overlay) noexcept {
+    if (!overlay.enabled) return;
+
+    constexpr std::int16_t kBarX = 2;
+    constexpr std::array<std::int16_t, 2> kBarY{{2, 4}};
+    constexpr std::uint16_t kBarWidth = 240;
+    constexpr std::uint32_t kFrameBudgetUs = 16'667;
+    const auto target = pixel_twins::makeRenderTarget(
+        framebuffer.drawBuffer(), pixel_twins::Screen::Full);
+    const auto& palette = framebuffer.palette();
+    const std::array<std::uint8_t, 4> colors{{
+        nearestPaletteColor(palette, {255, 48, 48}),
+        nearestPaletteColor(palette, {48, 255, 80}),
+        nearestPaletteColor(palette, {64, 128, 255}),
+        pixel_twins::kWhiteColor,
+    }};
+
+    for (std::size_t core = 0; core < overlay.cores.size(); ++core) {
+        pixel_twins::fillRectangle(
+            target, kBarX, kBarY[core], kBarWidth, 1,
+            pixel_twins::kDrawableBlackColor);
+        const auto& sample = overlay.cores[core];
+        const std::array<std::uint32_t, 4> durations{{
+            sample.renderUs, sample.audioUs, sample.updateUs, sample.otherUs,
+        }};
+        auto cumulativeUs = std::uint64_t{0};
+        auto previousX = std::uint16_t{0};
+        for (std::size_t category = 0; category < durations.size(); ++category) {
+            cumulativeUs += durations[category];
+            const auto endX = static_cast<std::uint16_t>(std::min<std::uint64_t>(
+                kBarWidth,
+                (cumulativeUs * kBarWidth + kFrameBudgetUs / 2U)
+                    / kFrameBudgetUs));
+            if (endX > previousX) {
+                pixel_twins::fillRectangle(
+                    target,
+                    static_cast<std::int16_t>(kBarX + previousX),
+                    kBarY[core],
+                    static_cast<std::uint16_t>(endX - previousX), 1,
+                    colors[category]);
+            }
+            previousX = endX;
+        }
+    }
+
+    char fpsText[] = "FPS 00.0";
+    const auto fpsTenths = std::min<std::uint16_t>(overlay.fpsTenths, 999U);
+    fpsText[4] = static_cast<char>('0' + fpsTenths / 100U);
+    fpsText[5] = static_cast<char>('0' + (fpsTenths / 10U) % 10U);
+    fpsText[7] = static_cast<char>('0' + fpsTenths % 10U);
+    pixel_twins::drawText(
+        target, assets::kWizwardFont, 268, 1, fpsText,
+        pixel_twins::kWhiteColor, 6);
+}
+
 PIXEL_TWINS_SRAM void drawPerkChoices(pixel_twins::RenderTarget target,
                      const assets::GameAssets& assets,
                      const PlayerState& player) noexcept {
@@ -1604,6 +1680,7 @@ bool Game::initialize(Scene initialScene, std::uint32_t mapSeed,
     frame_ = 0;
     sceneFrame_ = 0;
     paused_ = false;
+    performanceOverlay_ = {};
     if (scene_ == Scene::Title) return titleAssets_.applyPalette(framebuffer_);
     if (scene_ == Scene::AttractRanking) return titleAssets_.applyAttractPalette(framebuffer_);
     return gameAssets_.applyPalette(framebuffer_);
@@ -1933,6 +2010,7 @@ void Game::render() noexcept {
         drawResultPanel(right, gameAssets_, gameplay_, resultOutcome_, sceneFrame_, resultContinueTicks_, 1,
                         timeBonuses_, finalScores_, records, recordCount, rankingEntries_);
     }
+    drawPerformanceOverlay(framebuffer_, performanceOverlay_);
     framebuffer_.flip();
 }
 

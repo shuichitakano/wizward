@@ -46,6 +46,23 @@ int main() {
                 game.framebuffer().displayBuffer()[row + x];
         }
     }
+    wizward::game::PerformanceOverlay overlay{};
+    overlay.enabled = true;
+    overlay.fpsTenths = 600;
+    overlay.cores[0] = {4167, 4167, 4167, 4166};
+    overlay.cores[1] = {8333, 0, 0, 0};
+    game.setPerformanceOverlay(overlay);
+    game.render();
+    const auto& overlayPixels = game.framebuffer().displayBuffer();
+    const auto core0Row = std::size_t{2} * pixel_twins::kScreenWidth;
+    const auto core1Row = std::size_t{4} * pixel_twins::kScreenWidth;
+    assert(overlayPixels[core0Row + 2] != overlayPixels[core0Row + 62]);
+    assert(overlayPixels[core0Row + 62] != overlayPixels[core0Row + 122]);
+    assert(overlayPixels[core0Row + 122] != overlayPixels[core0Row + 182]);
+    assert(overlayPixels[core0Row + 182] == pixel_twins::kWhiteColor);
+    assert(overlayPixels[core1Row + 121] != pixel_twins::kDrawableBlackColor);
+    assert(overlayPixels[core1Row + 122] == pixel_twins::kDrawableBlackColor);
+
     assert(game.initialize(Scene::Title, 123U, wizward::game::Difficulty::Hard));
     game.render();
     const auto& hardTitlePixels = game.framebuffer().displayBuffer();

@@ -6,7 +6,9 @@
 #include "pixel_twins/rp2350/led_panel.hpp"
 #include "pixel_twins/rp2350/pwm_audio.hpp"
 #include "pixel_twins/rp2350/usb_controller.hpp"
+#include "pixel_twins/rp2350/board_pins.hpp"
 
+#include "hardware/sync.h"
 #include "pico/multicore.h"
 #include "pico/stdlib.h"
 #include "pico/rand.h"
@@ -30,13 +32,39 @@ std::atomic<std::uint32_t> publishedFrame{0};
 std::atomic<std::uint32_t> consumedFrame{0};
 std::atomic<std::uint32_t> paletteRevision{1};
 std::atomic<bool> ledCoreReady{false};
+std::atomic<std::uint32_t> profiledPresentUs{0};
 
 // 実機デバッガからフレーム時間の内訳を確認する。
-volatile std::uint32_t latestPresentUs = 0;
 volatile std::uint32_t latestUpdateUs = 0;
 volatile std::uint32_t latestRenderUs = 0;
 volatile std::uint32_t latestFrameUs = 0;
 volatile std::uint32_t maximumRenderUs = 0;
+
+struct ProfileStamp {
+    std::uint32_t timeUs;
+    std::uint32_t audioUs;
+};
+
+ProfileStamp takeProfileStamp() noexcept {
+    const auto interruptState = save_and_disable_interrupts();
+    const ProfileStamp result{
+        time_us_32(),
+        audioPlayer.diagnostics().totalRenderUs,
+    };
+    restore_interrupts(interruptState);
+    return result;
+}
+
+std::uint32_t sectionCpuUs(const ProfileStamp& start,
+                           const ProfileStamp& end) noexcept {
+    const auto wallUs = end.timeUs - start.timeUs;
+    const auto audioUs = end.audioUs - start.audioUs;
+    return wallUs > audioUs ? wallUs - audioUs : 0;
+}
+
+bool debugModeEnabled() noexcept {
+    return !gpio_get(pixel_twins::rp2350::board::kConfig1Pin);
+}
 
 wizward::game::Difficulty readDifficultyDipSwitch() noexcept {
     // ボードI/O確定後、HARD用DIPSWの入力をこの境界へ接続する。
@@ -135,7 +163,8 @@ void ledCoreMain() noexcept {
     while (true) {
         const auto presentStart = time_us_32();
         ledPanel.present(*currentBuffer);
-        latestPresentUs = time_us_32() - presentStart;
+        profiledPresentUs.store(
+            time_us_32() - presentStart, std::memory_order_release);
 
         const auto nextFrame = publishedFrame.load(std::memory_order_acquire);
         if (nextFrame == currentFrame) continue;
@@ -160,6 +189,9 @@ int main() {
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
     gpio_put(PICO_DEFAULT_LED_PIN, true);
+    gpio_init(pixel_twins::rp2350::board::kConfig1Pin);
+    gpio_set_dir(pixel_twins::rp2350::board::kConfig1Pin, GPIO_IN);
+    gpio_pull_up(pixel_twins::rp2350::board::kConfig1Pin);
 
     if (!game.initialize(wizward::game::Scene::Title, get_rand_32(),
                          readDifficultyDipSwitch())) {
@@ -190,13 +222,17 @@ int main() {
     constexpr std::uint32_t kHeartbeatFrames = 30;
     std::uint32_t heartbeatFrame = 0;
     bool heartbeatLed = true;
+    wizward::game::PerformanceOverlay performanceOverlay{};
+    auto fpsWindowStart = time_us_32();
+    std::uint32_t fpsWindowFrames = 0;
 
     // core 1のLED転送完了を60Hz更新の基準とする。
     // USBホストはcore 0のフレーム待ち時間にも進める。
     while (true) {
-        const auto frameStart = time_us_32();
+        const auto frameStart = takeProfileStamp();
         usbControllers.task();
         usbControllers.update(controllers);
+        const auto updateStart = takeProfileStamp();
         if (!applyUpdate(game.processInput(controllers))
             || !applyUpdate(game.tick(controllers))) {
             while (true) tight_loop_contents();
@@ -206,9 +242,11 @@ int main() {
             paletteScene = game.scene();
             paletteRevision.fetch_add(1, std::memory_order_release);
         }
-        const auto updateEnd = time_us_32();
+        const auto updateEnd = takeProfileStamp();
+        performanceOverlay.enabled = debugModeEnabled();
+        game.setPerformanceOverlay(performanceOverlay);
         game.render();
-        const auto renderEnd = time_us_32();
+        const auto renderEnd = takeProfileStamp();
 
         ++frame;
         publishedBuffer.store(
@@ -218,11 +256,35 @@ int main() {
             usbControllers.task();
             tight_loop_contents();
         }
-        const auto frameEnd = time_us_32();
+        const auto frameEnd = takeProfileStamp();
 
-        latestUpdateUs = updateEnd - frameStart;
-        latestRenderUs = renderEnd - updateEnd;
-        latestFrameUs = frameEnd - frameStart;
+        const auto updateUs = sectionCpuUs(updateStart, updateEnd);
+        const auto renderUs = sectionCpuUs(updateEnd, renderEnd);
+        const auto audioUs = frameEnd.audioUs - frameStart.audioUs;
+        const auto frameUs = frameEnd.timeUs - frameStart.timeUs;
+        const auto accountedUs = updateUs + renderUs + audioUs;
+        const auto otherUs = frameUs > accountedUs ? frameUs - accountedUs : 0;
+        performanceOverlay.cores[0] = {
+            renderUs, audioUs, updateUs, otherUs,
+        };
+        performanceOverlay.cores[1] = {
+            profiledPresentUs.load(std::memory_order_acquire), 0, 0, 0,
+        };
+
+        ++fpsWindowFrames;
+        const auto fpsWindowUs = frameEnd.timeUs - fpsWindowStart;
+        if (fpsWindowUs >= 500'000U) {
+            const auto numerator =
+                static_cast<std::uint64_t>(fpsWindowFrames) * 10'000'000U;
+            performanceOverlay.fpsTenths = static_cast<std::uint16_t>(
+                (numerator + fpsWindowUs / 2U) / fpsWindowUs);
+            fpsWindowStart = frameEnd.timeUs;
+            fpsWindowFrames = 0;
+        }
+
+        latestUpdateUs = updateUs;
+        latestRenderUs = renderUs;
+        latestFrameUs = frameUs;
         if (latestRenderUs > maximumRenderUs) maximumRenderUs = latestRenderUs;
 
         if (++heartbeatFrame == kHeartbeatFrames) {

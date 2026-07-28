@@ -42,6 +42,19 @@ struct UpdateResult {
     std::size_t sfxCueCount = 0;
 };
 
+struct CoreLoadSample {
+    std::uint32_t renderUs = 0;
+    std::uint32_t audioUs = 0;
+    std::uint32_t updateUs = 0;
+    std::uint32_t otherUs = 0;
+};
+
+struct PerformanceOverlay {
+    std::array<CoreLoadSample, 2> cores{};
+    std::uint16_t fpsTenths = 0;
+    bool enabled = false;
+};
+
 inline constexpr std::size_t kRankingLimit = 20;
 
 struct RankingRecord {
@@ -71,6 +84,9 @@ public:
     [[nodiscard]] UpdateResult processInput(const pixel_twins::Controllers& controllers) noexcept;
     [[nodiscard]] UpdateResult tick(const pixel_twins::Controllers& controllers) noexcept;
     void render() noexcept PIXEL_TWINS_SRAM;
+    void setPerformanceOverlay(const PerformanceOverlay& overlay) noexcept {
+        performanceOverlay_ = overlay;
+    }
 
     [[nodiscard]] pixel_twins::Framebuffer& framebuffer() noexcept { return framebuffer_; }
     [[nodiscard]] const pixel_twins::Framebuffer& framebuffer() const noexcept { return framebuffer_; }
@@ -128,6 +144,7 @@ private:
     Difficulty difficulty_ = Difficulty::Easy;
     bool paused_ = false;
     bool nameEntryBgmStarted_ = false;
+    PerformanceOverlay performanceOverlay_{};
     std::array<std::uint32_t, pixel_twins::kControllerCount> timeBonuses_{};
     std::array<std::uint32_t, pixel_twins::kControllerCount> finalScores_{};
     std::array<RankingRecord, kRankingLimit> rankings_{};
