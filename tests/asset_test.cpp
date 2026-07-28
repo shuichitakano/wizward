@@ -62,7 +62,7 @@ int main() {
     auto target = pixel_twins::makeRenderTarget(framebuffer.drawBuffer(), pixel_twins::Screen::Left);
     title.drawScreen(target);
     assert(framebuffer.drawBuffer()[0] == wizward::assets::kTitleScreenData[0]);
-    assert(wizward::audio::kLightCast.timbre.wave.samples != nullptr);
+    assert(wizward::audio::kLightCast.timbre.wave != nullptr);
     assert(wizward::audio::kBossDeathBlast.priority > wizward::audio::kHit.priority);
     return 0;
 }

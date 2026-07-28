@@ -10,7 +10,7 @@ using pixel_twins::Timbre;
 
 namespace {
 
-const pixel_twins::ExpandedWaveTable kBassDrumWave{
+PIXEL_TWINS_ASSET_SRAM const pixel_twins::WaveTable kBassDrumWave{
     pixel_twins::WaveTableSource{{
         0, 6393, 12539, 18204, 23170, 27245, 30273, 32137,
         32767, 32137, 30273, 27245, 23170, 18204, 12539, 6393,
