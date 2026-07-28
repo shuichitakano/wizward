@@ -68,9 +68,14 @@ PIXEL_TWINS_SRAM void drawFaceButtonGlyph(pixel_twins::RenderTarget target,
         pixel_twins::drawRectangle(target, x, y, 5, 5, kColor);
         break;
     case FaceButtonGlyph::Triangle:
-        pixel_twins::drawLine(target, x + 2, y, x, y + 4, kColor);
-        pixel_twins::drawLine(target, x, y + 4, x + 4, y + 4, kColor);
-        pixel_twins::drawLine(target, x + 4, y + 4, x + 2, y, kColor);
+        // Draw a fixed 5x5 bitmap so line rasterization cannot make the
+        // two slopes asymmetrical.
+        pixel_twins::fillRectangle(target, x + 2, y, 1, 1, kColor);
+        pixel_twins::fillRectangle(target, x + 1, y + 1, 1, 2, kColor);
+        pixel_twins::fillRectangle(target, x + 3, y + 1, 1, 2, kColor);
+        pixel_twins::fillRectangle(target, x, y + 3, 1, 1, kColor);
+        pixel_twins::fillRectangle(target, x + 4, y + 3, 1, 1, kColor);
+        pixel_twins::fillRectangle(target, x, y + 4, 5, 1, kColor);
         break;
     case FaceButtonGlyph::Circle:
         pixel_twins::drawCircle(target, x + 2, y + 2, 2, kColor);
