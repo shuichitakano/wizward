@@ -212,7 +212,6 @@ def verify(prototype: Path, project: Path) -> int:
             _verify_sprite_pack(output, report)
             _verify_background_pack(output, report)
         elif set_name == "title":
-            _verify_sprite_pack(output, report, "logo")
             _verify_raw_image(output, report)
         else:
             _verify_raw_image(output, report, "attract_p1_girl")

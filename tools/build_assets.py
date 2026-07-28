@@ -57,11 +57,6 @@ def main() -> int:
         "-o", str(gameplay / "background.bin"),
     ], converter)
     _run([
-        "uv", "run", "pixel-twins-sprites", str(title / "intermediate.json"),
-        "-o", str(title / "logo.bin"), "--header", str(title / "title_sprites.hpp"),
-        "--namespace", "wizward::title_assets",
-    ], converter)
-    _run([
         "uv", "run", "pixel-twins-raw-image", str(title / "intermediate.json"),
         "title_screen_selected__title_screen_160x120",
         "-o", str(title / "screen.bin"),

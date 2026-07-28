@@ -180,8 +180,6 @@ def _asset_layout(
         return "sprite", "sprite", {"width": 16, "height": 16}
     if relative.name == "powerup_icons_8_sheet.png":
         return "sprite", "sprite", {"width": 8, "height": 8}
-    if relative.name == "wizward_logo_104x20.png":
-        return "sprite", "sprite", {"width": 104, "height": 20}
     matches = list(FRAME_RE.finditer(relative.name))
     if not matches:
         raise ValueError(f"フレーム寸法を判定できません: {relative}")
@@ -256,7 +254,6 @@ def collect(prototype: Path, project: Path) -> Tuple[int, int, int]:
     gameplay_references.extend(_map_image_references(prototype))
     title_references = [
         "assets/title_screen_selected/title_screen_160x120.png",
-        "assets/title_screen_selected/wizward_logo_104x20.png",
     ]
     attract_references = [
         "assets/attract_selected/downscaled/ranking_p1_girl_mage_160x120.png",

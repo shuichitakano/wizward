@@ -33,9 +33,11 @@ add_custom_command(
         --output "${WIZWARD_GENERATED_DIR}/embedded_assets.cpp"
         --background "${WIZWARD_GAMEPLAY_ASSETS}/background.bin"
         --sprites "${WIZWARD_GAMEPLAY_ASSETS}/sprites.bin"
+        # ボス本体、およびrecall/bomb/level-up等の低頻度演出。
+        --rare-sprite-range 30:30
+        --rare-sprite-range 40:53
         --palette "${WIZWARD_GAMEPLAY_ASSETS}/palette.bin"
         --title-screen "${WIZWARD_TITLE_ASSETS}/screen.bin"
-        --title-sprites "${WIZWARD_TITLE_ASSETS}/logo.bin"
         --title-palette "${WIZWARD_TITLE_ASSETS}/palette.bin"
         --attract-p1 "${WIZWARD_ATTRACT_ASSETS}/attract_p1_girl.bin"
         --attract-p2 "${WIZWARD_ATTRACT_ASSETS}/attract_p2_boy.bin"
@@ -46,7 +48,6 @@ add_custom_command(
         "${WIZWARD_GAMEPLAY_ASSETS}/sprites.bin"
         "${WIZWARD_GAMEPLAY_ASSETS}/palette.bin"
         "${WIZWARD_TITLE_ASSETS}/screen.bin"
-        "${WIZWARD_TITLE_ASSETS}/logo.bin"
         "${WIZWARD_TITLE_ASSETS}/palette.bin"
         "${WIZWARD_ATTRACT_ASSETS}/attract_p1_girl.bin"
         "${WIZWARD_ATTRACT_ASSETS}/attract_p2_boy.bin"

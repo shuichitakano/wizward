@@ -8,6 +8,17 @@ import json
 import struct
 from pathlib import Path
 
+RARE_SPRITE_RANGES = ((30, 30), (40, 53))
+
+
+def _first_pixel_offset(sprites: bytes, asset_index: int) -> int:
+    header = struct.unpack_from("<4sHHHHIII", sprites)
+    asset_count = header[3]
+    first_frame = struct.unpack_from("<I", sprites, 24 + asset_index * 12)[0]
+    return struct.unpack_from(
+        "<I", sprites, 24 + asset_count * 12 + first_frame * 8
+    )[0]
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -23,8 +34,14 @@ def main() -> int:
     sprites = (gameplay / "sprites.bin").read_bytes()
     sprite_header = struct.unpack_from("<4sHHHHIII", sprites)
     sprite_pixel_offset = sprite_header[6]
+    sprite_pixel_size = len(sprites) - sprite_pixel_offset
+    rare_sprite_pixels = sum(
+        _first_pixel_offset(sprites, last + 1)
+        - _first_pixel_offset(sprites, first)
+        for first, last in RARE_SPRITE_RANGES
+    )
+    frequent_sprite_pixels = sprite_pixel_size - rare_sprite_pixels
     title_screen = (title / "screen.bin").stat().st_size
-    title_sprites = (title / "logo.bin").stat().st_size
     title_palette = (title / "palette.bin").stat().st_size
     gameplay_palette = (gameplay / "palette.bin").stat().st_size
     attract_screens = sum((attract / name).stat().st_size for name in (
@@ -32,10 +49,13 @@ def main() -> int:
     attract_palette = (attract / "palette.bin").stat().st_size
 
     font_glyphs = 95 * 18
-    gameplay_sram = len(sprites) + len(background) - background_pixel_offset + font_glyphs
+    gameplay_sram = (
+        sprite_pixel_offset + frequent_sprite_pixels
+        + len(background) - background_pixel_offset + font_glyphs
+    )
     flash_only = (
-        background_pixel_offset + gameplay_palette
-        + title_screen + title_sprites + title_palette + attract_screens + attract_palette
+        background_pixel_offset + rare_sprite_pixels + gameplay_palette
+        + title_screen + title_palette + attract_screens + attract_palette
     )
     framebuffer = 320 * 120 * 2
     tilemap = 100 * 100
@@ -51,15 +71,15 @@ def main() -> int:
         "asset_sram": {
             "background_pixels": len(background) - background_pixel_offset,
             "sprite_metadata": sprite_pixel_offset,
-            "sprite_pixels": len(sprites) - sprite_pixel_offset,
+            "sprite_pixels": frequent_sprite_pixels,
             "font_glyphs": font_glyphs,
             "total": gameplay_sram,
         },
         "flash_only": {
             "background_metadata": background_pixel_offset,
+            "rare_sprite_pixels": rare_sprite_pixels,
             "gameplay_palette_source": gameplay_palette,
             "title_screen": title_screen,
-            "title_sprites": title_sprites,
             "title_palette_source": title_palette,
             "attract_screens": attract_screens,
             "attract_palette_source": attract_palette,
@@ -85,11 +105,11 @@ def main() -> int:
 | BG画素 | {report['asset_sram']['background_pixels']:,} | SRAM |
 | スプライト記述表 | {report['asset_sram']['sprite_metadata']:,} | SRAM |
 | スプライト画素 | {report['asset_sram']['sprite_pixels']:,} | SRAM |
+| 低頻度スプライト画素 | {report['flash_only']['rare_sprite_pixels']:,} | Flash |
 | フォントグリフ | {report['asset_sram']['font_glyphs']:,} | SRAM |
 | BG参照表 | {report['flash_only']['background_metadata']:,} | Flash |
 | gameplayパレット原本 | {gameplay_palette:,} | Flash |
 | タイトル一枚絵 | {title_screen:,} | Flash |
-| タイトルロゴ | {title_sprites:,} | Flash |
 | タイトルパレット原本 | {title_palette:,} | Flash |
 | アトラクトランキング背景 | {attract_screens:,} | Flash |
 | アトラクトランキングパレット原本 | {attract_palette:,} | Flash |

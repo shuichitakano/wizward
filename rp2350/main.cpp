@@ -1,6 +1,10 @@
 #include "game/game.hpp"
 
+#include "audio/bgm_data.hpp"
+#include "audio/sfx_data.hpp"
+
 #include "pixel_twins/rp2350/led_panel.hpp"
+#include "pixel_twins/rp2350/pwm_audio.hpp"
 #include "pixel_twins/rp2350/usb_controller.hpp"
 
 #include "pico/multicore.h"
@@ -17,6 +21,7 @@ namespace {
 wizward::game::Game game;
 pixel_twins::Controllers controllers;
 pixel_twins::rp2350::LedPanelDriver ledPanel;
+pixel_twins::rp2350::PwmAudioPlayer audioPlayer;
 pixel_twins::rp2350::UsbControllerInput usbControllers;
 alignas(8) std::array<std::uint32_t, 512> ledCoreStack{};
 
@@ -36,6 +41,81 @@ volatile std::uint32_t maximumRenderUs = 0;
 wizward::game::Difficulty readDifficultyDipSwitch() noexcept {
     // ボードI/O確定後、HARD用DIPSWの入力をこの境界へ接続する。
     return wizward::game::Difficulty::Easy;
+}
+
+bool applyAudioEvent(wizward::game::AudioEvent event) noexcept {
+    switch (event) {
+    case wizward::game::AudioEvent::None: return true;
+    case wizward::game::AudioEvent::PlayField:
+        return audioPlayer.playBgm(wizward::audio::kField);
+    case wizward::game::AudioEvent::PlayEndless:
+        return audioPlayer.playBgm(wizward::audio::kEndless);
+    case wizward::game::AudioEvent::PlayBoss:
+        return audioPlayer.playBgm(wizward::audio::kBoss);
+    case wizward::game::AudioEvent::PlayVictory:
+        return audioPlayer.playBgm(wizward::audio::kVictory);
+    case wizward::game::AudioEvent::PlayNameEntry:
+        return audioPlayer.playBgm(wizward::audio::kNameEntry);
+    case wizward::game::AudioEvent::StopBgm:
+        return audioPlayer.stopBgm();
+    }
+    return false;
+}
+
+const pixel_twins::SfxPreset& sfxPreset(wizward::game::SfxId id) noexcept {
+    using wizward::game::SfxId;
+    switch (id) {
+    case SfxId::UiMove: return wizward::audio::kUiMove;
+    case SfxId::Start: return wizward::audio::kStart;
+    case SfxId::LightCast: return wizward::audio::kLightCast;
+    case SfxId::FireCast: return wizward::audio::kFireCast;
+    case SfxId::WindCast: return wizward::audio::kWindCast;
+    case SfxId::ThunderCast: return wizward::audio::kThunderCast;
+    case SfxId::IceCast: return wizward::audio::kIceCast;
+    case SfxId::FamiliarCast: return wizward::audio::kFamiliarCast;
+    case SfxId::Hit: return wizward::audio::kHit;
+    case SfxId::Deflect: return wizward::audio::kDeflect;
+    case SfxId::Kill: return wizward::audio::kKill;
+    case SfxId::PlayerDamage: return wizward::audio::kPlayerDamage;
+    case SfxId::Xp: return wizward::audio::kXp;
+    case SfxId::Level: return wizward::audio::kLevel;
+    case SfxId::Heal: return wizward::audio::kHeal;
+    case SfxId::HpUp: return wizward::audio::kHpUp;
+    case SfxId::Bomb: return wizward::audio::kBomb;
+    case SfxId::SealJingle: return wizward::audio::kSealJingle;
+    case SfxId::BossImpact: return wizward::audio::kBossImpact;
+    case SfxId::BossRock: return wizward::audio::kBossRock;
+    case SfxId::EnemySpawn: return wizward::audio::kEnemySpawn;
+    case SfxId::EnemyShoot: return wizward::audio::kEnemyShoot;
+    case SfxId::BossShoot: return wizward::audio::kBossShoot;
+    case SfxId::BossGather: return wizward::audio::kBossGather;
+    case SfxId::BossDeathImpact: return wizward::audio::kBossDeathImpact;
+    case SfxId::BossDeathBlast: return wizward::audio::kBossDeathBlast;
+    case SfxId::Clear: return wizward::audio::kClear;
+    case SfxId::Down: return wizward::audio::kDown;
+    case SfxId::Revive: return wizward::audio::kRevive;
+    case SfxId::GameOver: return wizward::audio::kGameOver;
+    }
+    return wizward::audio::kUiMove;
+}
+
+bool applyUpdate(const wizward::game::UpdateResult& result) noexcept {
+    if (!result.succeeded || !applyAudioEvent(result.audio)) return false;
+    if (result.playStartSfx
+        && !audioPlayer.playSfx(
+            pixel_twins::makeSfxRequest(wizward::audio::kStart))) {
+        return false;
+    }
+    for (std::size_t index = 0; index < result.sfxCueCount; ++index) {
+        const auto& cue = result.sfxCues[index];
+        auto request = pixel_twins::makeSfxRequest(sfxPreset(cue.id), cue.pan);
+        request.voice.frequency *= cue.pitchScale;
+        request.voice.endFrequency *= cue.pitchScale;
+        request.voice.pitchCurveScale *= cue.pitchScale;
+        request.voice.velocity *= cue.volumeScale;
+        if (!audioPlayer.playSfx(request)) return false;
+    }
+    return true;
 }
 
 void ledCoreMain() noexcept {
@@ -91,6 +171,9 @@ int main() {
     if (!usbControllers.initialize()) {
         while (true) tight_loop_contents();
     }
+    if (!audioPlayer.initialize()) {
+        while (true) tight_loop_contents();
+    }
 
     std::uint32_t frame = 1;
     publishedBuffer.store(
@@ -114,9 +197,8 @@ int main() {
         const auto frameStart = time_us_32();
         usbControllers.task();
         usbControllers.update(controllers);
-        const auto inputResult = game.processInput(controllers);
-        const auto tickResult = game.tick(controllers);
-        if (!inputResult.succeeded || !tickResult.succeeded) {
+        if (!applyUpdate(game.processInput(controllers))
+            || !applyUpdate(game.tick(controllers))) {
             while (true) tight_loop_contents();
         }
 

@@ -65,13 +65,11 @@ bool TitleAssets::initialize() noexcept {
         && kTitlePaletteDataSize == 256U * 3U
         && kAttractP1ScreenDataSize == static_cast<std::size_t>(kTitleWidth) * kTitleHeight
         && kAttractP2ScreenDataSize == static_cast<std::size_t>(kTitleWidth) * kTitleHeight
-        && kAttractPaletteDataSize == 256U * 3U
-        && logo_.reset(kTitleSpriteData, kTitleSpriteDataSize);
+        && kAttractPaletteDataSize == 256U * 3U;
 }
 
 bool TitleAssets::valid() const noexcept {
-    return logo_.valid()
-        && kTitleScreenDataSize == static_cast<std::size_t>(kTitleWidth) * kTitleHeight
+    return kTitleScreenDataSize == static_cast<std::size_t>(kTitleWidth) * kTitleHeight
         && kTitlePaletteDataSize == 256U * 3U
         && kAttractP1ScreenDataSize == static_cast<std::size_t>(kTitleWidth) * kTitleHeight
         && kAttractP2ScreenDataSize == static_cast<std::size_t>(kTitleWidth) * kTitleHeight
@@ -99,18 +97,6 @@ void TitleAssets::drawAttractScreen(pixel_twins::RenderTarget target,
     drawRawScreen(target,
                   player == 0 ? kAttractP1ScreenData : kAttractP2ScreenData,
                   player == 0 ? kAttractP1ScreenDataSize : kAttractP2ScreenDataSize);
-}
-
-bool TitleAssets::makeLogo(std::int16_t logicalX,
-                           std::int16_t logicalY,
-                           pixel_twins::Sprite& result) const noexcept {
-    return logo_.makeSpriteAt(
-        title_assets::spriteAssetIndex(title_assets::SpriteAssetId::WizwardLogo104x20),
-        0,
-        0,
-        logicalX,
-        logicalY,
-        result);
 }
 
 } // namespace wizward::assets

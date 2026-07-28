@@ -12,7 +12,7 @@ pico_sdk_init()
 set(WIZWARD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(WIZWARD_BUILD_APP OFF CACHE BOOL "" FORCE)
 set(WIZWARD_BUILD_DEMO OFF CACHE BOOL "" FORCE)
-set(WIZWARD_BUILD_AUDIO_DATA OFF CACHE BOOL "" FORCE)
+set(WIZWARD_BUILD_AUDIO_DATA ON CACHE BOOL "" FORCE)
 add_subdirectory(.. wizward)
 
 add_executable(wizward_rp2350 main.cpp)
@@ -28,8 +28,8 @@ target_compile_features(wizward_rp2350 PRIVATE cxx_std_17)
 target_compile_definitions(
     wizward_rp2350
     PRIVATE
-        # GameplayState::tick() とマップ生成は実測で約7.1KiBを使う。
-        PICO_STACK_SIZE=0x2000
+        # ゲーム単体の最大約7.1KiBに、音声DMA/USB割り込みのネスト余裕を加える。
+        PICO_STACK_SIZE=0x3000
         # core 1はmain.cppの独立した2KiBスタックを明示的に使う。
         PICO_CORE1_STACK_SIZE=0
 )

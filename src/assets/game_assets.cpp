@@ -34,11 +34,11 @@ bool GameAssets::initialize() noexcept {
         kGameplayBackgroundMetadataSize,
         kGameplayBackgroundPixels,
         kGameplayBackgroundPixelsSize);
-    const auto spritesValid = sprites_.resetSplit(
+    const auto spritesValid = sprites_.resetSplitRegions(
         kGameplaySpriteMetadata,
         kGameplaySpriteMetadataSize,
-        kGameplaySpritePixels,
-        kGameplaySpritePixelsSize);
+        kGameplaySpritePixelRegions,
+        kGameplaySpritePixelRegionCount);
     if (!backgroundValid || !spritesValid || kGameplayPaletteDataSize != 256U * 3U) return false;
     pixel_twins::Sprite source{};
     if (!sprites_.makeSpriteAt(spriteAssetIndex(SpriteAssetId::XpGem88x81fSheet),
