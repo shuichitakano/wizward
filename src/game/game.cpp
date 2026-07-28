@@ -73,8 +73,8 @@ PIXEL_TWINS_SRAM void drawPerkChoices(pixel_twins::RenderTarget target,
                 pixel_twins::drawSprite(target, sprite);
             }
             pixel_twins::drawGlyph(target, assets::kWizwardFont,
-                                   static_cast<std::int16_t>(kCenters[slot][0] - 16),
-                                   static_cast<std::int16_t>(kCenters[slot][1] - 4),
+                                   static_cast<std::int16_t>(kCenters[slot][0] - 13),
+                                   static_cast<std::int16_t>(kCenters[slot][1] - 5),
                                    kButtonGlyphs[slot], 255);
         }
     }
