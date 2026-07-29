@@ -222,6 +222,12 @@ struct PlayerState {
     std::uint8_t aiBlockedTicks = 0;
     std::int8_t aiTurnSign = 1;
     bool aiHoldingFormation = false;
+    float aiAttention = 0.55F;
+    float aiAttentionTarget = 0.55F;
+    float aiAttentionNoise = 0.0F;
+    float aiPerceptionSeed = 0.0F;
+    std::uint16_t aiAttentionClockTicks = 0;
+    std::uint32_t aiRandomState = 1;
 };
 
 struct CameraState {

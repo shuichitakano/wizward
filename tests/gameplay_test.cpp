@@ -128,6 +128,10 @@ int main() {
     assert(gameplay.player(0).moving);
     assert(!gameplay.playerIsManual(1));
     assert(gameplay.player(1).x != initialPartner.x || gameplay.player(1).y != initialPartner.y);
+    assert(gameplay.player(1).aiAttentionTarget >= 0.47F);
+    assert(gameplay.player(1).aiAttentionTarget <= 0.63F);
+    assert(gameplay.player(1).aiAttentionClockTicks >= 119U);
+    assert(gameplay.player(1).aiAttentionClockTicks <= 240U);
     assert(std::abs((gameplay.camera(0).x + 80.0F) - gameplay.player(0).x) < 0.01F);
     assert(std::abs((gameplay.camera(0).y + 60.0F) - (gameplay.player(0).y - 16.0F)) < 0.01F);
 

@@ -35,6 +35,13 @@ constexpr float kMageSeparationWeight = 2.0F;
 constexpr float kMageSeparationMaximumSpeed = 1.6F;
 constexpr float kWindLinkHitRadius = 4.0F;
 constexpr std::uint16_t kLightLifetimeTicks = 75;
+constexpr float kAiAttentionBase = 0.55F;
+constexpr float kAiAttentionMinimum = 0.2F;
+constexpr float kAiAttentionMaximum = 0.88F;
+constexpr float kAiAttentionHpDeadband = 0.08F;
+constexpr float kAiAttentionHpGain = 1.2F;
+constexpr float kAiAttentionResponseSeconds = 6.0F;
+constexpr float kAiAttentionNoise = 0.08F;
 
 std::int16_t scaledValue(std::int16_t value, std::uint8_t percent) noexcept {
     return static_cast<std::int16_t>(std::max<std::int32_t>(1,
@@ -359,29 +366,82 @@ void updatePerkEffects(std::array<PerkEffectState, kMaximumPerkEffects>& effects
     }
 }
 
+void updateAiAttention(PlayerState& player, const PlayerState& leader,
+                       bool rescuing) noexcept {
+    if (player.aiAttentionClockTicks > 0) --player.aiAttentionClockTicks;
+    if (player.aiAttentionClockTicks == 0) {
+        player.aiAttentionNoise =
+            (randomUnit(player.aiRandomState) * 2.0F - 1.0F) * kAiAttentionNoise;
+        const auto aiHpRatio = std::clamp(
+            static_cast<float>(player.hp)
+                / static_cast<float>(std::max<std::int16_t>(1, player.maxHp)),
+            0.0F, 1.0F);
+        const auto leaderHpRatio = std::clamp(
+            static_cast<float>(leader.hp)
+                / static_cast<float>(std::max<std::int16_t>(1, leader.maxHp)),
+            0.0F, 1.0F);
+        const auto rawGap = aiHpRatio - leaderHpRatio;
+        const auto gap = std::abs(rawGap) <= kAiAttentionHpDeadband
+            ? 0.0F
+            : std::copysign(std::abs(rawGap) - kAiAttentionHpDeadband, rawGap);
+        const auto target = rescuing
+            ? kAiAttentionMaximum
+            : kAiAttentionBase - gap * kAiAttentionHpGain + player.aiAttentionNoise;
+        player.aiAttentionTarget = std::clamp(
+            target, kAiAttentionMinimum, kAiAttentionMaximum);
+        player.aiAttentionClockTicks = static_cast<std::uint16_t>(std::round(
+            (2.0F + randomUnit(player.aiRandomState) * 2.0F) * 60.0F));
+    }
+    const auto blend = 1.0F - std::exp(
+        -(1.0F / 60.0F) / kAiAttentionResponseSeconds);
+    player.aiAttention +=
+        (player.aiAttentionTarget - player.aiAttention) * blend;
+}
+
+bool aiHazardVisible(const PlayerState* observer, float x, float y,
+                     std::size_t salt) noexcept {
+    if (observer == nullptr) return true;
+    const auto missChance =
+        0.3F + (0.02F - 0.3F) * observer->aiAttention;
+    const auto value = std::sin(
+        static_cast<double>(x) * 12.9898 + static_cast<double>(y) * 78.233
+        + static_cast<double>(observer->aiPerceptionSeed) * 37.719
+        + static_cast<double>(salt) * 11.173) * 43758.5453;
+    const auto roll = value - std::floor(value);
+    return roll >= missChance;
+}
+
 float aiDangerAt(
     float x, float y,
     const std::array<EnemyState, kMaximumEnemies>& enemies,
-    const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets) noexcept {
+    const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
+    const PlayerState* observer = nullptr) noexcept {
     auto danger = 0.0F;
-    for (const auto& enemy : enemies) {
+    for (std::size_t index = 0; index < enemies.size(); ++index) {
+        const auto& enemy = enemies[index];
         if (!enemy.active || enemy.hp <= 0 || enemy.bornTicks > 0
             || enemy.spawnDelayTicks > 0) continue;
+        if (!aiHazardVisible(observer, enemy.x, enemy.y, index)) continue;
         const auto range = 100.0F + enemy.radius;
         const auto distanceSquared = squaredDistance(x, y, enemy.x, enemy.y);
         if (distanceSquared >= range * range) continue;
         const auto gap = range - std::sqrt(distanceSquared);
         danger += gap * gap * 0.08F;
     }
-    for (const auto& bullet : enemyBullets) {
+    for (std::size_t index = 0; index < enemyBullets.size(); ++index) {
+        const auto& bullet = enemyBullets[index];
         if (!bullet.active || bullet.launchDelayTicks > 0) continue;
+        if (!aiHazardVisible(observer, bullet.x, bullet.y, index + 1000U)) continue;
         const auto speedSquared = bullet.velocityX * bullet.velocityX
             + bullet.velocityY * bullet.velocityY;
         const auto towardX = x - bullet.x;
         const auto towardY = y - bullet.y;
+        const auto predictionTicks = observer != nullptr
+            ? (0.15F + (0.55F - 0.15F) * observer->aiAttention) * 60.0F
+            : 42.0F;
         const auto closestTicks = speedSquared > 0.0F
             ? std::clamp((towardX * bullet.velocityX + towardY * bullet.velocityY)
-                         / speedSquared, 0.0F, 42.0F)
+                         / speedSquared, 0.0F, predictionTicks)
             : 0.0F;
         const auto closestX = bullet.x + bullet.velocityX * closestTicks;
         const auto closestY = bullet.y + bullet.velocityY * closestTicks;
@@ -412,8 +472,9 @@ float aiMoveScore(
     float targetX, float targetY, const PlayerState& leader,
     const std::array<EnemyState, kMaximumEnemies>& enemies,
     const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
-    bool rescuing, float moved, float lookahead) noexcept {
-    auto score = rescuing ? 0.0F : aiDangerAt(x, y, enemies, enemyBullets);
+    bool rescuing, bool useAttention, float moved, float lookahead) noexcept {
+    auto score = rescuing ? 0.0F : aiDangerAt(
+        x, y, enemies, enemyBullets, useAttention ? &player : nullptr);
     score += std::sqrt(squaredDistance(x, y, targetX, targetY))
         * (rescuing ? 1.8F : 0.45F);
     if (!rescuing) {
@@ -466,22 +527,31 @@ float moveAiPlayerSmart(
     const PlayerState& leader,
     const std::array<EnemyState, kMaximumEnemies>& enemies,
     const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
-    const world::WorldMap& map, bool rescuing) noexcept {
+    const world::WorldMap& map, bool rescuing,
+    bool useAttention = false) noexcept {
     constexpr float kLookahead = 22.0F;
     auto towardX = targetX - player.x;
     auto towardY = targetY - player.y;
     normalize(towardX, towardY);
+    const auto attention = rescuing || !useAttention ? 1.0F : player.aiAttention;
     const auto currentDanger = rescuing
-        ? 0.0F : aiDangerAt(player.x, player.y, enemies, enemyBullets);
+        ? 0.0F : aiDangerAt(player.x, player.y, enemies, enemyBullets,
+                            useAttention ? &player : nullptr);
     const auto urgent = currentDanger > 350.0F;
     const auto evading = currentDanger >= 80.0F;
     if (player.aiDecisionTicks > 0) --player.aiDecisionTicks;
-    if (player.aiDecisionTicks == 0 || urgent) {
+    if (player.aiDecisionTicks == 0 || (!useAttention && urgent)) {
+        if (useAttention) {
+            player.aiPerceptionSeed = randomUnit(player.aiRandomState) * 10000.0F;
+        }
         std::array<std::array<float, 2>, 18> directions{};
         directions[0] = {{player.aiDesiredDirectionX, player.aiDesiredDirectionY}};
         directions[1] = {{towardX, towardY}};
-        for (std::size_t index = 0; index < 16U; ++index) {
-            const auto angle = static_cast<float>(index) * kTau / 16.0F;
+        const auto directionSteps = rescuing || !useAttention
+            ? 16U : attention < 0.4F ? 8U : attention < 0.7F ? 12U : 16U;
+        for (std::size_t index = 0; index < directionSteps; ++index) {
+            const auto angle = static_cast<float>(index) * kTau
+                / static_cast<float>(directionSteps);
             directions[index + 2U] = {{std::cos(angle), std::sin(angle)}};
         }
         auto bestScore = std::numeric_limits<float>::max();
@@ -491,7 +561,7 @@ float moveAiPlayerSmart(
         auto retainedDirectionX = player.aiDesiredDirectionX;
         auto retainedDirectionY = player.aiDesiredDirectionY;
         auto retained = false;
-        for (std::size_t index = 0; index < directions.size(); ++index) {
+        for (std::size_t index = 0; index < directionSteps + 2U; ++index) {
             auto directionX = directions[index][0];
             auto directionY = directions[index][1];
             normalize(directionX, directionY);
@@ -505,9 +575,13 @@ float moveAiPlayerSmart(
             directionX = probeX - player.x;
             directionY = probeY - player.y;
             normalize(directionX, directionY);
-            const auto score = aiMoveScore(player, probeX, probeY, targetX, targetY,
-                                           leader, enemies, enemyBullets,
-                                           rescuing, moved, kLookahead);
+            auto score = aiMoveScore(player, probeX, probeY, targetX, targetY,
+                                     leader, enemies, enemyBullets,
+                                     rescuing, useAttention, moved, kLookahead);
+            if (useAttention && !rescuing) {
+                score += (randomUnit(player.aiRandomState) - 0.5F)
+                    * (120.0F + (0.0F - 120.0F) * attention);
+            }
             if (index == 0U) {
                 retained = true;
                 retainedScore = score;
@@ -528,10 +602,28 @@ float moveAiPlayerSmart(
             player.aiDesiredDirectionX = bestDirectionX;
             player.aiDesiredDirectionY = bestDirectionY;
         }
-        player.aiDecisionTicks = rescuing ? 7U : (urgent ? 4U : (evading ? 11U : 21U));
+        const auto decisionSeconds = rescuing
+            ? 0.12F
+            : !useAttention
+                ? (urgent ? 0.07F : evading ? 0.18F : 0.35F)
+                : urgent
+                    ? 0.28F + (0.1F - 0.28F) * attention
+                    : evading
+                        ? 0.5F + (0.18F - 0.5F) * attention
+                        : 0.65F + (0.25F - 0.65F) * attention;
+        player.aiDecisionTicks = static_cast<std::uint8_t>(
+            std::max(1.0F, std::round(decisionSeconds * 60.0F)));
     }
-    const auto maximumTurn = rescuing ? 12.0F / 60.0F
-        : urgent ? 14.0F / 60.0F : (evading ? 8.0F / 60.0F : 5.0F / 60.0F);
+    const auto turnRate = rescuing
+        ? 12.0F
+        : !useAttention
+            ? (urgent ? 14.0F : evading ? 8.0F : 5.0F)
+            : urgent
+                ? 8.0F + (14.0F - 8.0F) * attention
+                : evading
+                    ? 5.0F + (10.0F - 5.0F) * attention
+                    : 3.0F + (6.0F - 3.0F) * attention;
+    const auto maximumTurn = turnRate / 60.0F;
     const auto currentAngle = std::atan2(player.aiDirectionY, player.aiDirectionX);
     const auto desiredAngle = std::atan2(
         player.aiDesiredDirectionY, player.aiDesiredDirectionX);
@@ -570,6 +662,7 @@ void followAiPartner(PlayerState& player, std::size_t playerIndex,
                      const std::array<XpGemState, kMaximumXpGems>& xpGems,
                      const world::WorldMap& map) noexcept {
     const auto rescuing = leader.hp <= 0;
+    updateAiAttention(player, leader, rescuing);
     auto formationX = rescuing ? leader.x : leader.x - 38.0F;
     auto formationY = rescuing ? leader.y : leader.y + 24.0F;
     if (!rescuing && player.xpRecallAiCooldownTicks == 0
@@ -582,7 +675,8 @@ void followAiPartner(PlayerState& player, std::size_t playerIndex,
     }
     const auto distance = std::sqrt(squaredDistance(player.x, player.y, formationX, formationY));
     const auto stopDistance = rescuing ? kPlayerRadius * 2.0F + 6.0F : 8.0F;
-    const auto currentDanger = aiDangerAt(player.x, player.y, enemies, enemyBullets);
+    const auto currentDanger =
+        aiDangerAt(player.x, player.y, enemies, enemyBullets, &player);
     const auto shouldEvade = !rescuing && currentDanger >= 80.0F;
     if (rescuing && distance <= stopDistance) {
         player.moving = false;
@@ -605,7 +699,7 @@ void followAiPartner(PlayerState& player, std::size_t playerIndex,
         player.aiHoldingFormation = false;
     }
     const auto moved = moveAiPlayerSmart(player, formationX, formationY, leader,
-                                          enemies, enemyBullets, map, rescuing);
+                                          enemies, enemyBullets, map, rescuing, true);
     if (moved < 0.2F && distance > stopDistance) {
         if (player.aiBlockedTicks < 255U) ++player.aiBlockedTicks;
         if (player.aiStuckTicks < 255U) ++player.aiStuckTicks;
@@ -627,7 +721,7 @@ void followAiPartner(PlayerState& player, std::size_t playerIndex,
                     const auto score = std::sqrt(squaredDistance(
                         x, y, formationX, formationY))
                         + (rescuing ? 0.0F
-                            : aiDangerAt(x, y, enemies, enemyBullets) * 0.03F)
+                            : aiDangerAt(x, y, enemies, enemyBullets, &player) * 0.03F)
                         + radius * 0.15F;
                     if (score >= bestScore) continue;
                     bestScore = score;
@@ -2388,6 +2482,15 @@ void GameplayState::reset(const world::WorldMap& map, std::size_t startingPlayer
     enemyBullets_.fill({});
     const auto gameplaySeed = map.seed ^ 0x57495aU;
     randomState_ = gameplaySeed != 0U ? gameplaySeed : 0x57495aU;
+    for (std::size_t index = 0; index < players_.size(); ++index) {
+        auto& player = players_[index];
+        player.aiRandomState = gameplaySeed
+            ^ (0x9e3779b9U * static_cast<std::uint32_t>(index + 1U));
+        if (player.aiRandomState == 0U) {
+            player.aiRandomState = 0x6d2b79f5U + static_cast<std::uint32_t>(index);
+        }
+        player.aiPerceptionSeed = randomUnit(player.aiRandomState) * 10000.0F;
+    }
     spawnCooldownTicks_ = 1;
     swarmCooldownTicks_ = static_cast<std::uint16_t>(
         28U * 60U * balance.spawnIntervalPercent / 100U);
