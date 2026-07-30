@@ -237,6 +237,13 @@ int main() {
     (void)game.processInput(debugAdvance);
     assert(game.gameplay().elapsedTicks() == scheduleBefore + 60U * 60U);
 
+    const auto debugInvincible = pressedChord(
+        0, ControllerButton::system, ControllerButton::dpadDown);
+    (void)game.processInput(debugInvincible);
+    assert(game.gameplay().player(0).debugInvincible);
+    (void)game.processInput(debugInvincible);
+    assert(!game.gameplay().player(0).debugInvincible);
+
     const auto pause = pressedController(1, ControllerButton::start);
     (void)game.processInput(pause);
     assert(game.paused());

@@ -1301,7 +1301,8 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
 
         for (std::size_t playerIndex = 0; playerIndex < players.size(); ++playerIndex) {
             auto& player = players[playerIndex];
-            if (player.hp <= 0 || player.invulnerabilityTicks != 0) continue;
+            if (player.hp <= 0 || player.invulnerabilityTicks != 0
+                || player.debugInvincible) continue;
             const auto contactRange = enemy.radius + kPlayerRadius;
             if (squaredDistance(enemy.x, enemy.y, player.x, player.y) < contactRange * contactRange) {
                 auto damage = kContactDamage;
@@ -1811,7 +1812,8 @@ void updateEnemyBullets(std::array<EnemyBulletState, kMaximumEnemyBullets>& bull
             continue;
         }
         for (auto& player : players) {
-            if (player.hp <= 0 || player.invulnerabilityTicks > 0) continue;
+            if (player.hp <= 0 || player.invulnerabilityTicks > 0
+                || player.debugInvincible) continue;
             const auto range = bullet.radius + kPlayerRadius;
             if (squaredDistance(bullet.x, bullet.y, player.x, player.y) >= range * range) continue;
             const auto damage = scaledValue(bullet.damage, balance.incomingDamagePercent);
@@ -3072,6 +3074,11 @@ void GameplayState::debugAdvanceScheduleOneMinute() noexcept {
     elapsedTicks_ = std::min(
         elapsedTicks_, std::numeric_limits<std::uint32_t>::max() - kMinuteTicks);
     elapsedTicks_ += kMinuteTicks;
+}
+
+void GameplayState::debugToggleInvincible(std::size_t playerIndex) noexcept {
+    if (playerIndex >= players_.size()) return;
+    players_[playerIndex].debugInvincible = !players_[playerIndex].debugInvincible;
 }
 
 bool GameplayState::addEnemy(float x, float y, EnemyKind kind) noexcept {

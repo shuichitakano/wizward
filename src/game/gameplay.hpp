@@ -172,6 +172,7 @@ struct PlayerState {
     std::int16_t hp = 30;
     std::int16_t maxHp = 30;
     std::uint16_t invulnerabilityTicks = 0;
+    bool debugInvincible = false;
     std::uint16_t lightCooldownTicks = 0;
     std::uint16_t fireCooldownTicks = 0;
     std::uint16_t windCooldownTicks = 0;
@@ -367,6 +368,7 @@ public:
     void debugFullyPowerUp(std::size_t playerIndex) noexcept;
     void debugChargePowerUp(std::size_t playerIndex) noexcept;
     void debugAdvanceScheduleOneMinute() noexcept;
+    void debugToggleInvincible(std::size_t playerIndex) noexcept;
 
     [[nodiscard]] const PlayerState& player(std::size_t index) const noexcept {
         return players_[index];

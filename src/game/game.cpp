@@ -1455,7 +1455,10 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     pixel_twins::fillRectangle(target, 49, 4, static_cast<std::uint16_t>(maxHpWidth + 2U), 4,
                                assets::palette::kGaugeDark);
     if (hpWidth > 0) {
-        pixel_twins::fillRectangle(target, 50, 5, hpWidth, 2, assets::palette::kHpGauge);
+        pixel_twins::fillRectangle(
+            target, 50, 5, hpWidth, 2,
+            viewedPlayer.debugInvincible
+                ? assets::palette::kHighlight : assets::palette::kHpGauge);
     }
     pixel_twins::fillRectangle(target, 49, 7, 62, 4, assets::palette::kGaugeDark);
     const auto xpNeed = gameplay.xpNeeded(viewer);
@@ -1797,6 +1800,8 @@ UpdateResult Game::processInput(const pixel_twins::Controllers& controllers) noe
                 gameplay_.debugChargePowerUp(index);
             } else if (chordPressed(controller, pixel_twins::ControllerButton::dpadRight)) {
                 gameplay_.debugAdvanceScheduleOneMinute();
+            } else if (chordPressed(controller, pixel_twins::ControllerButton::dpadDown)) {
+                gameplay_.debugToggleInvincible(index);
             } else {
                 continue;
             }

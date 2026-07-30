@@ -269,6 +269,17 @@ int main() {
     assert(gameplay.player(0).invulnerabilityTicks > 0);
 
     gameplay.reset(map);
+    const auto invinciblePlayer = gameplay.player(0);
+    assert(gameplay.addEnemy(invinciblePlayer.x, invinciblePlayer.y,
+                             wizward::game::EnemyKind::Golem));
+    gameplay.debugToggleInvincible(0);
+    gameplay.tick(idle, map);
+    assert(gameplay.player(0).hp == gameplay.player(0).maxHp);
+    gameplay.debugToggleInvincible(0);
+    gameplay.tick(idle, map);
+    assert(gameplay.player(0).hp < gameplay.player(0).maxHp);
+
+    gameplay.reset(map);
     const auto rangedTarget = gameplay.player(0);
     assert(gameplay.addEnemy(rangedTarget.x + 160.0F, rangedTarget.y,
                              wizward::game::EnemyKind::Mage));
