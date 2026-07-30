@@ -250,9 +250,8 @@ void ledCoreMain() noexcept {
         while (true) tight_loop_contents();
     }
 
-    consumedFrame.store(currentFrame, std::memory_order_release);
-    ledCoreReady.store(true, std::memory_order_release);
     hard_assert(ledPanel.startPresent(*currentBuffer));
+    ledCoreReady.store(true, std::memory_order_release);
 
     while (true) {
         if (ledPanel.presenting()) {
@@ -263,20 +262,24 @@ void ledCoreMain() noexcept {
         profiledPresentUs.store(
             ledPanel.lastPresentActiveUs(), std::memory_order_release);
 
-        const auto nextFrame = publishedFrame.load(std::memory_order_acquire);
-        if (nextFrame != currentFrame) {
-            const auto nextPaletteRevision = paletteRevision.load(std::memory_order_acquire);
-            if (nextPaletteRevision != currentPaletteRevision) {
-                ledPanel.setPalette(game.framebuffer().palette());
-                currentPaletteRevision = nextPaletteRevision;
-            }
-            currentBuffer = publishedBuffer.load(std::memory_order_acquire);
-            currentFrame = nextFrame;
+        // GS6263の書込側バッファへの転送と走査境界でのflipが完了したので、
+        // このCPU側フレームバッファをcore 0へ返却できる。
+        consumedFrame.store(currentFrame, std::memory_order_release);
+        __sev();
 
-            // この時点で旧表示バッファをcore 0が再利用できる。
-            consumedFrame.store(currentFrame, std::memory_order_release);
-            __sev();
+        auto nextFrame = publishedFrame.load(std::memory_order_acquire);
+        while (nextFrame == currentFrame) {
+            if (!jobSystem.tryRunOne()) __wfe();
+            nextFrame = publishedFrame.load(std::memory_order_acquire);
         }
+
+        const auto nextPaletteRevision = paletteRevision.load(std::memory_order_acquire);
+        if (nextPaletteRevision != currentPaletteRevision) {
+            ledPanel.setPalette(game.framebuffer().palette());
+            currentPaletteRevision = nextPaletteRevision;
+        }
+        currentBuffer = publishedBuffer.load(std::memory_order_acquire);
+        currentFrame = nextFrame;
         hard_assert(ledPanel.startPresent(*currentBuffer));
     }
 }
