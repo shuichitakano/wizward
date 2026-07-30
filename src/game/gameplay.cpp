@@ -419,23 +419,31 @@ float aiDangerAt(
     float x, float y,
     const std::array<EnemyState, kMaximumEnemies>& enemies,
     const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
+    const EnemySpatialGrid& enemyGrid,
+    const EnemyBulletSpatialGrid& enemyBulletGrid,
     const PlayerState* observer = nullptr) noexcept {
     auto danger = 0.0F;
-    for (std::size_t index = 0; index < enemies.size(); ++index) {
+    constexpr float kEnemyQueryRadius = 100.0F + kMaximumEnemyRadius;
+    enemyGrid.forEachCandidate(x, y, kEnemyQueryRadius, [&](std::size_t index) {
         const auto& enemy = enemies[index];
         if (!enemy.active || enemy.hp <= 0 || enemy.bornTicks > 0
-            || enemy.spawnDelayTicks > 0) continue;
-        if (!aiHazardVisible(observer, enemy.x, enemy.y, index)) continue;
+            || enemy.spawnDelayTicks > 0) return;
+        if (!aiHazardVisible(observer, enemy.x, enemy.y, index)) return;
         const auto range = 100.0F + enemy.radius;
         const auto distanceSquared = squaredDistance(x, y, enemy.x, enemy.y);
-        if (distanceSquared >= range * range) continue;
+        if (distanceSquared >= range * range) return;
         const auto gap = range - std::sqrt(distanceSquared);
         danger += gap * gap * 0.08F;
-    }
-    for (std::size_t index = 0; index < enemyBullets.size(); ++index) {
+    });
+    // 最速弾(124px/s)を42tick予測した移動量と最大危険半径を包含する。
+    constexpr float kEnemyBulletQueryRadius =
+        (124.0F / 60.0F) * 42.0F
+        + kPlayerRadius + kMaximumEnemyBulletRadius + 22.0F;
+    enemyBulletGrid.forEachCandidate(
+        x, y, kEnemyBulletQueryRadius, [&](std::size_t index) {
         const auto& bullet = enemyBullets[index];
-        if (!bullet.active || bullet.launchDelayTicks > 0) continue;
-        if (!aiHazardVisible(observer, bullet.x, bullet.y, index + 1000U)) continue;
+        if (!bullet.active || bullet.launchDelayTicks > 0) return;
+        if (!aiHazardVisible(observer, bullet.x, bullet.y, index + 1000U)) return;
         const auto speedSquared = bullet.velocityX * bullet.velocityX
             + bullet.velocityY * bullet.velocityY;
         const auto towardX = x - bullet.x;
@@ -451,10 +459,10 @@ float aiDangerAt(
         const auto closestY = bullet.y + bullet.velocityY * closestTicks;
         const auto range = kPlayerRadius + bullet.radius + 22.0F;
         const auto distanceSquared = squaredDistance(x, y, closestX, closestY);
-        if (distanceSquared >= range * range) continue;
+        if (distanceSquared >= range * range) return;
         const auto gap = range - std::sqrt(distanceSquared);
         danger += gap * gap * 1.8F;
-    }
+    });
     return danger;
 }
 
@@ -476,9 +484,12 @@ float aiMoveScore(
     float targetX, float targetY, const PlayerState& leader,
     const std::array<EnemyState, kMaximumEnemies>& enemies,
     const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
+    const EnemySpatialGrid& enemyGrid,
+    const EnemyBulletSpatialGrid& enemyBulletGrid,
     bool rescuing, bool useAttention, float moved, float lookahead) noexcept {
     auto score = rescuing ? 0.0F : aiDangerAt(
-        x, y, enemies, enemyBullets, useAttention ? &player : nullptr);
+        x, y, enemies, enemyBullets, enemyGrid, enemyBulletGrid,
+        useAttention ? &player : nullptr);
     score += std::sqrt(squaredDistance(x, y, targetX, targetY))
         * (rescuing ? 1.8F : 0.45F);
     if (!rescuing) {
@@ -538,6 +549,8 @@ struct AiDirectionJob {
     const PlayerState* leader;
     const std::array<EnemyState, kMaximumEnemies>* enemies;
     const std::array<EnemyBulletState, kMaximumEnemyBullets>* enemyBullets;
+    const EnemySpatialGrid* enemyGrid;
+    const EnemyBulletSpatialGrid* enemyBulletGrid;
     const world::WorldMap* map;
     const std::array<std::array<float, 2>, 18>* directions;
     std::array<AiDirectionResult, 18>* results;
@@ -572,6 +585,7 @@ void scoreAiDirections(void* context) noexcept {
         result.score = aiMoveScore(
             *job.player, probeX, probeY, job.targetX, job.targetY,
             *job.leader, *job.enemies, *job.enemyBullets,
+            *job.enemyGrid, *job.enemyBulletGrid,
             job.rescuing, job.useAttention, moved, job.lookahead);
         result.directionX = directionX;
         result.directionY = directionY;
@@ -584,6 +598,8 @@ float moveAiPlayerSmart(
     const PlayerState& leader,
     const std::array<EnemyState, kMaximumEnemies>& enemies,
     const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
+    const EnemySpatialGrid& enemyGrid,
+    const EnemyBulletSpatialGrid& enemyBulletGrid,
     const world::WorldMap& map, bool rescuing,
     bool useAttention = false,
     const ParallelExecutor* parallel = nullptr) noexcept {
@@ -593,8 +609,9 @@ float moveAiPlayerSmart(
     normalize(towardX, towardY);
     const auto attention = rescuing || !useAttention ? 1.0F : player.aiAttention;
     const auto currentDanger = rescuing
-        ? 0.0F : aiDangerAt(player.x, player.y, enemies, enemyBullets,
-                            useAttention ? &player : nullptr);
+        ? 0.0F : aiDangerAt(
+            player.x, player.y, enemies, enemyBullets, enemyGrid, enemyBulletGrid,
+            useAttention ? &player : nullptr);
     const auto urgent = currentDanger > 350.0F;
     const auto evading = currentDanger >= 80.0F;
     if (player.aiDecisionTicks > 0) --player.aiDecisionTicks;
@@ -625,12 +642,14 @@ float moveAiPlayerSmart(
         const auto split = (directionCount + 1U) / 2U;
         std::array<AiDirectionJob, 2> jobs{{
             {
-                &player, &leader, &enemies, &enemyBullets, &map,
+                &player, &leader, &enemies, &enemyBullets,
+                &enemyGrid, &enemyBulletGrid, &map,
                 &directions, &results, targetX, targetY, kLookahead,
                 0, split, rescuing, useAttention,
             },
             {
-                &player, &leader, &enemies, &enemyBullets, &map,
+                &player, &leader, &enemies, &enemyBullets,
+                &enemyGrid, &enemyBulletGrid, &map,
                 &directions, &results, targetX, targetY, kLookahead,
                 split, directionCount, rescuing, useAttention,
             },
@@ -725,6 +744,8 @@ void followAiPartner(PlayerState& player, std::size_t playerIndex,
                      const std::array<EnemyState, kMaximumEnemies>& enemies,
                      const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                      const std::array<XpGemState, kMaximumXpGems>& xpGems,
+                     const EnemySpatialGrid& enemyGrid,
+                     const EnemyBulletSpatialGrid& enemyBulletGrid,
                      const world::WorldMap& map,
                      const ParallelExecutor* parallel = nullptr) noexcept {
     const auto rescuing = leader.hp <= 0;
@@ -741,8 +762,9 @@ void followAiPartner(PlayerState& player, std::size_t playerIndex,
     }
     const auto distance = std::sqrt(squaredDistance(player.x, player.y, formationX, formationY));
     const auto stopDistance = rescuing ? kPlayerRadius * 2.0F + 6.0F : 8.0F;
-    const auto currentDanger =
-        aiDangerAt(player.x, player.y, enemies, enemyBullets, &player);
+    const auto currentDanger = aiDangerAt(
+        player.x, player.y, enemies, enemyBullets,
+        enemyGrid, enemyBulletGrid, &player);
     const auto shouldEvade = !rescuing && currentDanger >= 80.0F;
     if (rescuing && distance <= stopDistance) {
         player.moving = false;
@@ -765,7 +787,9 @@ void followAiPartner(PlayerState& player, std::size_t playerIndex,
         player.aiHoldingFormation = false;
     }
     const auto moved = moveAiPlayerSmart(player, formationX, formationY, leader,
-                                          enemies, enemyBullets, map, rescuing, true,
+                                          enemies, enemyBullets,
+                                          enemyGrid, enemyBulletGrid,
+                                          map, rescuing, true,
                                           parallel);
     if (moved < 0.2F && distance > stopDistance) {
         if (player.aiBlockedTicks < 255U) ++player.aiBlockedTicks;
@@ -788,7 +812,9 @@ void followAiPartner(PlayerState& player, std::size_t playerIndex,
                     const auto score = std::sqrt(squaredDistance(
                         x, y, formationX, formationY))
                         + (rescuing ? 0.0F
-                            : aiDangerAt(x, y, enemies, enemyBullets, &player) * 0.03F)
+                            : aiDangerAt(
+                                x, y, enemies, enemyBullets,
+                                enemyGrid, enemyBulletGrid, &player) * 0.03F)
                         + radius * 0.15F;
                     if (score >= bestScore) continue;
                     bestScore = score;
@@ -824,11 +850,14 @@ void moveAttractPlayer(
     const std::array<EnemyState, kMaximumEnemies>& enemies,
     const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
     const std::array<XpGemState, kMaximumXpGems>& xpGems,
+    const EnemySpatialGrid& enemyGrid,
+    const EnemyBulletSpatialGrid& enemyBulletGrid,
     const world::WorldMap& map, std::uint32_t elapsedTicks,
     const ParallelExecutor* parallel = nullptr) noexcept {
     if (partner.hp <= 0) {
         (void)moveAiPlayerSmart(player, partner.x, partner.y, partner,
-                                enemies, enemyBullets, map, true, false, parallel);
+                                enemies, enemyBullets, enemyGrid, enemyBulletGrid,
+                                map, true, false, parallel);
         return;
     }
     if (map.sealCount > 0 && !player.xpRecallInside
@@ -840,7 +869,8 @@ void moveAttractPlayer(
                 && gem.recallPlayer != playerIndex;
         })) {
         (void)moveAiPlayerSmart(player, kWorldCenter, kWorldCenter, partner,
-                                enemies, enemyBullets, map, false, false, parallel);
+                                enemies, enemyBullets, enemyGrid, enemyBulletGrid,
+                                map, false, false, parallel);
         return;
     }
     const EnemyState* nearest = nullptr;
@@ -890,7 +920,8 @@ void moveAttractPlayer(
         }
     }
     (void)moveAiPlayerSmart(player, targetX, targetY, partner,
-                            enemies, enemyBullets, map, false, false, parallel);
+                            enemies, enemyBullets, enemyGrid, enemyBulletGrid,
+                            map, false, false, parallel);
 }
 
 EnemyState* nearestEnemy(std::array<EnemyState, kMaximumEnemies>& enemies,
@@ -2787,6 +2818,8 @@ struct PlayerUpdateJob {
     const std::array<EnemyState, kMaximumEnemies>* enemies;
     const std::array<EnemyBulletState, kMaximumEnemyBullets>* enemyBullets;
     const std::array<XpGemState, kMaximumXpGems>* xpGems;
+    const EnemySpatialGrid* enemyGrid;
+    const EnemyBulletSpatialGrid* enemyBulletGrid;
     const world::WorldMap* map;
     const pixel_twins::ControllerState* controller;
     const ParallelExecutor* parallel;
@@ -2805,12 +2838,14 @@ void updatePlayerJob(void* context) noexcept {
         } else if (job.attract) {
             moveAttractPlayer(
                 player, job.index, *job.partner, *job.enemies,
-                *job.enemyBullets, *job.xpGems, *job.map,
+                *job.enemyBullets, *job.xpGems,
+                *job.enemyGrid, *job.enemyBulletGrid, *job.map,
                 job.attractElapsedTicks, job.parallel);
         } else {
             followAiPartner(
                 player, job.index, *job.partner, *job.enemies,
-                *job.enemyBullets, *job.xpGems, *job.map, job.parallel);
+                *job.enemyBullets, *job.xpGems,
+                *job.enemyGrid, *job.enemyBulletGrid, *job.map, job.parallel);
         }
     } else {
         player.moving = false;
@@ -2991,16 +3026,22 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
             }
         }
     }
+    EnemySpatialGrid enemyGrid;
+    EnemyBulletSpatialGrid enemyBulletGrid;
+    enemyGrid.rebuild(enemies_);
+    enemyBulletGrid.rebuild(enemyBullets_);
     std::array<PlayerUpdateJob, pixel_twins::kControllerCount> playerJobs{{
         {
             &players_[0], &cameras_[0], &players_[1],
-            &enemies_, &enemyBullets_, &xpGems_, &map, &controllers[0], parallel, 0,
+            &enemies_, &enemyBullets_, &xpGems_, &enemyGrid, &enemyBulletGrid,
+            &map, &controllers[0], parallel, 0,
             elapsedTicks_ - (attractMode_ ? 105U * 60U : 0U),
             manualPlayers_[0], attractMode_,
         },
         {
             &players_[1], &cameras_[1], &players_[0],
-            &enemies_, &enemyBullets_, &xpGems_, &map, &controllers[1], parallel, 1,
+            &enemies_, &enemyBullets_, &xpGems_, &enemyGrid, &enemyBulletGrid,
+            &map, &controllers[1], parallel, 1,
             elapsedTicks_ - (attractMode_ ? 105U * 60U : 0U),
             manualPlayers_[1], attractMode_,
         },
@@ -3106,7 +3147,6 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
                 ? 3.0F : 1.0F) * 60.0F
                 * balance.spawnIntervalPercent / 100.0F));
     }
-    EnemySpatialGrid enemyGrid;
     enemyGrid.rebuild(enemies_);
     for (std::size_t index = 0; index < enemies_.size(); ++index) {
         const auto& enemy = enemies_[index];
@@ -3150,7 +3190,6 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         enemyAttackIntents_, enemyRandomCooldowns_, enemyContactReady_,
         enemyAttackDirectionX_, enemyAttackDirectionY_,
         map, randomState_, balance);
-    EnemyBulletSpatialGrid enemyBulletGrid;
     EnemyGridJob enemyGridJob{&enemyGrid, &enemies_};
     EnemyBulletGridJob enemyBulletGridJob{&enemyBulletGrid, &enemyBullets_};
     invokePair(
