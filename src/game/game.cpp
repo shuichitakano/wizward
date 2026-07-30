@@ -84,11 +84,12 @@ PIXEL_TWINS_SRAM void drawPerformanceOverlay(
     const auto target = pixel_twins::makeRenderTarget(
         framebuffer.drawBuffer(), pixel_twins::Screen::Full);
     const auto& palette = framebuffer.palette();
-    const std::array<std::uint8_t, 4> colors{{
+    const std::array<std::uint8_t, 5> colors{{
         nearestPaletteColor(palette, {255, 48, 48}),
         nearestPaletteColor(palette, {48, 255, 80}),
         nearestPaletteColor(palette, {64, 128, 255}),
         pixel_twins::kWhiteColor,
+        nearestPaletteColor(palette, {255, 220, 32}),
     }};
 
     for (std::size_t core = 0; core < overlay.cores.size(); ++core) {
@@ -96,8 +97,8 @@ PIXEL_TWINS_SRAM void drawPerformanceOverlay(
             target, kBarX, kBarY[core], kBarWidth, 1,
             pixel_twins::kDrawableBlackColor);
         const auto& sample = overlay.cores[core];
-        const std::array<std::uint32_t, 4> durations{{
-            sample.renderUs, sample.audioUs, sample.updateUs, sample.otherUs,
+        const std::array<std::uint32_t, 5> durations{{
+            sample.renderUs, sample.audioUs, sample.updateUs, sample.otherUs, sample.ledUs,
         }};
         auto cumulativeUs = std::uint64_t{0};
         auto previousX = std::uint16_t{0};

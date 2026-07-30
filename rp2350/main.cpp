@@ -287,6 +287,7 @@ int main() {
             core1Jobs.audioUs,
             core1Jobs.gameUs,
             core1Jobs.otherUs,
+            profiledPresentUs.load(std::memory_order_acquire),
         };
 
         ++fpsWindowFrames;

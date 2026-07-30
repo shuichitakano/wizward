@@ -47,6 +47,7 @@ struct CoreLoadSample {
     std::uint32_t audioUs = 0;
     std::uint32_t updateUs = 0;
     std::uint32_t otherUs = 0;
+    std::uint32_t ledUs = 0;
 };
 
 struct PerformanceOverlay {
