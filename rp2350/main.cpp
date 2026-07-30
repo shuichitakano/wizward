@@ -132,6 +132,7 @@ volatile std::uint32_t latestCore1RenderJobUs = 0;
 volatile std::uint32_t latestCore0GameActiveUs = 0;
 volatile std::uint32_t latestCore1GameJobUs = 0;
 volatile std::uint32_t latestCore0GameIdleUs = 0;
+volatile std::uint32_t totalLedHoldScans = 0;
 
 struct ProfileStamp {
     std::uint32_t timeUs;
@@ -259,6 +260,13 @@ void ledCoreMain() noexcept {
             if (!jobSystem.tryRunOne()) __wfe();
             continue;
         }
+        if (ledPanel.holding()) {
+            if (publishedFrame.load(std::memory_order_acquire) != currentFrame) {
+                ledPanel.requestHoldStop();
+            }
+            if (!jobSystem.tryRunOne()) __wfe();
+            continue;
+        }
 
         profiledPresentUs.store(
             ledPanel.lastPresentActiveUs(), std::memory_order_release);
@@ -276,8 +284,13 @@ void ledCoreMain() noexcept {
             // この時点で旧表示バッファをcore 0が再利用できる。
             consumedFrame.store(currentFrame, std::memory_order_release);
             __sev();
+            hard_assert(ledPanel.startPresent(*currentBuffer));
+        } else {
+            // 次フレームが遅れている間は旧表示のPWMだけを1走査ずつ継続する。
+            // VSyncも輝度データも送らないため、ティアリングは発生しない。
+            hard_assert(ledPanel.startHoldScan());
+            ++totalLedHoldScans;
         }
-        hard_assert(ledPanel.startPresent(*currentBuffer));
     }
 }
 
