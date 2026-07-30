@@ -54,14 +54,14 @@ int main() {
     game.setPerformanceOverlay(overlay);
     game.render();
     const auto& overlayPixels = game.framebuffer().displayBuffer();
-    const auto core0Row = std::size_t{2} * pixel_twins::kScreenWidth;
-    const auto core1Row = std::size_t{4} * pixel_twins::kScreenWidth;
-    assert(overlayPixels[core0Row + 2] != overlayPixels[core0Row + 62]);
-    assert(overlayPixels[core0Row + 62] != overlayPixels[core0Row + 122]);
-    assert(overlayPixels[core0Row + 122] != overlayPixels[core0Row + 182]);
-    assert(overlayPixels[core0Row + 182] == pixel_twins::kWhiteColor);
-    assert(overlayPixels[core1Row + 121] != pixel_twins::kDrawableBlackColor);
-    assert(overlayPixels[core1Row + 122] == pixel_twins::kDrawableBlackColor);
+    const auto core0Row = std::size_t{1} * pixel_twins::kScreenWidth;
+    const auto core1Row = std::size_t{3} * pixel_twins::kScreenWidth;
+    assert(overlayPixels[core0Row + 2] != overlayPixels[core0Row + 42]);
+    assert(overlayPixels[core0Row + 42] != overlayPixels[core0Row + 81]);
+    assert(overlayPixels[core0Row + 81] != overlayPixels[core0Row + 121]);
+    assert(overlayPixels[core0Row + 121] == pixel_twins::kWhiteColor);
+    assert(overlayPixels[core1Row + 80] != pixel_twins::kDrawableBlackColor);
+    assert(overlayPixels[core1Row + 81] == pixel_twins::kDrawableBlackColor);
 
     assert(game.initialize(Scene::Title, 123U, wizward::game::Difficulty::Hard));
     game.render();
