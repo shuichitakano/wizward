@@ -344,7 +344,16 @@ PIXEL_TWINS_SRAM void drawMiniMap(pixel_twins::RenderTarget target,
         const auto x = static_cast<std::int16_t>(kX + seal.x * kSize / world::kMapColumns);
         const auto y = static_cast<std::int16_t>(kY + seal.y * kSize / world::kMapRows);
         pixel_twins::fillCircle(target, x, y, 1,
-            gameplay.seal(index).active ? 255 : assets::palette::kMinimapLandmark);
+            gameplay.seal(index).active ? 255 : assets::palette::kHighlight);
+    }
+    if (const auto* boss = gameplay.boss()) {
+        const auto x = static_cast<std::int16_t>(kX + boss->x * kSize
+            / static_cast<float>(world::kMapColumns * kWorldTileSize));
+        const auto y = static_cast<std::int16_t>(kY + boss->y * kSize
+            / static_cast<float>(world::kMapRows * kWorldTileSize));
+        pixel_twins::drawRectangle(
+            target, static_cast<std::int16_t>(x - 1), static_cast<std::int16_t>(y - 1),
+            3, 3, assets::palette::kHpGauge);
     }
     // 重なった場合も、この画面を見ているプレイヤーの色と輪郭を前面に出す。
     for (std::size_t order = 0; order < pixel_twins::kControllerCount; ++order) {

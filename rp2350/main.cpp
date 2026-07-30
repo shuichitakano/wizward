@@ -38,11 +38,14 @@ std::atomic<std::uint32_t> publishedFrame{0};
 std::atomic<std::uint32_t> consumedFrame{0};
 std::atomic<std::uint32_t> paletteRevision{1};
 std::atomic<std::uint16_t> ledGammaTenths{22};
+std::atomic<std::uint16_t> ledBrightness256{256};
 std::atomic<bool> ledCoreReady{false};
 std::atomic<bool> flashPauseRequested{false};
 std::atomic<bool> flashPauseReady{false};
 std::atomic<std::uint32_t> profiledPresentUs{0};
 std::uint32_t gamePairIdleUs = 0;
+
+constexpr std::uint8_t kSaveFadeLevels = 16;
 
 std::uint32_t ledInterruptActiveUs() noexcept {
     return ledPanel.totalPresentActiveUs();
@@ -239,6 +242,53 @@ const pixel_twins::SfxPreset& sfxPreset(wizward::game::SfxId id) noexcept {
     return wizward::audio::kUiMove;
 }
 
+std::uint16_t audioDelayBlocks(std::uint16_t displayFrames) noexcept {
+    const auto seconds = static_cast<float>(displayFrames) / 60.0F;
+    return static_cast<std::uint16_t>(
+        seconds / pixel_twins::kAudioBlockSeconds + 0.5F);
+}
+
+bool playStartJingle() noexcept {
+    struct Note {
+        std::uint16_t frame;
+        float frequency;
+    };
+    constexpr std::array<Note, 5> kNotes{{
+        {0, 659.0F},
+        {6, 784.0F},
+        {12, 988.0F},
+        {20, 1175.0F},
+        {30, 1568.0F},
+    }};
+    struct Echo {
+        std::uint16_t frame;
+        float volume;
+        float pan;
+    };
+    constexpr std::array<Echo, 3> kEchoes{{
+        {0, 1.0F, 0.0F},
+        {7, 0.38F, -0.45F},
+        {14, 0.17F, 0.45F},
+    }};
+
+    bool queuedAny = false;
+    for (const auto& echo : kEchoes) {
+        for (const auto& note : kNotes) {
+            auto request = pixel_twins::makeSfxRequest(
+                wizward::audio::kSealJingle, echo.pan);
+            const auto pitchScale = note.frequency / 659.0F;
+            request.voice.frequency *= pitchScale;
+            request.voice.endFrequency *= pitchScale;
+            request.voice.pitchCurveScale *= pitchScale;
+            request.voice.velocity *= echo.volume;
+            request.delayBlocks = audioDelayBlocks(note.frame + echo.frame);
+            if (!audioPlayer.playSfx(request)) return queuedAny;
+            queuedAny = true;
+        }
+    }
+    return queuedAny;
+}
+
 bool applyUpdate(const wizward::game::UpdateResult& result) noexcept {
     if (!result.succeeded || !applyAudioEvent(result.audio)) return false;
     if (result.playStartSfx
@@ -263,9 +313,12 @@ void ledCoreMain() noexcept {
     ledPanel.initialize();
     ledPanel.setGamma(
         static_cast<float>(ledGammaTenths.load(std::memory_order_acquire)) / 10.0F);
+    ledPanel.setBrightness(
+        static_cast<float>(ledBrightness256.load(std::memory_order_acquire)) / 256.0F);
     ledPanel.setPalette(game.framebuffer().palette());
 
     auto currentPaletteRevision = paletteRevision.load(std::memory_order_acquire);
+    auto currentBrightness256 = ledBrightness256.load(std::memory_order_acquire);
     auto currentFrame = publishedFrame.load(std::memory_order_acquire);
     auto currentBuffer = publishedBuffer.load(std::memory_order_acquire);
     if (currentBuffer == nullptr || currentFrame == 0) {
@@ -320,6 +373,13 @@ void ledCoreMain() noexcept {
                         ledGammaTenths.load(std::memory_order_acquire)) / 10.0F);
                 ledPanel.setPalette(game.framebuffer().palette());
                 currentPaletteRevision = nextPaletteRevision;
+            }
+            const auto nextBrightness256 =
+                ledBrightness256.load(std::memory_order_acquire);
+            if (nextBrightness256 != currentBrightness256) {
+                ledPanel.setBrightness(
+                    static_cast<float>(nextBrightness256) / 256.0F);
+                currentBrightness256 = nextBrightness256;
             }
             currentBuffer = publishedBuffer.load(std::memory_order_acquire);
             currentFrame = nextFrame;
@@ -481,6 +541,20 @@ int main() {
     wizward::game::PerformanceOverlay performanceOverlay{};
     auto fpsWindowStart = time_us_32();
     std::uint32_t fpsWindowFrames = 0;
+    std::uint8_t titleFadeInStep = kSaveFadeLevels;
+    bool titleFadeInActive = false;
+
+    const auto presentTransitionFrame = [&](std::uint16_t brightness256) {
+        ledBrightness256.store(brightness256, std::memory_order_release);
+        ++frame;
+        publishedBuffer.store(
+            &game.framebuffer().displayBuffer(), std::memory_order_relaxed);
+        publishedFrame.store(frame, std::memory_order_release);
+        while (consumedFrame.load(std::memory_order_acquire) != frame) {
+            usbControllers.task();
+            if (!jobSystem.tryRunOne()) __wfe();
+        }
+    };
 
     // core 1のLED転送完了を60Hz更新の基準とする。
     // USBホストはcore 0のフレーム待ち時間にも進める。
@@ -492,16 +566,67 @@ int main() {
         game.setDebugMode(debugMode);
         const auto updateStart = takeProfileStamp();
         gamePairIdleUs = 0;
-        const auto inputResult = game.processInput(controllers);
-        const auto tickResult = game.tick(controllers, &renderExecutor);
-        if (!applyUpdate(inputResult) || !applyUpdate(tickResult)) {
+        const auto sceneBeforeUpdate = game.scene();
+        bool startFeedbackPlayed = false;
+        if (sceneBeforeUpdate == wizward::game::Scene::Title) {
+            for (std::size_t index = 0;
+                 index < pixel_twins::kControllerCount; ++index) {
+                const auto& controller = controllers[index];
+                if (controller.pressed == 0
+                    || controller.isPressed(pixel_twins::ControllerButton::back)) {
+                    continue;
+                }
+                startFeedbackPlayed = playStartJingle();
+                break;
+            }
+        }
+        auto inputResult = game.processInput(controllers);
+        if (startFeedbackPlayed) inputResult.playStartSfx = false;
+        const auto inputStartedSaveFade =
+            sceneBeforeUpdate == wizward::game::Scene::Result
+            && game.scene() == wizward::game::Scene::Title
+            && game.rankingsDirty();
+        if (inputStartedSaveFade
+            && inputResult.audio == wizward::game::AudioEvent::StopBgm) {
+            inputResult.audio = wizward::game::AudioEvent::None;
+        }
+        if (!applyUpdate(inputResult)) {
             while (true) tight_loop_contents();
         }
-        const auto sceneChanged = game.scene() != paletteScene;
-        if (sceneChanged
+
+        const auto sceneBeforeTick = game.scene();
+        auto tickResult = game.tick(controllers, &renderExecutor);
+        const auto tickStartedSaveFade =
+            sceneBeforeTick == wizward::game::Scene::Result
             && game.scene() == wizward::game::Scene::Title
-            && game.rankingsDirty()) {
+            && game.rankingsDirty();
+        if (tickStartedSaveFade
+            && tickResult.audio == wizward::game::AudioEvent::StopBgm) {
+            tickResult.audio = wizward::game::AudioEvent::None;
+        }
+        if (!applyUpdate(tickResult)) {
+            while (true) tight_loop_contents();
+        }
+        const auto fadingForSave = inputStartedSaveFade || tickStartedSaveFade;
+        const auto sceneChanged = game.scene() != paletteScene;
+        if (fadingForSave) {
+            for (std::uint8_t darkness = 1;
+                 darkness <= kSaveFadeLevels; ++darkness) {
+                const auto remaining = static_cast<std::uint8_t>(
+                    kSaveFadeLevels - darkness);
+                const auto volume = static_cast<float>(remaining)
+                    / static_cast<float>(kSaveFadeLevels);
+                hard_assert(audioPlayer.setMasterVolume(volume));
+                presentTransitionFrame(
+                    static_cast<std::uint16_t>(remaining) * 256U
+                    / kSaveFadeLevels);
+            }
+            hard_assert(audioPlayer.stopAll());
+            // 完全な黒と無音を1表示周期維持してからFlash IRQ停止へ入る。
+            presentTransitionFrame(0);
             (void)savePersistentState();
+            titleFadeInStep = 0;
+            titleFadeInActive = true;
         }
         if (sceneChanged) {
             paletteScene = game.scene();
@@ -511,6 +636,21 @@ int main() {
         performanceOverlay.enabled = debugMode;
         game.setPerformanceOverlay(performanceOverlay);
         game.render(&renderExecutor);
+        if (titleFadeInActive) {
+            const auto volume = static_cast<float>(titleFadeInStep)
+                / static_cast<float>(kSaveFadeLevels);
+            hard_assert(audioPlayer.setMasterVolume(volume));
+            ledBrightness256.store(
+                static_cast<std::uint16_t>(titleFadeInStep) * 256U
+                    / kSaveFadeLevels,
+                std::memory_order_release);
+            if (titleFadeInStep == kSaveFadeLevels) {
+                titleFadeInActive = false;
+                hard_assert(audioPlayer.setMasterVolume(1.0F));
+            } else {
+                ++titleFadeInStep;
+            }
+        }
         const auto renderEnd = takeProfileStamp();
 
         ++frame;
