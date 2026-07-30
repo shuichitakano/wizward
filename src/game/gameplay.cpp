@@ -1196,8 +1196,14 @@ void fireBossRadial(EnemyState& enemy,
 }
 
 std::array<float, 2> mageSeparation(
-    const EnemyState& enemy,
-    const std::array<EnemyState, kMaximumEnemies>& enemies,
+    std::size_t enemyIndex, float enemyX, float enemyY, float enemyPhase,
+    const std::array<float, kMaximumEnemies>& sourceX,
+    const std::array<float, kMaximumEnemies>& sourceY,
+    const std::array<std::int16_t, kMaximumEnemies>& sourceHp,
+    const std::array<std::uint16_t, kMaximumEnemies>& sourceBorn,
+    const std::array<std::uint16_t, kMaximumEnemies>& sourceSpawnDelay,
+    const std::array<EnemyKind, kMaximumEnemies>& sourceKind,
+    const std::array<bool, kMaximumEnemies>& sourceActive,
     const EnemySpatialGrid& enemyGrid) noexcept {
     std::array<float, 2> separation{};
     // Earlier enemies in the array may already have moved or received contact
@@ -1206,7 +1212,7 @@ std::array<float, 2> mageSeparation(
     std::array<std::uint16_t, kMaximumEnemies> candidateIndices;
     std::size_t candidateCount = 0;
     enemyGrid.forEachCandidate(
-        enemy.x, enemy.y, kMageSeparationRange + kGridMotionPadding,
+        enemyX, enemyY, kMageSeparationRange + kGridMotionPadding,
         [&](std::size_t otherIndex) {
             candidateIndices[candidateCount++] = static_cast<std::uint16_t>(otherIndex);
         });
@@ -1214,13 +1220,14 @@ std::array<float, 2> mageSeparation(
               candidateIndices.begin() + static_cast<std::ptrdiff_t>(candidateCount));
     for (std::size_t candidate = 0; candidate < candidateCount; ++candidate) {
         const auto otherIndex = candidateIndices[candidate];
-        const auto& other = enemies[otherIndex];
-        if (&other == &enemy || !other.active || other.kind != EnemyKind::Mage
-            || other.hp <= 0 || other.bornTicks > 0 || other.spawnDelayTicks > 0) {
+        if (otherIndex == enemyIndex || !sourceActive[otherIndex]
+            || sourceKind[otherIndex] != EnemyKind::Mage
+            || sourceHp[otherIndex] <= 0 || sourceBorn[otherIndex] > 0
+            || sourceSpawnDelay[otherIndex] > 0) {
             continue;
         }
-        const auto dx = enemy.x - other.x;
-        const auto dy = enemy.y - other.y;
+        const auto dx = enemyX - sourceX[otherIndex];
+        const auto dy = enemyY - sourceY[otherIndex];
         const auto gap = std::sqrt(dx * dx + dy * dy);
         if (gap >= kMageSeparationRange) continue;
         const auto weight = 1.0F - gap / kMageSeparationRange;
@@ -1228,24 +1235,49 @@ std::array<float, 2> mageSeparation(
             separation[0] += dx / gap * weight;
             separation[1] += dy / gap * weight;
         } else {
-            separation[0] += std::cos(enemy.phase) * weight;
-            separation[1] += std::sin(enemy.phase) * weight;
+            separation[0] += std::cos(enemyPhase) * weight;
+            separation[1] += std::sin(enemyPhase) * weight;
         }
     }
     return separation;
 }
 
-void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
-                 const EnemySpatialGrid& enemyGrid,
-                 std::array<PlayerState, pixel_twins::kControllerCount>& players,
-                 std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
-                 std::array<XpGemState, kMaximumXpGems>& xpGems,
-                 std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
-                 std::array<std::uint32_t, pixel_twins::kControllerCount>& killCounts,
-                 const world::WorldMap& map,
-                 std::uint32_t& randomState,
-                 const BalanceProfile& balance) noexcept {
-    for (auto& enemy : enemies) {
+enum class EnemyAttackIntent : std::uint8_t {
+    None,
+    BossRadial,
+    Arrow,
+    Magic,
+};
+
+struct EnemyMotionJob {
+    std::array<EnemyState, kMaximumEnemies>* destination;
+    const std::array<float, kMaximumEnemies>* sourceX;
+    const std::array<float, kMaximumEnemies>* sourceY;
+    const std::array<std::int16_t, kMaximumEnemies>* sourceHp;
+    const std::array<std::uint16_t, kMaximumEnemies>* sourceBorn;
+    const std::array<std::uint16_t, kMaximumEnemies>* sourceSpawnDelay;
+    const std::array<EnemyKind, kMaximumEnemies>* sourceKind;
+    const std::array<bool, kMaximumEnemies>* sourceActive;
+    std::array<std::uint8_t, kMaximumEnemies>* attackIntents;
+    std::array<bool, kMaximumEnemies>* randomCooldowns;
+    std::array<bool, kMaximumEnemies>* contactReady;
+    std::array<float, kMaximumEnemies>* attackDirectionX;
+    std::array<float, kMaximumEnemies>* attackDirectionY;
+    const EnemySpatialGrid* enemyGrid;
+    std::array<PlayerState, pixel_twins::kControllerCount>* players;
+    const world::WorldMap* map;
+    std::size_t begin;
+    std::size_t end;
+};
+
+void moveEnemyRangeJob(void* context) noexcept {
+    auto& job = *static_cast<EnemyMotionJob*>(context);
+    for (auto index = job.begin; index < job.end; ++index) {
+        auto& enemy = (*job.destination)[index];
+        (*job.attackIntents)[index] =
+            static_cast<std::uint8_t>(EnemyAttackIntent::None);
+        (*job.randomCooldowns)[index] = false;
+        (*job.contactReady)[index] = false;
         if (!enemy.active) continue;
         if (enemy.spawnDelayTicks > 0) {
             --enemy.spawnDelayTicks;
@@ -1255,7 +1287,9 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
             --enemy.bornTicks;
             continue;
         }
-        const auto speed = enemy.speedPerTick * (enemy.slowTicks > 0 ? 0.42F : 1.0F);
+        (*job.contactReady)[index] = true;
+        const auto speed =
+            enemy.speedPerTick * (enemy.slowTicks > 0 ? 0.42F : 1.0F);
         if (enemy.slowTicks > 0) --enemy.slowTicks;
         if (enemy.contactStunTicks > 0) --enemy.contactStunTicks;
         if (enemy.attackCooldownTicks > 0) --enemy.attackCooldownTicks;
@@ -1263,14 +1297,16 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
         const auto beforeX = enemy.x;
         const auto beforeY = enemy.y;
         if (enemy.contactStunTicks == 0) {
-            auto* target = nearestLivingPlayer(players, enemy.x, enemy.y);
+            auto* target =
+                nearestLivingPlayer(*job.players, enemy.x, enemy.y);
             if (enemy.kind == EnemyKind::Wisp) {
-                if (enemy.targetPlayerIndex < players.size()
-                    && players[enemy.targetPlayerIndex].hp > 0) {
-                    target = &players[enemy.targetPlayerIndex];
+                if (enemy.targetPlayerIndex < job.players->size()
+                    && (*job.players)[enemy.targetPlayerIndex].hp > 0) {
+                    target = &(*job.players)[enemy.targetPlayerIndex];
                 } else {
                     enemy.targetPlayerIndex =
-                        static_cast<std::uint8_t>(target - players.data());
+                        static_cast<std::uint8_t>(
+                            target - job.players->data());
                 }
             }
             auto dx = target->x - enemy.x;
@@ -1278,32 +1314,41 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
             const auto targetDistance = std::sqrt(dx * dx + dy * dy);
             normalize(dx, dy);
             if (enemy.kind == EnemyKind::Boss) {
-                moveActor(enemy, dx * speed, dy * speed, map);
+                moveActor(enemy, dx * speed, dy * speed, *job.map);
                 if (enemy.attackCooldownTicks == 0) {
-                    fireBossRadial(enemy, enemyBullets);
+                    (*job.attackIntents)[index] =
+                        static_cast<std::uint8_t>(
+                            EnemyAttackIntent::BossRadial);
                     enemy.attackCooldownTicks = enemy.endlessScaled
                         ? 105 : (enemy.hp < enemy.maxHp / 2 ? 81 : 105);
                 }
             } else if (enemy.kind == EnemyKind::Bat) {
                 if (enemy.dashTicks > 0) {
                     --enemy.dashTicks;
-                    moveActor(enemy, enemy.dashVelocityX, enemy.dashVelocityY, map);
+                    moveActor(
+                        enemy, enemy.dashVelocityX, enemy.dashVelocityY,
+                        *job.map);
                 } else {
                     enemy.phase += 7.0F / 60.0F;
-                    const auto wave = std::sin(enemy.phase) * (28.0F / 60.0F);
-                    moveActor(enemy, dx * speed - dy * wave, dy * speed + dx * wave, map);
-                    if (enemy.attackCooldownTicks == 0 && targetDistance < 90.0F) {
+                    const auto wave =
+                        std::sin(enemy.phase) * (28.0F / 60.0F);
+                    moveActor(
+                        enemy, dx * speed - dy * wave,
+                        dy * speed + dx * wave, *job.map);
+                    if (enemy.attackCooldownTicks == 0
+                        && targetDistance < 90.0F) {
                         enemy.dashTicks = 17;
                         enemy.dashVelocityX = dx * (155.0F / 60.0F);
                         enemy.dashVelocityY = dy * (155.0F / 60.0F);
-                        enemy.attackCooldownTicks = static_cast<std::uint16_t>(
-                            std::round((1.7F + randomUnit(randomState) * 0.8F) * 60.0F));
+                        (*job.randomCooldowns)[index] = true;
                     }
                 }
             } else if (enemy.kind == EnemyKind::Wisp) {
                 enemy.phase += 3.2F / 60.0F;
-                const auto radialWobble = std::sin(enemy.phase * 1.7F) * (24.0F / 60.0F);
-                const auto inwardSpeed = std::max(speed * 0.42F, speed * 0.82F + radialWobble);
+                const auto radialWobble =
+                    std::sin(enemy.phase * 1.7F) * (24.0F / 60.0F);
+                const auto inwardSpeed =
+                    std::max(speed * 0.42F, speed * 0.82F + radialWobble);
                 const auto outerOrbitSpeed =
                     std::min(96.0F, 46.0F + targetDistance * 0.3F) / 60.0F;
                 const auto tighten =
@@ -1312,24 +1357,31 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
                     std::sin(enemy.phase * 1.13F) * (14.0F / 60.0F);
                 const auto orbitSpeed = static_cast<float>(enemy.orbitSign)
                     * (outerOrbitSpeed + orbitWobble) * tighten;
-                moveEnemyActor(enemy, dx * inwardSpeed - dy * orbitSpeed,
-                               dy * inwardSpeed + dx * orbitSpeed, map);
+                moveEnemyActor(
+                    enemy, dx * inwardSpeed - dy * orbitSpeed,
+                    dy * inwardSpeed + dx * orbitSpeed, *job.map);
             } else if (enemy.kind == EnemyKind::Archer) {
-                constexpr float nearRange = 72.0F;
-                constexpr float farRange = 105.0F;
-                if (targetDistance < nearRange) moveActor(enemy, -dx * speed, -dy * speed, map);
-                else if (targetDistance > farRange) moveActor(enemy, dx * speed, dy * speed, map);
-                if (enemy.attackCooldownTicks == 0 && targetDistance < 150.0F) {
+                constexpr float kNearRange = 72.0F;
+                constexpr float kFarRange = 105.0F;
+                if (targetDistance < kNearRange) {
+                    moveActor(enemy, -dx * speed, -dy * speed, *job.map);
+                } else if (targetDistance > kFarRange) {
+                    moveActor(enemy, dx * speed, dy * speed, *job.map);
+                }
+                if (enemy.attackCooldownTicks == 0
+                    && targetDistance < 150.0F) {
                     constexpr float kStep = kTau / 16.0F;
-                    const auto angle = std::round(std::atan2(dy, dx) / kStep) * kStep;
+                    const auto angle =
+                        std::round(std::atan2(dy, dx) / kStep) * kStep;
                     dx = std::cos(angle);
                     dy = std::sin(angle);
                     enemy.facing = facingFor(dx, dy);
                     enemy.attackAnimationTicks = 20;
-                    (void)spawnEnemyBullet(enemyBullets, enemy,
-                                           EnemyBulletType::Arrow, dx, dy);
-                    enemy.attackCooldownTicks = static_cast<std::uint16_t>(
-                        std::round((2.2F + randomUnit(randomState) * 0.9F) * 60.0F));
+                    (*job.attackIntents)[index] =
+                        static_cast<std::uint8_t>(EnemyAttackIntent::Arrow);
+                    (*job.attackDirectionX)[index] = dx;
+                    (*job.attackDirectionY)[index] = dy;
+                    (*job.randomCooldowns)[index] = true;
                 }
             } else if (enemy.kind == EnemyKind::Mage) {
                 auto moveX = 0.0F;
@@ -1341,32 +1393,88 @@ void moveEnemies(std::array<EnemyState, kMaximumEnemies>& enemies,
                     moveX += dx * speed;
                     moveY += dy * speed;
                 }
-                const auto separation = mageSeparation(enemy, enemies, enemyGrid);
+                const auto separation =
+                    mageSeparation(
+                        index, (*job.sourceX)[index], (*job.sourceY)[index],
+                        enemy.phase, *job.sourceX, *job.sourceY, *job.sourceHp,
+                        *job.sourceBorn, *job.sourceSpawnDelay, *job.sourceKind,
+                        *job.sourceActive, *job.enemyGrid);
                 moveX += separation[0] * speed * kMageSeparationWeight;
                 moveY += separation[1] * speed * kMageSeparationWeight;
-                const auto moveSpeed = std::sqrt(moveX * moveX + moveY * moveY);
-                const auto maximumSpeed = speed * kMageSeparationMaximumSpeed;
+                const auto moveSpeed =
+                    std::sqrt(moveX * moveX + moveY * moveY);
+                const auto maximumSpeed =
+                    speed * kMageSeparationMaximumSpeed;
                 if (moveSpeed > maximumSpeed) {
                     moveX = moveX / moveSpeed * maximumSpeed;
                     moveY = moveY / moveSpeed * maximumSpeed;
                 }
-                moveActor(enemy, moveX, moveY, map);
-                if (enemy.attackCooldownTicks == 0 && targetDistance < 165.0F) {
-                    (void)spawnEnemyBullet(enemyBullets, enemy,
-                                           EnemyBulletType::Magic, dx, dy);
-                    enemy.attackCooldownTicks = static_cast<std::uint16_t>(
-                        std::round((1.9F + randomUnit(randomState) * 0.9F) * 60.0F));
+                moveActor(enemy, moveX, moveY, *job.map);
+                if (enemy.attackCooldownTicks == 0
+                    && targetDistance < 165.0F) {
+                    (*job.attackIntents)[index] =
+                        static_cast<std::uint8_t>(EnemyAttackIntent::Magic);
+                    (*job.attackDirectionX)[index] = dx;
+                    (*job.attackDirectionY)[index] = dy;
+                    (*job.randomCooldowns)[index] = true;
                 }
             } else {
-                moveActor(enemy, dx * speed, dy * speed, map);
+                moveActor(enemy, dx * speed, dy * speed, *job.map);
             }
         }
-
         const auto movedX = enemy.x - beforeX;
         const auto movedY = enemy.y - beforeY;
-        enemy.moving = std::sqrt(movedX * movedX + movedY * movedY) > 0.01F;
+        enemy.moving =
+            std::sqrt(movedX * movedX + movedY * movedY) > 0.01F;
         if (enemy.moving) enemy.facing = facingFor(movedX, movedY);
+    }
+}
 
+void resolveEnemyMotion(std::array<EnemyState, kMaximumEnemies>& enemies,
+                 std::array<PlayerState, pixel_twins::kControllerCount>& players,
+                 std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
+                 std::array<XpGemState, kMaximumXpGems>& xpGems,
+                 std::array<std::uint32_t, pixel_twins::kControllerCount>& scores,
+                 std::array<std::uint32_t, pixel_twins::kControllerCount>& killCounts,
+                 const std::array<std::uint8_t, kMaximumEnemies>& attackIntents,
+                 const std::array<bool, kMaximumEnemies>& randomCooldowns,
+                 const std::array<bool, kMaximumEnemies>& contactReady,
+                 const std::array<float, kMaximumEnemies>& attackDirectionX,
+                 const std::array<float, kMaximumEnemies>& attackDirectionY,
+                 const world::WorldMap& map,
+                 std::uint32_t& randomState,
+                 const BalanceProfile& balance) noexcept {
+    for (std::size_t enemyIndex = 0; enemyIndex < enemies.size(); ++enemyIndex) {
+        auto& enemy = enemies[enemyIndex];
+        if (!contactReady[enemyIndex]) continue;
+        const auto attackIntent =
+            static_cast<EnemyAttackIntent>(attackIntents[enemyIndex]);
+        if (attackIntent == EnemyAttackIntent::BossRadial) {
+            fireBossRadial(enemy, enemyBullets);
+        } else if (attackIntent == EnemyAttackIntent::Arrow) {
+            (void)spawnEnemyBullet(
+                enemyBullets, enemy, EnemyBulletType::Arrow,
+                attackDirectionX[enemyIndex], attackDirectionY[enemyIndex]);
+        } else if (attackIntent == EnemyAttackIntent::Magic) {
+            (void)spawnEnemyBullet(
+                enemyBullets, enemy, EnemyBulletType::Magic,
+                attackDirectionX[enemyIndex], attackDirectionY[enemyIndex]);
+        }
+        if (randomCooldowns[enemyIndex]) {
+            if (enemy.kind == EnemyKind::Bat) {
+                enemy.attackCooldownTicks = static_cast<std::uint16_t>(
+                    std::round(
+                        (1.7F + randomUnit(randomState) * 0.8F) * 60.0F));
+            } else if (enemy.kind == EnemyKind::Archer) {
+                enemy.attackCooldownTicks = static_cast<std::uint16_t>(
+                    std::round(
+                        (2.2F + randomUnit(randomState) * 0.9F) * 60.0F));
+            } else {
+                enemy.attackCooldownTicks = static_cast<std::uint16_t>(
+                    std::round(
+                        (1.9F + randomUnit(randomState) * 0.9F) * 60.0F));
+            }
+        }
         for (std::size_t playerIndex = 0; playerIndex < players.size(); ++playerIndex) {
             auto& player = players[playerIndex];
             if (player.hp <= 0 || player.invulnerabilityTicks != 0
@@ -3000,8 +3108,48 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
     }
     EnemySpatialGrid enemyGrid;
     enemyGrid.rebuild(enemies_);
-    moveEnemies(enemies_, enemyGrid, players_, enemyBullets_, xpGems_, scores_, killCounts_,
-                map, randomState_, balance);
+    for (std::size_t index = 0; index < enemies_.size(); ++index) {
+        const auto& enemy = enemies_[index];
+        enemyMotionSourceX_[index] = enemy.x;
+        enemyMotionSourceY_[index] = enemy.y;
+        enemyMotionSourceHp_[index] = enemy.hp;
+        enemyMotionSourceBorn_[index] = enemy.bornTicks;
+        enemyMotionSourceSpawnDelay_[index] = enemy.spawnDelayTicks;
+        enemyMotionSourceKind_[index] = enemy.kind;
+        enemyMotionSourceActive_[index] = enemy.active;
+    }
+    constexpr auto kEnemySplit = kMaximumEnemies / 2U;
+    std::array<EnemyMotionJob, 2> enemyMotionJobs{{
+        {
+            &enemies_,
+            &enemyMotionSourceX_, &enemyMotionSourceY_, &enemyMotionSourceHp_,
+            &enemyMotionSourceBorn_, &enemyMotionSourceSpawnDelay_,
+            &enemyMotionSourceKind_, &enemyMotionSourceActive_,
+            &enemyAttackIntents_,
+            &enemyRandomCooldowns_, &enemyContactReady_,
+            &enemyAttackDirectionX_, &enemyAttackDirectionY_,
+            &enemyGrid, &players_, &map, 0, kEnemySplit,
+        },
+        {
+            &enemies_,
+            &enemyMotionSourceX_, &enemyMotionSourceY_, &enemyMotionSourceHp_,
+            &enemyMotionSourceBorn_, &enemyMotionSourceSpawnDelay_,
+            &enemyMotionSourceKind_, &enemyMotionSourceActive_,
+            &enemyAttackIntents_,
+            &enemyRandomCooldowns_, &enemyContactReady_,
+            &enemyAttackDirectionX_, &enemyAttackDirectionY_,
+            &enemyGrid, &players_, &map, kEnemySplit, kMaximumEnemies,
+        },
+    }};
+    invokePair(
+        parallel,
+        moveEnemyRangeJob, &enemyMotionJobs[0],
+        moveEnemyRangeJob, &enemyMotionJobs[1]);
+    resolveEnemyMotion(
+        enemies_, players_, enemyBullets_, xpGems_, scores_, killCounts_,
+        enemyAttackIntents_, enemyRandomCooldowns_, enemyContactReady_,
+        enemyAttackDirectionX_, enemyAttackDirectionY_,
+        map, randomState_, balance);
     EnemyBulletSpatialGrid enemyBulletGrid;
     EnemyGridJob enemyGridJob{&enemyGrid, &enemies_};
     EnemyBulletGridJob enemyBulletGridJob{&enemyBulletGrid, &enemyBullets_};

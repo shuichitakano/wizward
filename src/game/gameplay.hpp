@@ -455,6 +455,18 @@ private:
     std::array<PlayerState, pixel_twins::kControllerCount> players_{};
     std::array<CameraState, pixel_twins::kControllerCount> cameras_{};
     std::array<EnemyState, kMaximumEnemies> enemies_{};
+    std::array<float, kMaximumEnemies> enemyMotionSourceX_{};
+    std::array<float, kMaximumEnemies> enemyMotionSourceY_{};
+    std::array<std::int16_t, kMaximumEnemies> enemyMotionSourceHp_{};
+    std::array<std::uint16_t, kMaximumEnemies> enemyMotionSourceBorn_{};
+    std::array<std::uint16_t, kMaximumEnemies> enemyMotionSourceSpawnDelay_{};
+    std::array<EnemyKind, kMaximumEnemies> enemyMotionSourceKind_{};
+    std::array<bool, kMaximumEnemies> enemyMotionSourceActive_{};
+    std::array<std::uint8_t, kMaximumEnemies> enemyAttackIntents_{};
+    std::array<bool, kMaximumEnemies> enemyRandomCooldowns_{};
+    std::array<bool, kMaximumEnemies> enemyContactReady_{};
+    std::array<float, kMaximumEnemies> enemyAttackDirectionX_{};
+    std::array<float, kMaximumEnemies> enemyAttackDirectionY_{};
     std::array<PlayerBulletState, kMaximumPlayerBullets> bullets_{};
     std::array<std::uint8_t, kMaximumPlayerBullets> freeBulletSlots_{};
     std::size_t freeBulletSlotCount_ = 0;
