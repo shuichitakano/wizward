@@ -36,11 +36,74 @@ std::atomic<std::uint32_t> paletteRevision{1};
 std::atomic<bool> ledCoreReady{false};
 std::atomic<std::uint32_t> profiledPresentUs{0};
 
+std::uint32_t ledInterruptActiveUs() noexcept {
+    return ledPanel.totalPresentActiveUs();
+}
+
+struct RenderChainBatch;
+
+struct RenderChain {
+    RenderChainBatch* batch = nullptr;
+    void* stepContext = nullptr;
+};
+
+struct RenderChainBatch {
+    wizward::rp2350::JobSystem* jobs = nullptr;
+    wizward::game::ParallelExecutor::Step step = nullptr;
+    std::atomic<std::uint32_t> remaining{2};
+    std::array<RenderChain, pixel_twins::kControllerCount> chains{};
+};
+
+void finishRenderChain(RenderChainBatch& batch) noexcept {
+    if (batch.remaining.fetch_sub(1, std::memory_order_release) == 1) {
+        __sev();
+    }
+}
+
+void runRenderChainStep(void* context) noexcept {
+    auto& chain = *static_cast<RenderChain*>(context);
+    auto& batch = *chain.batch;
+    if (!batch.step(chain.stepContext)) {
+        finishRenderChain(batch);
+        return;
+    }
+    if (batch.jobs->trySubmit(
+            runRenderChainStep, &chain, nullptr,
+            wizward::rp2350::JobSystem::Category::Render)) {
+        return;
+    }
+    while (batch.step(chain.stepContext)) {}
+    finishRenderChain(batch);
+}
+
+void invokeRenderChains(
+        void* context, wizward::game::ParallelExecutor::Step step,
+        void* firstContext, void* secondContext) noexcept {
+    auto& jobs = *static_cast<wizward::rp2350::JobSystem*>(context);
+    RenderChainBatch batch;
+    batch.jobs = &jobs;
+    batch.step = step;
+    batch.chains[0] = {&batch, firstContext};
+    batch.chains[1] = {&batch, secondContext};
+    for (auto& chain : batch.chains) {
+        if (!jobs.trySubmit(
+                runRenderChainStep, &chain, nullptr,
+                wizward::rp2350::JobSystem::Category::Render)) {
+            runRenderChainStep(&chain);
+        }
+    }
+    while (batch.remaining.load(std::memory_order_acquire) != 0) {
+        if (!jobs.tryRunOne()) __wfe();
+    }
+}
+
 // 実機デバッガからフレーム時間の内訳を確認する。
 volatile std::uint32_t latestUpdateUs = 0;
 volatile std::uint32_t latestRenderUs = 0;
 volatile std::uint32_t latestFrameUs = 0;
 volatile std::uint32_t maximumRenderUs = 0;
+volatile std::uint32_t latestCore0RenderJobUs = 0;
+volatile std::uint32_t latestCore1RenderJobUs = 0;
 
 struct ProfileStamp {
     std::uint32_t timeUs;
@@ -214,7 +277,9 @@ int main() {
     if (!audioPlayer.initialize()) {
         while (true) tight_loop_contents();
     }
-    jobSystem.initialize();
+    jobSystem.initialize(ledInterruptActiveUs);
+    const wizward::game::ParallelExecutor renderExecutor{
+        &jobSystem, invokeRenderChains};
 
     std::uint32_t frame = 1;
     publishedBuffer.store(
@@ -256,7 +321,7 @@ int main() {
         const auto updateEnd = takeProfileStamp();
         performanceOverlay.enabled = debugMode;
         game.setPerformanceOverlay(performanceOverlay);
-        game.render();
+        game.render(&renderExecutor);
         const auto renderEnd = takeProfileStamp();
 
         ++frame;
@@ -277,10 +342,13 @@ int main() {
         const auto accountedCpuUs = updateUs + renderUs;
         const auto otherUs =
             preWaitCpuUs > accountedCpuUs ? preWaitCpuUs - accountedCpuUs : 0;
-        (void)jobSystem.takeProfile(0);
+        const auto core0Jobs = jobSystem.takeProfile(0);
         const auto core1Jobs = jobSystem.takeProfile(1);
+        latestCore0RenderJobUs = core0Jobs.renderUs;
+        latestCore1RenderJobUs = core1Jobs.renderUs;
         performanceOverlay.cores[0] = {
-            renderUs, audioUs, updateUs, otherUs,
+            core0Jobs.renderUs != 0 ? core0Jobs.renderUs : renderUs,
+            audioUs, updateUs, otherUs,
         };
         performanceOverlay.cores[1] = {
             core1Jobs.renderUs,

@@ -42,6 +42,16 @@ pixel_twins::Controllers idleControllers() noexcept {
 }
 
 wizward::game::Game game;
+wizward::game::Game serialRenderGame;
+wizward::game::Game stagedRenderGame;
+
+void invokeChainsInReverse(
+        void*,
+        wizward::game::ParallelExecutor::Step step,
+        void* firstContext, void* secondContext) noexcept {
+    while (step(secondContext)) {}
+    while (step(firstContext)) {}
+}
 
 } // namespace
 
@@ -49,6 +59,19 @@ int main() {
     using pixel_twins::ControllerButton;
     using wizward::game::AudioEvent;
     using wizward::game::Scene;
+
+    assert(serialRenderGame.initialize(Scene::Gameplay, 0x12345678U));
+    assert(stagedRenderGame.initialize(Scene::Gameplay, 0x12345678U));
+    for (std::uint16_t tick = 0; tick < 240U; ++tick) {
+        (void)serialRenderGame.tick(idleControllers());
+        (void)stagedRenderGame.tick(idleControllers());
+    }
+    serialRenderGame.render();
+    const wizward::game::ParallelExecutor reverseExecutor{
+        nullptr, invokeChainsInReverse};
+    stagedRenderGame.render(&reverseExecutor);
+    assert(serialRenderGame.framebuffer().displayBuffer()
+           == stagedRenderGame.framebuffer().displayBuffer());
 
     assert(game.initialize(Scene::Title, 123U, wizward::game::Difficulty::Easy));
     game.render();

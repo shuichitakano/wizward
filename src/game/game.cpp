@@ -1058,18 +1058,23 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        pixel_twins::SpriteBuckets<Capacity, ExCapacity>& spriteBuckets,
                        std::uint32_t frame,
                        std::size_t viewer,
+                       GameplayRenderStage stage,
                        bool showHud = true,
                        bool attractMode = false) noexcept {
     // The prototype rounds the camera once before drawing the world and every overlay.
     // Keep that shared pixel origin so fixed world details cannot drift by one pixel.
     const CameraState camera{std::round(cameraState.x), std::round(cameraState.y)};
-    map.draw(target, assets.background(), static_cast<std::int32_t>(camera.x),
-             static_cast<std::int32_t>(camera.y));
-    drawXpRecallCircle(target, assets, camera, gameplay);
-    drawActiveSeals(target, map, gameplay, camera);
-    drawBossIntroShadow(target, gameplay, camera);
-    spriteBuckets.reset();
-    for (const auto& bullet : gameplay.bullets()) {
+    if (stage == GameplayRenderStage::Background) {
+        map.draw(target, assets.background(), static_cast<std::int32_t>(camera.x),
+                 static_cast<std::int32_t>(camera.y));
+        drawXpRecallCircle(target, assets, camera, gameplay);
+        drawActiveSeals(target, map, gameplay, camera);
+        drawBossIntroShadow(target, gameplay, camera);
+        spriteBuckets.reset();
+        return;
+    }
+    if (stage == GameplayRenderStage::PlayerAttacks) {
+        for (const auto& bullet : gameplay.bullets()) {
         if (!bullet.active) continue;
         auto asset = assets::SpriteAssetId::LightOrb88x83fSheet;
         std::int16_t halfSize = 4;
@@ -1090,8 +1095,11 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                    static_cast<std::int16_t>(bullet.x - camera.x - halfSize),
                    static_cast<std::int16_t>(bullet.y - camera.y - 10.0F - halfSize),
                    bullet.y - camera.y, directionRow);
+        }
+        return;
     }
-    for (const auto& effect : gameplay.impactEffects()) {
+    if (stage == GameplayRenderStage::Effects) {
+        for (const auto& effect : gameplay.impactEffects()) {
         if (!effect.active || effect.lifetimeTicks == 0) continue;
         if (effect.type == ImpactEffectType::BossDeath) {
             const auto progress = static_cast<float>(effect.ageTicks)
@@ -1146,8 +1154,8 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                    static_cast<std::int16_t>(effect.x - camera.x - halfSize),
                    static_cast<std::int16_t>(effect.y - camera.y - halfSize),
                    effect.y - camera.y);
-    }
-    for (const auto& gem : gameplay.xpGems()) {
+        }
+        for (const auto& gem : gameplay.xpGems()) {
         if (!gem.active) continue;
         const auto gemX = static_cast<std::int16_t>(gem.x - camera.x - 4.0F);
         const auto gemY = static_cast<std::int16_t>(gem.y - camera.y - 4.0F);
@@ -1159,8 +1167,11 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
         if (assets.makeXpGemSprite(gem.owner, gemX, gemY, sprite)) {
             (void)spriteBuckets.addSprite(bucket, sprite);
         }
+        }
+        return;
     }
-    for (const auto& enemy : gameplay.enemies()) {
+    if (stage == GameplayRenderStage::Enemies) {
+        for (const auto& enemy : gameplay.enemies()) {
         if ((!enemy.active && enemy.deathTicks == 0) || enemy.spawnDelayTicks > 0) continue;
         const auto dying = !enemy.active && enemy.deathTicks > 0;
         auto drawEnemyY = enemy.y;
@@ -1271,8 +1282,11 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                    static_cast<std::int16_t>(enemy.x - camera.x - anchorX),
                    static_cast<std::int16_t>(drawEnemyY - camera.y - anchorY), drawEnemyY - camera.y,
                    fourDirectionRow(enemy.facing));
+        }
+        return;
     }
-    for (const auto& bullet : gameplay.enemyBullets()) {
+    if (stage == GameplayRenderStage::EnemyAttacks) {
+        for (const auto& bullet : gameplay.enemyBullets()) {
         if (!bullet.active || bullet.launchDelayTicks > 0) continue;
         if (bullet.type == EnemyBulletType::Arrow) {
             auto angle = std::atan2(bullet.velocityY, bullet.velocityX);
@@ -1295,8 +1309,11 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        static_cast<std::int16_t>(bullet.x - camera.x - 8.0F),
                        static_cast<std::int16_t>(bullet.y - camera.y - 8.0F), bullet.y - camera.y);
         }
+        }
+        return;
     }
-    for (const auto& slash : gameplay.windSlashes()) {
+    if (stage == GameplayRenderStage::AreaAttacks) {
+        for (const auto& slash : gameplay.windSlashes()) {
         if (!slash.active || slash.owner >= pixel_twins::kControllerCount) continue;
         const auto& owner = gameplay.player(slash.owner);
         const auto sweep = static_cast<float>(slash.ageTicks) / 28.0F * 2.35F * 3.1415927F;
@@ -1312,11 +1329,11 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        static_cast<std::int16_t>(x - camera.x - 8.0F),
                        static_cast<std::int16_t>(y - camera.y - 18.0F), y - camera.y);
         }
-    }
-    constexpr std::array<std::array<std::int16_t, 4>, 3> kThunderConnections{{
+        }
+        constexpr std::array<std::array<std::int16_t, 4>, 3> kThunderConnections{{
         {{14, 0, 10, 59}}, {{10, 0, 12, 59}}, {{12, 0, 13, 59}},
-    }};
-    for (const auto& strike : gameplay.thunderStrikes()) {
+        }};
+        for (const auto& strike : gameplay.thunderStrikes()) {
         if (!strike.active) continue;
         auto connectX = strike.x - camera.x;
         auto connectY = strike.y - camera.y;
@@ -1340,8 +1357,11 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        static_cast<std::int16_t>(std::round(strike.y - camera.y - 8.0F)),
                        strike.y - camera.y);
         }
+        }
+        return;
     }
-    for (std::size_t playerIndex = 0; playerIndex < pixel_twins::kControllerCount; ++playerIndex) {
+    if (stage == GameplayRenderStage::Actors) {
+        for (std::size_t playerIndex = 0; playerIndex < pixel_twins::kControllerCount; ++playerIndex) {
         const auto& player = gameplay.player(playerIndex);
         if (player.hp <= 0) continue;
         for (const auto& familiar : player.familiars) {
@@ -1395,11 +1415,17 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
     // SpriteBuckets draws equal-Y entries in reverse insertion order. Queue the
     // ground rings last so they are drawn first, behind players and other actors.
     queuePerkEffectUnder(spriteBuckets, assets, camera, gameplay);
-    drawBossIntroOverlay(target, gameplay, camera);
-    spriteBuckets.draw(target);
-    drawPerkEffectOver(target, assets, camera, gameplay);
-    drawClearSequence(target, assets, gameplay, camera, frame);
-    for (std::size_t playerIndex = 0; playerIndex < pixel_twins::kControllerCount; ++playerIndex) {
+        return;
+    }
+    if (stage == GameplayRenderStage::Composite) {
+        drawBossIntroOverlay(target, gameplay, camera);
+        spriteBuckets.draw(target);
+        return;
+    }
+    if (stage == GameplayRenderStage::Overlays) {
+        drawPerkEffectOver(target, assets, camera, gameplay);
+        drawClearSequence(target, assets, gameplay, camera, frame);
+        for (std::size_t playerIndex = 0; playerIndex < pixel_twins::kControllerCount; ++playerIndex) {
         const auto& player = gameplay.player(playerIndex);
         if (player.bombEffectTicks == 0) continue;
         constexpr PerkSpriteSpec kBombCore{
@@ -1440,15 +1466,17 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
             drawPerkSpriteProgress(target, assets, camera, kBombFragment,
                                    progress, x, y, fragment % 3U);
         }
-    }
-    for (const auto& strike : gameplay.thunderStrikes()) {
+        }
+        for (const auto& strike : gameplay.thunderStrikes()) {
         if (!strike.active) continue;
         pixel_twins::drawCircle(target,
             static_cast<std::int16_t>(std::round(strike.x - camera.x)),
             static_cast<std::int16_t>(std::round(strike.y - camera.y)),
             thunderShockwaveRadius(strike.ageTicks), assets::palette::kThunder);
+        }
+        return;
     }
-    if (!showHud) return;
+    if (stage != GameplayRenderStage::Hud || !showHud) return;
     const auto& viewedPlayer = gameplay.player(viewer);
     const auto maxHpWidth = static_cast<std::uint16_t>(std::clamp<std::int16_t>(viewedPlayer.maxHp, 1, 60));
     const auto hpWidth = static_cast<std::uint16_t>(
@@ -2021,7 +2049,48 @@ void Game::updateRankingInput(const pixel_twins::Controllers& controllers) noexc
     }
 }
 
-void Game::render() noexcept {
+void Game::renderPanelStage(
+        std::size_t viewer, GameplayRenderStage stage) noexcept {
+    const auto screen =
+        viewer == 0 ? pixel_twins::Screen::Left : pixel_twins::Screen::Right;
+    const auto target =
+        pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), screen);
+    if (scene_ == Scene::AttractDemo) {
+        drawGameplayPanel(
+            target, worldMap_, gameAssets_, gameplay_.camera(viewer), gameplay_,
+            spriteBuckets_[viewer], frame_, viewer, stage, true, true);
+    } else if (scene_ == Scene::Gameplay) {
+        drawGameplayPanel(
+            target, worldMap_, gameAssets_, gameplay_.camera(viewer), gameplay_,
+            spriteBuckets_[viewer], frame_, viewer, stage);
+        if (stage == GameplayRenderStage::Hud && paused_) {
+            drawCenteredText(target, "PAUSED", 80, 84);
+        }
+    } else {
+        drawGameplayPanel(
+            target, worldMap_, gameAssets_, gameplay_.camera(viewer), gameplay_,
+            spriteBuckets_[viewer], frame_, viewer, stage, false);
+        if (stage == GameplayRenderStage::Hud) {
+            const auto endless = difficulty_ == Difficulty::Endless;
+            const auto& records = endless ? endlessRankings_ : rankings_;
+            const auto recordCount = endless ? endlessRankingCount_ : rankingCount_;
+            drawResultPanel(
+                target, gameAssets_, gameplay_, resultOutcome_, sceneFrame_,
+                resultContinueTicks_, viewer, timeBonuses_, finalScores_,
+                records, recordCount, rankingEntries_);
+        }
+    }
+}
+
+bool Game::renderPanelStageStep(void* context) noexcept {
+    auto& job = *static_cast<PanelJobContext*>(context);
+    job.game->renderPanelStage(job.viewer, job.stage);
+    const auto next = static_cast<std::uint8_t>(job.stage) + 1U;
+    job.stage = static_cast<GameplayRenderStage>(next);
+    return next < static_cast<std::uint8_t>(GameplayRenderStage::Count);
+}
+
+void Game::render(const ParallelExecutor* parallel) noexcept {
     if (scene_ == Scene::Title) {
         drawTitle(framebuffer_, titleAssets_, frame_, difficulty_);
     } else if (scene_ == Scene::AttractRanking) {
@@ -2029,38 +2098,18 @@ void Game::render() noexcept {
         drawAttractRanking(framebuffer_, titleAssets_,
                            endless ? endlessRankings_ : rankings_,
                            endless ? endlessRankingCount_ : rankingCount_, endless);
-    } else if (scene_ == Scene::AttractDemo) {
-        const auto left = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Left);
-        const auto right = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Right);
-        drawGameplayPanel(left, worldMap_, gameAssets_, gameplay_.camera(0), gameplay_,
-                          spriteBuckets_, frame_, 0, true, true);
-        drawGameplayPanel(right, worldMap_, gameAssets_, gameplay_.camera(1), gameplay_,
-                          spriteBuckets_, frame_, 1, true, true);
-    } else if (scene_ == Scene::Gameplay) {
-        const auto left = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Left);
-        const auto right = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Right);
-        drawGameplayPanel(left, worldMap_, gameAssets_, gameplay_.camera(0), gameplay_,
-                          spriteBuckets_, frame_, 0);
-        drawGameplayPanel(right, worldMap_, gameAssets_, gameplay_.camera(1), gameplay_,
-                          spriteBuckets_, frame_, 1);
-        if (paused_) {
-            drawCenteredText(left, "PAUSED", 80, 84);
-            drawCenteredText(right, "PAUSED", 80, 84);
-        }
     } else {
-        const auto left = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Left);
-        const auto right = pixel_twins::makeRenderTarget(framebuffer_.drawBuffer(), pixel_twins::Screen::Right);
-        drawGameplayPanel(left, worldMap_, gameAssets_, gameplay_.camera(0), gameplay_,
-                          spriteBuckets_, frame_, 0, false);
-        drawGameplayPanel(right, worldMap_, gameAssets_, gameplay_.camera(1), gameplay_,
-                          spriteBuckets_, frame_, 1, false);
-        const auto endless = difficulty_ == Difficulty::Endless;
-        const auto& records = endless ? endlessRankings_ : rankings_;
-        const auto recordCount = endless ? endlessRankingCount_ : rankingCount_;
-        drawResultPanel(left, gameAssets_, gameplay_, resultOutcome_, sceneFrame_, resultContinueTicks_, 0,
-                        timeBonuses_, finalScores_, records, recordCount, rankingEntries_);
-        drawResultPanel(right, gameAssets_, gameplay_, resultOutcome_, sceneFrame_, resultContinueTicks_, 1,
-                        timeBonuses_, finalScores_, records, recordCount, rankingEntries_);
+        std::array<PanelJobContext, pixel_twins::kControllerCount> jobs{{
+            {this, 0, GameplayRenderStage::Background},
+            {this, 1, GameplayRenderStage::Background},
+        }};
+        if (parallel != nullptr && parallel->invokeChains != nullptr) {
+            parallel->invokeChains(
+                parallel->context, renderPanelStageStep, &jobs[0], &jobs[1]);
+        } else {
+            while (renderPanelStageStep(&jobs[0])) {}
+            while (renderPanelStageStep(&jobs[1])) {}
+        }
     }
     drawPerformanceOverlay(framebuffer_, performanceOverlay_);
     framebuffer_.flip();

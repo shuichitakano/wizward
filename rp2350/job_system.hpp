@@ -42,9 +42,11 @@ public:
     // contextの寿命は完了カウンタが0になるまで呼び出し側が保証する。
     // LEDのフレーム境界を遅延させない、短時間かつ非ブロッキングな処理だけを投入する。
     using Function = void (*)(void*) noexcept;
+    using InterruptTimeProvider = std::uint32_t (*)() noexcept;
 
-    void initialize() noexcept {
+    void initialize(InterruptTimeProvider interruptTimeProvider = nullptr) noexcept {
         critical_section_init(&criticalSection_);
+        interruptTimeProvider_ = interruptTimeProvider;
         initialized_ = true;
     }
 
@@ -83,9 +85,14 @@ public:
         --queuedCount_;
         critical_section_exit(&criticalSection_);
 
+        const auto interruptStart =
+            interruptTimeProvider_ != nullptr ? interruptTimeProvider_() : 0;
         const auto startedAt = time_us_32();
         job.function(job.context);
-        const auto elapsedUs = time_us_32() - startedAt;
+        const auto wallUs = time_us_32() - startedAt;
+        const auto interruptUs = interruptTimeProvider_ != nullptr
+            ? interruptTimeProvider_() - interruptStart : 0;
+        const auto elapsedUs = wallUs > interruptUs ? wallUs - interruptUs : 0;
         const auto core = get_core_num();
         const auto category = static_cast<std::size_t>(job.category);
         profileUs_[core][category].fetch_add(elapsedUs, std::memory_order_relaxed);
@@ -137,6 +144,7 @@ private:
     std::array<
         std::array<std::atomic<std::uint32_t>, static_cast<std::size_t>(Category::Count)>,
         2> profileUs_{};
+    InterruptTimeProvider interruptTimeProvider_ = nullptr;
     bool initialized_ = false;
 };
 

@@ -56,6 +56,29 @@ struct PerformanceOverlay {
     bool enabled = false;
 };
 
+struct ParallelExecutor {
+    using Step = bool (*)(void*) noexcept;
+    using InvokeChains = void (*)(
+        void*, Step, void*, void*) noexcept;
+
+    void* context = nullptr;
+    InvokeChains invokeChains = nullptr;
+};
+
+enum class GameplayRenderStage : std::uint8_t {
+    Background,
+    PlayerAttacks,
+    Effects,
+    Enemies,
+    EnemyAttacks,
+    AreaAttacks,
+    Actors,
+    Composite,
+    Overlays,
+    Hud,
+    Count,
+};
+
 inline constexpr std::size_t kRankingLimit = 20;
 
 struct RankingRecord {
@@ -84,7 +107,7 @@ public:
                                   Difficulty difficulty = Difficulty::Easy) noexcept;
     [[nodiscard]] UpdateResult processInput(const pixel_twins::Controllers& controllers) noexcept;
     [[nodiscard]] UpdateResult tick(const pixel_twins::Controllers& controllers) noexcept;
-    void render() noexcept PIXEL_TWINS_SRAM;
+    void render(const ParallelExecutor* parallel = nullptr) noexcept PIXEL_TWINS_SRAM;
     void setPerformanceOverlay(const PerformanceOverlay& overlay) noexcept {
         performanceOverlay_ = overlay;
     }
@@ -122,14 +145,17 @@ private:
     void updateRankingInput(const pixel_twins::Controllers& controllers) noexcept;
     void submitRanking(std::size_t player) noexcept;
     [[nodiscard]] bool hasPendingRanking() const noexcept;
+    void renderPanelStage(
+        std::size_t viewer, GameplayRenderStage stage) noexcept PIXEL_TWINS_SRAM;
 
-    assets::GameAssets gameAssets_;
-    assets::TitleAssets titleAssets_;
-    world::TerrainWorkspace terrainWorkspace_;
-    world::WorldMap worldMap_;
-    pixel_twins::Framebuffer framebuffer_;
-    GameplayState gameplay_;
-    pixel_twins::SpriteBuckets<
+    struct PanelJobContext {
+        Game* game = nullptr;
+        std::size_t viewer = 0;
+        GameplayRenderStage stage = GameplayRenderStage::Background;
+    };
+    static bool renderPanelStageStep(void* context) noexcept PIXEL_TWINS_SRAM;
+
+    using GameplaySpriteBuckets = pixel_twins::SpriteBuckets<
         kMaximumEnemies + kMaximumPlayerBullets + kMaximumXpGems
             + kMaximumEnemyBullets
             + kMaximumWindSlashes * 3U + kMaximumThunderStrikes * 3U
@@ -137,7 +163,15 @@ private:
             + kMaximumPerkEffects
             + pixel_twins::kControllerCount * 10U
             + pixel_twins::kControllerCount * (4U + kMaximumFamiliarsPerPlayer),
-        kMaximumEnemies> spriteBuckets_;
+        kMaximumEnemies>;
+
+    assets::GameAssets gameAssets_;
+    assets::TitleAssets titleAssets_;
+    world::TerrainWorkspace terrainWorkspace_;
+    world::WorldMap worldMap_;
+    pixel_twins::Framebuffer framebuffer_;
+    GameplayState gameplay_;
+    std::array<GameplaySpriteBuckets, pixel_twins::kControllerCount> spriteBuckets_;
     Scene scene_ = Scene::Title;
     std::uint32_t frame_ = 0;
     std::uint32_t sceneFrame_ = 0;
