@@ -23,6 +23,7 @@ target_link_libraries(
         pixel_twins::rp2350
         pico_multicore
         pico_rand
+        pico_sync
 )
 target_compile_features(wizward_rp2350 PRIVATE cxx_std_17)
 target_compile_definitions(

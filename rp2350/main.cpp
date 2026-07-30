@@ -2,6 +2,7 @@
 
 #include "audio/bgm_data.hpp"
 #include "audio/sfx_data.hpp"
+#include "job_system.hpp"
 
 #include "pixel_twins/rp2350/led_panel.hpp"
 #include "pixel_twins/rp2350/pwm_audio.hpp"
@@ -25,6 +26,7 @@ pixel_twins::Controllers controllers;
 pixel_twins::rp2350::LedPanelDriver ledPanel;
 pixel_twins::rp2350::PwmAudioPlayer audioPlayer;
 pixel_twins::rp2350::UsbControllerInput usbControllers;
+wizward::rp2350::JobSystem jobSystem;
 alignas(8) std::array<std::uint32_t, 512> ledCoreStack{};
 
 std::atomic<const pixel_twins::PixelBuffer*> publishedBuffer{nullptr};
@@ -159,25 +161,32 @@ void ledCoreMain() noexcept {
 
     consumedFrame.store(currentFrame, std::memory_order_release);
     ledCoreReady.store(true, std::memory_order_release);
+    hard_assert(ledPanel.startPresent(*currentBuffer));
 
     while (true) {
-        ledPanel.present(*currentBuffer);
+        if (ledPanel.presenting()) {
+            if (!jobSystem.tryRunOne()) __wfe();
+            continue;
+        }
+
         profiledPresentUs.store(
             ledPanel.lastPresentActiveUs(), std::memory_order_release);
 
         const auto nextFrame = publishedFrame.load(std::memory_order_acquire);
-        if (nextFrame == currentFrame) continue;
+        if (nextFrame != currentFrame) {
+            const auto nextPaletteRevision = paletteRevision.load(std::memory_order_acquire);
+            if (nextPaletteRevision != currentPaletteRevision) {
+                ledPanel.setPalette(game.framebuffer().palette());
+                currentPaletteRevision = nextPaletteRevision;
+            }
+            currentBuffer = publishedBuffer.load(std::memory_order_acquire);
+            currentFrame = nextFrame;
 
-        const auto nextPaletteRevision = paletteRevision.load(std::memory_order_acquire);
-        if (nextPaletteRevision != currentPaletteRevision) {
-            ledPanel.setPalette(game.framebuffer().palette());
-            currentPaletteRevision = nextPaletteRevision;
+            // この時点で旧表示バッファをcore 0が再利用できる。
+            consumedFrame.store(currentFrame, std::memory_order_release);
+            __sev();
         }
-        currentBuffer = publishedBuffer.load(std::memory_order_acquire);
-        currentFrame = nextFrame;
-
-        // この時点で旧表示バッファをcore 0が再利用できる。
-        consumedFrame.store(currentFrame, std::memory_order_release);
+        hard_assert(ledPanel.startPresent(*currentBuffer));
     }
 }
 
@@ -205,6 +214,7 @@ int main() {
     if (!audioPlayer.initialize()) {
         while (true) tight_loop_contents();
     }
+    jobSystem.initialize();
 
     std::uint32_t frame = 1;
     publishedBuffer.store(
@@ -255,7 +265,7 @@ int main() {
         publishedFrame.store(frame, std::memory_order_release);
         const auto workEnd = takeProfileStamp();
         while (consumedFrame.load(std::memory_order_acquire) != frame) {
-            tight_loop_contents();
+            if (!jobSystem.tryRunOne()) __wfe();
         }
         const auto frameEnd = takeProfileStamp();
 
