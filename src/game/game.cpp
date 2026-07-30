@@ -983,10 +983,7 @@ PIXEL_TWINS_SRAM void drawTitle(pixel_twins::Framebuffer& framebuffer,
     auto right = pixel_twins::makeRenderTarget(framebuffer.drawBuffer(), pixel_twins::Screen::Right);
     title.drawScreen(left);
     title.drawScreen(right);
-    if (difficulty == Difficulty::Easy) {
-        pixel_twins::drawText(left, assets::kWizwardFont, 118, 5, "NORMAL", 2, 6);
-        pixel_twins::drawText(right, assets::kWizwardFont, 118, 5, "NORMAL", 2, 6);
-    } else if (difficulty == Difficulty::Hard) {
+    if (difficulty == Difficulty::Hard) {
         pixel_twins::drawText(left, assets::kWizwardFont, 130, 5, "HARD", 3, 6);
         pixel_twins::drawText(right, assets::kWizwardFont, 130, 5, "HARD", 3, 6);
     } else if (difficulty == Difficulty::Endless) {
