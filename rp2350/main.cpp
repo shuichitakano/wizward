@@ -340,6 +340,7 @@ void ledCoreMain() noexcept {
 bool savePersistentState() noexcept {
     // Flash erase中に音声DMAが二周すると、復帰後IRQが既に再チェインされた
     // 左chの完了を永久待ちする。DMAを停止してからcore lockoutへ入る。
+    usbControllers.suspendPioHostForFlash();
     audioPlayer.suspendForFlash();
     flashPauseRequested.store(true, std::memory_order_release);
     __sev();
@@ -349,6 +350,7 @@ bool savePersistentState() noexcept {
     const auto saved = rankingStore.save(game);
     flashPauseRequested.store(false, std::memory_order_release);
     __sev();
+    usbControllers.resumePioHostAfterFlash();
     audioPlayer.resumeAfterFlash();
     if (saved) game.markRankingsSaved();
     return saved;
