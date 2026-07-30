@@ -277,11 +277,16 @@ int main() {
         const auto accountedCpuUs = updateUs + renderUs;
         const auto otherUs =
             preWaitCpuUs > accountedCpuUs ? preWaitCpuUs - accountedCpuUs : 0;
+        (void)jobSystem.takeProfile(0);
+        const auto core1Jobs = jobSystem.takeProfile(1);
         performanceOverlay.cores[0] = {
             renderUs, audioUs, updateUs, otherUs,
         };
         performanceOverlay.cores[1] = {
-            profiledPresentUs.load(std::memory_order_acquire), 0, 0, 0,
+            core1Jobs.renderUs,
+            core1Jobs.audioUs,
+            core1Jobs.gameUs,
+            core1Jobs.otherUs,
         };
 
         ++fpsWindowFrames;

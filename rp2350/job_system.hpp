@@ -2,6 +2,7 @@
 
 #include "pico/critical_section.h"
 #include "pico/platform.h"
+#include "pico/time.h"
 
 #include <array>
 #include <atomic>
@@ -23,6 +24,21 @@ private:
 
 class JobSystem {
 public:
+    enum class Category : std::uint8_t {
+        Render,
+        Audio,
+        Game,
+        Other,
+        Count,
+    };
+
+    struct Profile {
+        std::uint32_t renderUs = 0;
+        std::uint32_t audioUs = 0;
+        std::uint32_t gameUs = 0;
+        std::uint32_t otherUs = 0;
+    };
+
     // contextの寿命は完了カウンタが0になるまで呼び出し側が保証する。
     // LEDのフレーム境界を遅延させない、短時間かつ非ブロッキングな処理だけを投入する。
     using Function = void (*)(void*) noexcept;
@@ -33,7 +49,8 @@ public:
     }
 
     [[nodiscard]] bool trySubmit(
-        Function function, void* context, JobCounter* counter = nullptr) noexcept {
+        Function function, void* context, JobCounter* counter = nullptr,
+        Category category = Category::Other) noexcept {
         if (!initialized_ || function == nullptr) return false;
 
         critical_section_enter_blocking(&criticalSection_);
@@ -44,7 +61,7 @@ public:
         if (counter != nullptr) {
             counter->remaining_.fetch_add(1, std::memory_order_relaxed);
         }
-        jobs_[writePosition_] = {function, context, counter};
+        jobs_[writePosition_] = {function, context, counter, category};
         writePosition_ = (writePosition_ + 1U) & kIndexMask;
         ++queuedCount_;
         critical_section_exit(&criticalSection_);
@@ -66,12 +83,31 @@ public:
         --queuedCount_;
         critical_section_exit(&criticalSection_);
 
+        const auto startedAt = time_us_32();
         job.function(job.context);
+        const auto elapsedUs = time_us_32() - startedAt;
+        const auto core = get_core_num();
+        const auto category = static_cast<std::size_t>(job.category);
+        profileUs_[core][category].fetch_add(elapsedUs, std::memory_order_relaxed);
         if (job.counter != nullptr
             && job.counter->remaining_.fetch_sub(1, std::memory_order_release) == 1) {
             __sev();
         }
         return true;
+    }
+
+    [[nodiscard]] Profile takeProfile(std::size_t core) noexcept {
+        if (core >= profileUs_.size()) return {};
+        return {
+            profileUs_[core][static_cast<std::size_t>(Category::Render)].exchange(
+                0, std::memory_order_acq_rel),
+            profileUs_[core][static_cast<std::size_t>(Category::Audio)].exchange(
+                0, std::memory_order_acq_rel),
+            profileUs_[core][static_cast<std::size_t>(Category::Game)].exchange(
+                0, std::memory_order_acq_rel),
+            profileUs_[core][static_cast<std::size_t>(Category::Other)].exchange(
+                0, std::memory_order_acq_rel),
+        };
     }
 
     void wait(JobCounter& counter) noexcept {
@@ -85,6 +121,7 @@ private:
         Function function = nullptr;
         void* context = nullptr;
         JobCounter* counter = nullptr;
+        Category category = Category::Other;
     };
 
     static constexpr std::size_t kCapacity = 32;
@@ -97,6 +134,9 @@ private:
     std::size_t readPosition_ = 0;
     std::size_t writePosition_ = 0;
     std::size_t queuedCount_ = 0;
+    std::array<
+        std::array<std::atomic<std::uint32_t>, static_cast<std::size_t>(Category::Count)>,
+        2> profileUs_{};
     bool initialized_ = false;
 };
 
