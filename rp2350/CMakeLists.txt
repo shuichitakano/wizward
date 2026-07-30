@@ -15,13 +15,17 @@ set(WIZWARD_BUILD_DEMO OFF CACHE BOOL "" FORCE)
 set(WIZWARD_BUILD_AUDIO_DATA ON CACHE BOOL "" FORCE)
 add_subdirectory(.. wizward)
 
-add_executable(wizward_rp2350 main.cpp)
+add_executable(wizward_rp2350
+    main.cpp
+    ranking_store.cpp
+)
 target_link_libraries(
     wizward_rp2350
     PRIVATE
         wizward::core
         pixel_twins::rp2350
         pico_multicore
+        pico_flash
         pico_rand
         pico_sync
 )

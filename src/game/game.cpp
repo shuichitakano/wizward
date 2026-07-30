@@ -1723,6 +1723,8 @@ bool Game::initialize(Scene initialScene, std::uint32_t mapSeed,
     frame_ = 0;
     sceneFrame_ = 0;
     paused_ = false;
+    cheatedRun_ = false;
+    rankingsDirty_ = false;
     performanceOverlay_ = {};
     if (scene_ == Scene::Title) return titleAssets_.applyPalette(framebuffer_);
     if (scene_ == Scene::AttractRanking) return titleAssets_.applyAttractPalette(framebuffer_);
@@ -1744,7 +1746,10 @@ UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
             return {AudioEvent::StopBgm, playStartSfx, false};
         }
         if (scene_ == Scene::AttractDemo) gameplay_.resetAttract(worldMap_, difficulty_);
-        else gameplay_.reset(worldMap_, startingPlayer_, difficulty_);
+        else {
+            gameplay_.reset(worldMap_, startingPlayer_, difficulty_);
+            cheatedRun_ = false;
+        }
         resultOutcome_ = GameplayOutcome::Running;
     }
     const bool paletteApplied = scene_ == Scene::Title
@@ -1834,6 +1839,7 @@ UpdateResult Game::processInput(const pixel_twins::Controllers& controllers) noe
             } else {
                 continue;
             }
+            cheatedRun_ = true;
             UpdateResult result{};
             result.sfxCues[0] = {SfxId::UiMove, index == 0 ? -0.32F : 0.32F};
             result.sfxCueCount = 1;
@@ -1964,7 +1970,8 @@ void Game::finalizeResult() noexcept {
         finalScores_[player] = eligible ? gameplay_.score(player) + bonus : 0U;
     }
     for (std::size_t player = 0; player < finalScores_.size(); ++player) {
-        if (!gameplay_.playerIsManual(player) || finalScores_[player] == 0) continue;
+        if (cheatedRun_ || !gameplay_.playerIsManual(player)
+            || finalScores_[player] == 0) continue;
         std::size_t rank = 0;
         const auto& records = difficulty_ == Difficulty::Endless
             ? endlessRankings_ : rankings_;
@@ -2022,6 +2029,23 @@ void Game::submitRanking(std::size_t player) noexcept {
     if (insertAt < kRankingLimit) records[insertAt] = record;
     recordCount = newCount;
     entry.submitted = true;
+    rankingsDirty_ = true;
+}
+
+void Game::loadRankings(
+    const std::array<RankingRecord, kRankingLimit>& rankings,
+    std::size_t rankingCount,
+    const std::array<RankingRecord, kRankingLimit>& endlessRankings,
+    std::size_t endlessRankingCount,
+    const std::array<std::array<char, 3>,
+                     pixel_twins::kControllerCount>& lastNames) noexcept {
+    rankings_ = rankings;
+    endlessRankings_ = endlessRankings;
+    rankingCount_ = std::min(rankingCount, rankings_.size());
+    endlessRankingCount_ =
+        std::min(endlessRankingCount, endlessRankings_.size());
+    lastNames_ = lastNames;
+    rankingsDirty_ = false;
 }
 
 void Game::updateRankingInput(const pixel_twins::Controllers& controllers) noexcept {

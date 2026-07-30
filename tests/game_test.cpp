@@ -294,7 +294,9 @@ int main() {
     for (std::size_t player = 0; player < pixel_twins::kControllerCount; ++player) {
         assert(game.timeBonus(player) == 0U);
         assert(game.finalScore(player) == game.gameplay().score(player));
+        assert(!game.rankingEntry(player).active);
     }
+    assert(game.rankingCount() == 0U);
     game.render();
     const auto earlyContinue = pressedController(0, ControllerButton::choiceRight);
     (void)game.processInput(earlyContinue);
@@ -334,5 +336,31 @@ int main() {
     assert(aiResultGame.finalScore(1) == 0U);
     assert(aiResultGame.timeBonus(1) == 0U);
     assert(!aiResultGame.rankingEntry(1).active);
+    assert(aiResultGame.finalScore(0) > 0U);
+    assert(aiResultGame.rankingEntry(0).active);
+    for (std::uint16_t tick = 0; tick < 160U; ++tick) {
+        (void)aiResultGame.tick(idle);
+    }
+    for (std::uint8_t cursor = 0; cursor < 3U; ++cursor) {
+        (void)aiResultGame.processInput(
+            pressedController(0, ControllerButton::choiceRight));
+    }
+    assert(aiResultGame.rankingEntry(0).submitted);
+    assert(aiResultGame.rankingCount() == 1U);
+    assert(aiResultGame.rankingsDirty());
+
+    wizward::game::Game restoredRankingGame;
+    assert(restoredRankingGame.initialize(Scene::Title, 0x13579bdfU));
+    restoredRankingGame.loadRankings(
+        aiResultGame.rankings(), aiResultGame.rankingCount(),
+        aiResultGame.endlessRankings(), aiResultGame.endlessRankingCount(),
+        aiResultGame.lastNames());
+    assert(restoredRankingGame.rankingCount() == 1U);
+    assert(restoredRankingGame.rankings()[0].score
+           == aiResultGame.rankings()[0].score);
+    assert(restoredRankingGame.lastNames()[0] == aiResultGame.lastNames()[0]);
+    assert(!restoredRankingGame.rankingsDirty());
+    aiResultGame.markRankingsSaved();
+    assert(!aiResultGame.rankingsDirty());
     return 0;
 }

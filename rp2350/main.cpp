@@ -3,6 +3,7 @@
 #include "audio/bgm_data.hpp"
 #include "audio/sfx_data.hpp"
 #include "job_system.hpp"
+#include "ranking_store.hpp"
 
 #include "pixel_twins/rp2350/led_panel.hpp"
 #include "pixel_twins/rp2350/pwm_audio.hpp"
@@ -10,6 +11,7 @@
 #include "pixel_twins/rp2350/board_pins.hpp"
 
 #include "hardware/sync.h"
+#include "pico/flash.h"
 #include "pico/multicore.h"
 #include "pico/stdlib.h"
 #include "pico/rand.h"
@@ -27,6 +29,7 @@ pixel_twins::rp2350::LedPanelDriver ledPanel;
 pixel_twins::rp2350::PwmAudioPlayer audioPlayer;
 pixel_twins::rp2350::UsbControllerInput usbControllers;
 wizward::rp2350::JobSystem jobSystem;
+wizward::rp2350::RankingStore rankingStore;
 alignas(8) std::array<std::uint32_t, 512> ledCoreStack{};
 
 std::atomic<const pixel_twins::PixelBuffer*> publishedBuffer{nullptr};
@@ -241,6 +244,7 @@ bool applyUpdate(const wizward::game::UpdateResult& result) noexcept {
 }
 
 void ledCoreMain() noexcept {
+    hard_assert(flash_safe_execute_core_init());
     ledPanel.initialize();
     ledPanel.setPalette(game.framebuffer().palette());
 
@@ -309,6 +313,7 @@ int main() {
                          readDifficultyDipSwitch())) {
         while (true) tight_loop_contents();
     }
+    rankingStore.load(game);
     game.render();
 
     // USB2がDMA15を予約してから、LED側のDMAをcore 1で動的確保する。
@@ -351,9 +356,13 @@ int main() {
         game.setDebugMode(debugMode);
         const auto updateStart = takeProfileStamp();
         gamePairIdleUs = 0;
-        if (!applyUpdate(game.processInput(controllers))
-            || !applyUpdate(game.tick(controllers, &renderExecutor))) {
+        const auto inputResult = game.processInput(controllers);
+        const auto tickResult = game.tick(controllers, &renderExecutor);
+        if (!applyUpdate(inputResult) || !applyUpdate(tickResult)) {
             while (true) tight_loop_contents();
+        }
+        if (game.rankingsDirty() && rankingStore.save(game)) {
+            game.markRankingsSaved();
         }
 
         if (game.scene() != paletteScene) {

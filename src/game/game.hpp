@@ -128,6 +128,30 @@ public:
         return rankingEntries_[player];
     }
     [[nodiscard]] std::size_t rankingCount() const noexcept { return rankingCount_; }
+    [[nodiscard]] std::size_t endlessRankingCount() const noexcept {
+        return endlessRankingCount_;
+    }
+    [[nodiscard]] const std::array<RankingRecord, kRankingLimit>& rankings() const noexcept {
+        return rankings_;
+    }
+    [[nodiscard]] const std::array<RankingRecord, kRankingLimit>&
+    endlessRankings() const noexcept {
+        return endlessRankings_;
+    }
+    [[nodiscard]] const std::array<std::array<char, 3>,
+                                   pixel_twins::kControllerCount>&
+    lastNames() const noexcept {
+        return lastNames_;
+    }
+    void loadRankings(
+        const std::array<RankingRecord, kRankingLimit>& rankings,
+        std::size_t rankingCount,
+        const std::array<RankingRecord, kRankingLimit>& endlessRankings,
+        std::size_t endlessRankingCount,
+        const std::array<std::array<char, 3>,
+                         pixel_twins::kControllerCount>& lastNames) noexcept;
+    [[nodiscard]] bool rankingsDirty() const noexcept { return rankingsDirty_; }
+    void markRankingsSaved() noexcept { rankingsDirty_ = false; }
     [[nodiscard]] bool attractMode() const noexcept {
         return scene_ == Scene::AttractRanking || scene_ == Scene::AttractDemo;
     }
@@ -174,6 +198,8 @@ private:
     bool paused_ = false;
     bool nameEntryBgmStarted_ = false;
     bool debugMode_ = false;
+    bool cheatedRun_ = false;
+    bool rankingsDirty_ = false;
     PerformanceOverlay performanceOverlay_{};
     std::array<std::uint32_t, pixel_twins::kControllerCount> timeBonuses_{};
     std::array<std::uint32_t, pixel_twins::kControllerCount> finalScores_{};
