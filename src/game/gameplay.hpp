@@ -10,6 +10,19 @@
 
 namespace wizward::game {
 
+struct ParallelExecutor {
+    using Function = void (*)(void*) noexcept;
+    using InvokePair = void (*)(
+        void*, Function, void*, Function, void*) noexcept;
+    using Step = bool (*)(void*) noexcept;
+    using InvokeChains = void (*)(
+        void*, Step, void*, void*) noexcept;
+
+    void* context = nullptr;
+    InvokePair invokePair = nullptr;
+    InvokeChains invokeChains = nullptr;
+};
+
 enum class Difficulty : std::uint8_t {
     Easy,
     Hard,
@@ -362,7 +375,8 @@ public:
                Difficulty difficulty = Difficulty::Hard) noexcept;
     void resetAttract(const world::WorldMap& map,
                       Difficulty difficulty = Difficulty::Hard) noexcept;
-    void tick(const pixel_twins::Controllers& controllers, const world::WorldMap& map) noexcept;
+    void tick(const pixel_twins::Controllers& controllers, const world::WorldMap& map,
+              const ParallelExecutor* parallel = nullptr) noexcept;
     [[nodiscard]] bool addEnemy(float x, float y, EnemyKind kind = EnemyKind::Imp) noexcept;
     void grantXp(std::size_t playerIndex, std::uint16_t amount) noexcept;
     void debugFullyPowerUp(std::size_t playerIndex) noexcept;

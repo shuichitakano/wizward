@@ -56,15 +56,6 @@ struct PerformanceOverlay {
     bool enabled = false;
 };
 
-struct ParallelExecutor {
-    using Step = bool (*)(void*) noexcept;
-    using InvokeChains = void (*)(
-        void*, Step, void*, void*) noexcept;
-
-    void* context = nullptr;
-    InvokeChains invokeChains = nullptr;
-};
-
 enum class GameplayRenderStage : std::uint8_t {
     Background,
     PlayerAttacks,
@@ -106,7 +97,9 @@ public:
                                   std::uint32_t mapSeed = 0x57495aU,
                                   Difficulty difficulty = Difficulty::Easy) noexcept;
     [[nodiscard]] UpdateResult processInput(const pixel_twins::Controllers& controllers) noexcept;
-    [[nodiscard]] UpdateResult tick(const pixel_twins::Controllers& controllers) noexcept;
+    [[nodiscard]] UpdateResult tick(
+        const pixel_twins::Controllers& controllers,
+        const ParallelExecutor* parallel = nullptr) noexcept;
     void render(const ParallelExecutor* parallel = nullptr) noexcept PIXEL_TWINS_SRAM;
     void setPerformanceOverlay(const PerformanceOverlay& overlay) noexcept {
         performanceOverlay_ = overlay;

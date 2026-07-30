@@ -35,6 +35,7 @@ std::atomic<std::uint32_t> consumedFrame{0};
 std::atomic<std::uint32_t> paletteRevision{1};
 std::atomic<bool> ledCoreReady{false};
 std::atomic<std::uint32_t> profiledPresentUs{0};
+std::uint32_t gamePairIdleUs = 0;
 
 std::uint32_t ledInterruptActiveUs() noexcept {
     return ledPanel.totalPresentActiveUs();
@@ -97,6 +98,30 @@ void invokeRenderChains(
     }
 }
 
+void invokeGamePair(
+        void* context,
+        wizward::game::ParallelExecutor::Function first, void* firstContext,
+        wizward::game::ParallelExecutor::Function second, void* secondContext) noexcept {
+    auto& jobs = *static_cast<wizward::rp2350::JobSystem*>(context);
+    wizward::rp2350::JobCounter counter;
+    if (!jobs.trySubmit(
+            first, firstContext, &counter,
+            wizward::rp2350::JobSystem::Category::Game)) {
+        first(firstContext);
+    }
+    if (!jobs.trySubmit(
+            second, secondContext, &counter,
+            wizward::rp2350::JobSystem::Category::Game)) {
+        second(secondContext);
+    }
+    while (!counter.complete()) {
+        const auto idleStart = time_us_32();
+        if (jobs.tryRunOne()) continue;
+        __wfe();
+        gamePairIdleUs += time_us_32() - idleStart;
+    }
+}
+
 // 実機デバッガからフレーム時間の内訳を確認する。
 volatile std::uint32_t latestUpdateUs = 0;
 volatile std::uint32_t latestRenderUs = 0;
@@ -104,6 +129,9 @@ volatile std::uint32_t latestFrameUs = 0;
 volatile std::uint32_t maximumRenderUs = 0;
 volatile std::uint32_t latestCore0RenderJobUs = 0;
 volatile std::uint32_t latestCore1RenderJobUs = 0;
+volatile std::uint32_t latestCore0GameActiveUs = 0;
+volatile std::uint32_t latestCore1GameJobUs = 0;
+volatile std::uint32_t latestCore0GameIdleUs = 0;
 
 struct ProfileStamp {
     std::uint32_t timeUs;
@@ -279,7 +307,7 @@ int main() {
     }
     jobSystem.initialize(ledInterruptActiveUs);
     const wizward::game::ParallelExecutor renderExecutor{
-        &jobSystem, invokeRenderChains};
+        &jobSystem, invokeGamePair, invokeRenderChains};
 
     std::uint32_t frame = 1;
     publishedBuffer.store(
@@ -309,8 +337,9 @@ int main() {
         const auto debugMode = debugModeEnabled();
         game.setDebugMode(debugMode);
         const auto updateStart = takeProfileStamp();
+        gamePairIdleUs = 0;
         if (!applyUpdate(game.processInput(controllers))
-            || !applyUpdate(game.tick(controllers))) {
+            || !applyUpdate(game.tick(controllers, &renderExecutor))) {
             while (true) tight_loop_contents();
         }
 
@@ -346,9 +375,15 @@ int main() {
         const auto core1Jobs = jobSystem.takeProfile(1);
         latestCore0RenderJobUs = core0Jobs.renderUs;
         latestCore1RenderJobUs = core1Jobs.renderUs;
+        latestCore0GameActiveUs =
+            updateUs > gamePairIdleUs ? updateUs - gamePairIdleUs : 0;
+        latestCore1GameJobUs = core1Jobs.gameUs;
+        latestCore0GameIdleUs = gamePairIdleUs;
         performanceOverlay.cores[0] = {
             core0Jobs.renderUs != 0 ? core0Jobs.renderUs : renderUs,
-            audioUs, updateUs, otherUs,
+            audioUs,
+            latestCore0GameActiveUs,
+            otherUs,
         };
         performanceOverlay.cores[1] = {
             core1Jobs.renderUs,

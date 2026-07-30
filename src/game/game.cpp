@@ -1853,11 +1853,13 @@ UpdateResult Game::processInput(const pixel_twins::Controllers& controllers) noe
     return {};
 }
 
-UpdateResult Game::tick(const pixel_twins::Controllers& controllers) noexcept {
+UpdateResult Game::tick(
+        const pixel_twins::Controllers& controllers,
+        const ParallelExecutor* parallel) noexcept {
     if (scene_ == Scene::Gameplay && !paused_) {
         const auto bossIntroBefore = gameplay_.bossIntroTicks();
         const auto clearBefore = gameplay_.clearSequenceActive();
-        gameplay_.tick(controllers, worldMap_);
+        gameplay_.tick(controllers, worldMap_, parallel);
         UpdateResult tickResult{};
         copySfxCues(gameplay_, tickResult);
         if (bossIntroBefore == 0 && gameplay_.bossIntroTicks() > 0) {
@@ -1884,7 +1886,7 @@ UpdateResult Game::tick(const pixel_twins::Controllers& controllers) noexcept {
         ++sceneFrame_;
         return tickResult;
     } else if (scene_ == Scene::AttractDemo) {
-        gameplay_.tick(controllers, worldMap_);
+        gameplay_.tick(controllers, worldMap_, parallel);
         UpdateResult result{};
         copySfxCues(gameplay_, result);
         for (std::uint8_t index = 0; index < worldMap_.sealCount; ++index) {

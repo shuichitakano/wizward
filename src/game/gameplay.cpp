@@ -33,6 +33,10 @@ constexpr float kEnemyContactKnockback = 14.0F;
 constexpr float kMageSeparationRange = 28.0F;
 constexpr float kMageSeparationWeight = 2.0F;
 constexpr float kMageSeparationMaximumSpeed = 1.6F;
+
+void invokePair(const ParallelExecutor* parallel,
+                ParallelExecutor::Function first, void* firstContext,
+                ParallelExecutor::Function second, void* secondContext) noexcept;
 constexpr float kWindLinkHitRadius = 4.0F;
 constexpr std::uint16_t kLightLifetimeTicks = 75;
 constexpr float kAiAttentionBase = 0.55F;
@@ -522,13 +526,67 @@ void probeAiMovement(const world::WorldMap& map, float startX, float startY,
     }
 }
 
+struct AiDirectionResult {
+    float score = 0.0F;
+    float directionX = 0.0F;
+    float directionY = 0.0F;
+    bool valid = false;
+};
+
+struct AiDirectionJob {
+    const PlayerState* player;
+    const PlayerState* leader;
+    const std::array<EnemyState, kMaximumEnemies>* enemies;
+    const std::array<EnemyBulletState, kMaximumEnemyBullets>* enemyBullets;
+    const world::WorldMap* map;
+    const std::array<std::array<float, 2>, 18>* directions;
+    std::array<AiDirectionResult, 18>* results;
+    float targetX;
+    float targetY;
+    float lookahead;
+    std::size_t begin;
+    std::size_t end;
+    bool rescuing;
+    bool useAttention;
+};
+
+void scoreAiDirections(void* context) noexcept {
+    const auto& job = *static_cast<AiDirectionJob*>(context);
+    for (auto index = job.begin; index < job.end; ++index) {
+        auto directionX = (*job.directions)[index][0];
+        auto directionY = (*job.directions)[index][1];
+        normalize(directionX, directionY);
+        auto probeX = job.player->x;
+        auto probeY = job.player->y;
+        probeAiMovement(
+            *job.map, job.player->x, job.player->y,
+            directionX * job.lookahead, directionY * job.lookahead,
+            probeX, probeY);
+        const auto moved = std::sqrt(squaredDistance(
+            job.player->x, job.player->y, probeX, probeY));
+        if (moved < 0.05F) continue;
+        directionX = probeX - job.player->x;
+        directionY = probeY - job.player->y;
+        normalize(directionX, directionY);
+        auto& result = (*job.results)[index];
+        result.score = aiMoveScore(
+            *job.player, probeX, probeY, job.targetX, job.targetY,
+            *job.leader, *job.enemies, *job.enemyBullets,
+            job.rescuing, job.useAttention, moved, job.lookahead);
+        result.directionX = directionX;
+        result.directionY = directionY;
+        result.valid = true;
+    }
+}
+
 float moveAiPlayerSmart(
     PlayerState& player, float targetX, float targetY,
     const PlayerState& leader,
     const std::array<EnemyState, kMaximumEnemies>& enemies,
     const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
     const world::WorldMap& map, bool rescuing,
-    bool useAttention = false) noexcept {
+    bool useAttention = false,
+    const ParallelExecutor* parallel = nullptr) noexcept {
     constexpr float kLookahead = 22.0F;
     auto towardX = targetX - player.x;
     auto towardY = targetY - player.y;
@@ -561,23 +619,30 @@ float moveAiPlayerSmart(
         auto retainedDirectionX = player.aiDesiredDirectionX;
         auto retainedDirectionY = player.aiDesiredDirectionY;
         auto retained = false;
-        for (std::size_t index = 0; index < directionSteps + 2U; ++index) {
-            auto directionX = directions[index][0];
-            auto directionY = directions[index][1];
-            normalize(directionX, directionY);
-            float probeX = player.x;
-            float probeY = player.y;
-            probeAiMovement(map, player.x, player.y,
-                            directionX * kLookahead, directionY * kLookahead,
-                            probeX, probeY);
-            const auto moved = std::sqrt(squaredDistance(player.x, player.y, probeX, probeY));
-            if (moved < 0.05F) continue;
-            directionX = probeX - player.x;
-            directionY = probeY - player.y;
-            normalize(directionX, directionY);
-            auto score = aiMoveScore(player, probeX, probeY, targetX, targetY,
-                                     leader, enemies, enemyBullets,
-                                     rescuing, useAttention, moved, kLookahead);
+        std::array<AiDirectionResult, 18> results{};
+        const auto directionCount =
+            static_cast<std::size_t>(directionSteps + 2U);
+        const auto split = (directionCount + 1U) / 2U;
+        std::array<AiDirectionJob, 2> jobs{{
+            {
+                &player, &leader, &enemies, &enemyBullets, &map,
+                &directions, &results, targetX, targetY, kLookahead,
+                0, split, rescuing, useAttention,
+            },
+            {
+                &player, &leader, &enemies, &enemyBullets, &map,
+                &directions, &results, targetX, targetY, kLookahead,
+                split, directionCount, rescuing, useAttention,
+            },
+        }};
+        invokePair(
+            parallel,
+            scoreAiDirections, &jobs[0],
+            scoreAiDirections, &jobs[1]);
+        for (std::size_t index = 0; index < directionCount; ++index) {
+            const auto& result = results[index];
+            if (!result.valid) continue;
+            auto score = result.score;
             if (useAttention && !rescuing) {
                 score += (randomUnit(player.aiRandomState) - 0.5F)
                     * (120.0F + (0.0F - 120.0F) * attention);
@@ -585,13 +650,13 @@ float moveAiPlayerSmart(
             if (index == 0U) {
                 retained = true;
                 retainedScore = score;
-                retainedDirectionX = directionX;
-                retainedDirectionY = directionY;
+                retainedDirectionX = result.directionX;
+                retainedDirectionY = result.directionY;
             }
             if (score >= bestScore) continue;
             bestScore = score;
-            bestDirectionX = directionX;
-            bestDirectionY = directionY;
+            bestDirectionX = result.directionX;
+            bestDirectionY = result.directionY;
         }
         const auto switchMargin = rescuing
             ? 2.0F : (urgent ? 3.0F : (evading ? 10.0F : 18.0F));
@@ -660,7 +725,8 @@ void followAiPartner(PlayerState& player, std::size_t playerIndex,
                      const std::array<EnemyState, kMaximumEnemies>& enemies,
                      const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                      const std::array<XpGemState, kMaximumXpGems>& xpGems,
-                     const world::WorldMap& map) noexcept {
+                     const world::WorldMap& map,
+                     const ParallelExecutor* parallel = nullptr) noexcept {
     const auto rescuing = leader.hp <= 0;
     updateAiAttention(player, leader, rescuing);
     auto formationX = rescuing ? leader.x : leader.x - 38.0F;
@@ -699,7 +765,8 @@ void followAiPartner(PlayerState& player, std::size_t playerIndex,
         player.aiHoldingFormation = false;
     }
     const auto moved = moveAiPlayerSmart(player, formationX, formationY, leader,
-                                          enemies, enemyBullets, map, rescuing, true);
+                                          enemies, enemyBullets, map, rescuing, true,
+                                          parallel);
     if (moved < 0.2F && distance > stopDistance) {
         if (player.aiBlockedTicks < 255U) ++player.aiBlockedTicks;
         if (player.aiStuckTicks < 255U) ++player.aiStuckTicks;
@@ -757,10 +824,11 @@ void moveAttractPlayer(
     const std::array<EnemyState, kMaximumEnemies>& enemies,
     const std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
     const std::array<XpGemState, kMaximumXpGems>& xpGems,
-    const world::WorldMap& map, std::uint32_t elapsedTicks) noexcept {
+    const world::WorldMap& map, std::uint32_t elapsedTicks,
+    const ParallelExecutor* parallel = nullptr) noexcept {
     if (partner.hp <= 0) {
         (void)moveAiPlayerSmart(player, partner.x, partner.y, partner,
-                                enemies, enemyBullets, map, true);
+                                enemies, enemyBullets, map, true, false, parallel);
         return;
     }
     if (map.sealCount > 0 && !player.xpRecallInside
@@ -772,7 +840,7 @@ void moveAttractPlayer(
                 && gem.recallPlayer != playerIndex;
         })) {
         (void)moveAiPlayerSmart(player, kWorldCenter, kWorldCenter, partner,
-                                enemies, enemyBullets, map, false);
+                                enemies, enemyBullets, map, false, false, parallel);
         return;
     }
     const EnemyState* nearest = nullptr;
@@ -822,7 +890,7 @@ void moveAttractPlayer(
         }
     }
     (void)moveAiPlayerSmart(player, targetX, targetY, partner,
-                            enemies, enemyBullets, map, false);
+                            enemies, enemyBullets, map, false, false, parallel);
 }
 
 EnemyState* nearestEnemy(std::array<EnemyState, kMaximumEnemies>& enemies,
@@ -2590,8 +2658,122 @@ void GameplayState::resetAttract(const world::WorldMap& map,
     }
 }
 
+namespace {
+
+void invokePair(const ParallelExecutor* parallel,
+                ParallelExecutor::Function first, void* firstContext,
+                ParallelExecutor::Function second, void* secondContext) noexcept {
+    if (parallel != nullptr && parallel->invokePair != nullptr) {
+        parallel->invokePair(
+            parallel->context, first, firstContext, second, secondContext);
+        return;
+    }
+    first(firstContext);
+    second(secondContext);
+}
+
+struct PlayerUpdateJob {
+    PlayerState* player;
+    CameraState* camera;
+    const PlayerState* partner;
+    const std::array<EnemyState, kMaximumEnemies>* enemies;
+    const std::array<EnemyBulletState, kMaximumEnemyBullets>* enemyBullets;
+    const std::array<XpGemState, kMaximumXpGems>* xpGems;
+    const world::WorldMap* map;
+    const pixel_twins::ControllerState* controller;
+    const ParallelExecutor* parallel;
+    std::size_t index;
+    std::uint32_t attractElapsedTicks;
+    bool manual;
+    bool attract;
+};
+
+void updatePlayerJob(void* context) noexcept {
+    auto& job = *static_cast<PlayerUpdateJob*>(context);
+    auto& player = *job.player;
+    if (player.hp > 0) {
+        if (job.manual) {
+            movePlayer(player, *job.controller, *job.map);
+        } else if (job.attract) {
+            moveAttractPlayer(
+                player, job.index, *job.partner, *job.enemies,
+                *job.enemyBullets, *job.xpGems, *job.map,
+                job.attractElapsedTicks, job.parallel);
+        } else {
+            followAiPartner(
+                player, job.index, *job.partner, *job.enemies,
+                *job.enemyBullets, *job.xpGems, *job.map, job.parallel);
+        }
+    } else {
+        player.moving = false;
+    }
+    if (player.invulnerabilityTicks > 0) --player.invulnerabilityTicks;
+    if (player.lightCooldownTicks > 0) --player.lightCooldownTicks;
+    if (player.fireCooldownTicks > 0) --player.fireCooldownTicks;
+    if (player.windCooldownTicks > 0) --player.windCooldownTicks;
+    if (player.thunderCooldownTicks > 0) --player.thunderCooldownTicks;
+    if (player.iceCooldownTicks > 0) --player.iceCooldownTicks;
+    if (player.orbCooldownTicks > 0) --player.orbCooldownTicks;
+    if (player.familiarCooldownTicks > 0) --player.familiarCooldownTicks;
+    if (player.xpRecallAiCooldownTicks > 0) --player.xpRecallAiCooldownTicks;
+    if (player.hp > 0) {
+        player.orbAngle -=
+            (8.1F + static_cast<float>(player.orbLevel) * 0.72F) / 60.0F;
+        if (player.hp < player.maxHp) {
+            player.hpRegenAccumulator += 0.225F / 60.0F;
+            if (player.hpRegenAccumulator >= 1.0F) {
+                ++player.hp;
+                player.hpRegenAccumulator -= 1.0F;
+            }
+        } else {
+            player.hpRegenAccumulator = 0.0F;
+        }
+    }
+    updateCamera(*job.camera, player);
+}
+
+struct EnemyGridJob {
+    EnemySpatialGrid* grid;
+    const std::array<EnemyState, kMaximumEnemies>* enemies;
+};
+
+void rebuildEnemyGridJob(void* context) noexcept {
+    auto& job = *static_cast<EnemyGridJob*>(context);
+    job.grid->rebuild(*job.enemies);
+}
+
+struct EnemyBulletGridJob {
+    EnemyBulletSpatialGrid* grid;
+    const std::array<EnemyBulletState, kMaximumEnemyBullets>* bullets;
+};
+
+void rebuildEnemyBulletGridJob(void* context) noexcept {
+    auto& job = *static_cast<EnemyBulletGridJob*>(context);
+    job.grid->rebuild(*job.bullets);
+}
+
+struct EnemyBulletUpdateJob {
+    std::array<EnemyBulletState, kMaximumEnemyBullets>* bullets;
+    std::array<PlayerState, pixel_twins::kControllerCount>* players;
+    const BalanceProfile* balance;
+};
+
+void updateEnemyBulletJob(void* context) noexcept {
+    auto& job = *static_cast<EnemyBulletUpdateJob*>(context);
+    updateEnemyBullets(*job.bullets, *job.players, *job.balance);
+}
+
+void updateThunderJob(void* context) noexcept {
+    updateThunderStrikes(
+        *static_cast<std::array<ThunderStrikeState, kMaximumThunderStrikes>*>(
+            context));
+}
+
+} // namespace
+
 void GameplayState::tick(const pixel_twins::Controllers& controllers,
-                         const world::WorldMap& map) noexcept {
+                         const world::WorldMap& map,
+                         const ParallelExecutor* parallel) noexcept {
     sfxCueCount_ = 0;
     if (outcome_ != GameplayOutcome::Running) return;
     auto balance = balanceProfile(difficulty_);
@@ -2694,47 +2876,29 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
                 updatePerkChoice(players_[index], controllers[index],
                                  static_cast<std::uint8_t>(index), randomState_, perkEffects_,
                                  difficulty_ == Difficulty::Endless);
-                movePlayer(players_[index], controllers[index], map);
-            } else if (attractMode_) {
-                updateAutoPerkChoice(players_[index], static_cast<std::uint8_t>(index),
-                                     enemies_, randomState_, perkEffects_,
-                                     difficulty_ == Difficulty::Endless);
-                moveAttractPlayer(players_[index], index, players_[1U - index], enemies_,
-                                  enemyBullets_, xpGems_, map, elapsedTicks_ - 105U * 60U);
             } else {
                 updateAutoPerkChoice(players_[index], static_cast<std::uint8_t>(index),
                                      enemies_, randomState_, perkEffects_,
                                      difficulty_ == Difficulty::Endless);
-                followAiPartner(players_[index], index, players_[1U - index],
-                                enemies_, enemyBullets_, xpGems_, map);
             }
         }
-        else players_[index].moving = false;
-        if (players_[index].invulnerabilityTicks > 0) --players_[index].invulnerabilityTicks;
-        if (players_[index].lightCooldownTicks > 0) --players_[index].lightCooldownTicks;
-        if (players_[index].fireCooldownTicks > 0) --players_[index].fireCooldownTicks;
-        if (players_[index].windCooldownTicks > 0) --players_[index].windCooldownTicks;
-        if (players_[index].thunderCooldownTicks > 0) --players_[index].thunderCooldownTicks;
-        if (players_[index].iceCooldownTicks > 0) --players_[index].iceCooldownTicks;
-        if (players_[index].orbCooldownTicks > 0) --players_[index].orbCooldownTicks;
-        if (players_[index].familiarCooldownTicks > 0) --players_[index].familiarCooldownTicks;
-        if (players_[index].xpRecallAiCooldownTicks > 0) {
-            --players_[index].xpRecallAiCooldownTicks;
-        }
-        if (players_[index].hp > 0) {
-            players_[index].orbAngle -= (8.1F + static_cast<float>(players_[index].orbLevel) * 0.72F) / 60.0F;
-            if (players_[index].hp < players_[index].maxHp) {
-                players_[index].hpRegenAccumulator += 0.225F / 60.0F;
-                if (players_[index].hpRegenAccumulator >= 1.0F) {
-                    ++players_[index].hp;
-                    players_[index].hpRegenAccumulator -= 1.0F;
-                }
-            } else {
-                players_[index].hpRegenAccumulator = 0.0F;
-            }
-        }
-        updateCamera(cameras_[index], players_[index]);
     }
+    std::array<PlayerUpdateJob, pixel_twins::kControllerCount> playerJobs{{
+        {
+            &players_[0], &cameras_[0], &players_[1],
+            &enemies_, &enemyBullets_, &xpGems_, &map, &controllers[0], parallel, 0,
+            elapsedTicks_ - (attractMode_ ? 105U * 60U : 0U),
+            manualPlayers_[0], attractMode_,
+        },
+        {
+            &players_[1], &cameras_[1], &players_[0],
+            &enemies_, &enemyBullets_, &xpGems_, &map, &controllers[1], parallel, 1,
+            elapsedTicks_ - (attractMode_ ? 105U * 60U : 0U),
+            manualPlayers_[1], attractMode_,
+        },
+    }};
+    updatePlayerJob(&playerJobs[0]);
+    updatePlayerJob(&playerJobs[1]);
     processLinkShares(players_, perkEffects_, randomState_,
                       difficulty_ == Difficulty::Endless);
     if (sealNoticeTicks_ > 0) --sealNoticeTicks_;
@@ -2838,9 +3002,13 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
     enemyGrid.rebuild(enemies_);
     moveEnemies(enemies_, enemyGrid, players_, enemyBullets_, xpGems_, scores_, killCounts_,
                 map, randomState_, balance);
-    enemyGrid.rebuild(enemies_);
     EnemyBulletSpatialGrid enemyBulletGrid;
-    enemyBulletGrid.rebuild(enemyBullets_);
+    EnemyGridJob enemyGridJob{&enemyGrid, &enemies_};
+    EnemyBulletGridJob enemyBulletGridJob{&enemyBulletGrid, &enemyBullets_};
+    invokePair(
+        parallel,
+        rebuildEnemyGridJob, &enemyGridJob,
+        rebuildEnemyBulletGridJob, &enemyBulletGridJob);
     for (std::size_t index = 0; index < players_.size(); ++index) {
         auto& player = players_[index];
         if (player.hp > 0) {
@@ -2897,8 +3065,12 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
                   scores_, killCounts_, impactEffects_);
     updateWindSlashes(windSlashes_, players_, enemies_, enemyGrid, enemyBullets_,
                       enemyBulletGrid, xpGems_, scores_, killCounts_, impactEffects_);
-    updateThunderStrikes(thunderStrikes_);
-    updateEnemyBullets(enemyBullets_, players_, balance);
+    EnemyBulletUpdateJob enemyBulletUpdateJob{
+        &enemyBullets_, &players_, &balance};
+    invokePair(
+        parallel,
+        updateThunderJob, &thunderStrikes_,
+        updateEnemyBulletJob, &enemyBulletUpdateJob);
     const auto xpRecallStarted = difficulty_ == Difficulty::Endless
         ? false : updateXpRecallCircle(xpGems_, players_);
     updateXpGems(xpGems_, players_, xpEarned_, randomState_, perkEffects_, difficulty_);

@@ -45,6 +45,14 @@ wizward::game::Game game;
 wizward::game::Game serialRenderGame;
 wizward::game::Game stagedRenderGame;
 
+void invokePairInReverse(
+        void*,
+        wizward::game::ParallelExecutor::Function first, void* firstContext,
+        wizward::game::ParallelExecutor::Function second, void* secondContext) noexcept {
+    second(secondContext);
+    first(firstContext);
+}
+
 void invokeChainsInReverse(
         void*,
         wizward::game::ParallelExecutor::Step step,
@@ -62,13 +70,13 @@ int main() {
 
     assert(serialRenderGame.initialize(Scene::Gameplay, 0x12345678U));
     assert(stagedRenderGame.initialize(Scene::Gameplay, 0x12345678U));
+    const wizward::game::ParallelExecutor reverseExecutor{
+        nullptr, invokePairInReverse, invokeChainsInReverse};
     for (std::uint16_t tick = 0; tick < 240U; ++tick) {
         (void)serialRenderGame.tick(idleControllers());
-        (void)stagedRenderGame.tick(idleControllers());
+        (void)stagedRenderGame.tick(idleControllers(), &reverseExecutor);
     }
     serialRenderGame.render();
-    const wizward::game::ParallelExecutor reverseExecutor{
-        nullptr, invokeChainsInReverse};
     stagedRenderGame.render(&reverseExecutor);
     assert(serialRenderGame.framebuffer().displayBuffer()
            == stagedRenderGame.framebuffer().displayBuffer());
