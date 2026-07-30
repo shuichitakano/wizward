@@ -77,8 +77,9 @@ PIXEL_TWINS_SRAM void drawPerformanceOverlay(
 
     constexpr std::int16_t kBarX = 2;
     constexpr std::array<std::int16_t, 2> kBarY{{1, 3}};
-    constexpr std::uint16_t kBarWidth =
+    constexpr std::uint16_t kFrameBudgetWidth =
         pixel_twins::kScreenWidth / 2U - static_cast<std::uint16_t>(kBarX);
+    constexpr std::uint16_t kBarWidth = kFrameBudgetWidth * 2U;
     constexpr std::uint32_t kFrameBudgetUs = 16'667;
     const auto target = pixel_twins::makeRenderTarget(
         framebuffer.drawBuffer(), pixel_twins::Screen::Full);
@@ -104,7 +105,7 @@ PIXEL_TWINS_SRAM void drawPerformanceOverlay(
             cumulativeUs += durations[category];
             const auto endX = static_cast<std::uint16_t>(std::min<std::uint64_t>(
                 kBarWidth,
-                (cumulativeUs * kBarWidth + kFrameBudgetUs / 2U)
+                (cumulativeUs * kFrameBudgetWidth + kFrameBudgetUs / 2U)
                     / kFrameBudgetUs));
             if (endX > previousX) {
                 pixel_twins::fillRectangle(

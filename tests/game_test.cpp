@@ -64,7 +64,7 @@ int main() {
     overlay.enabled = true;
     overlay.fpsTenths = 600;
     overlay.cores[0] = {4167, 4167, 4167, 4166};
-    overlay.cores[1] = {8333, 0, 0, 0};
+    overlay.cores[1] = {25'000, 0, 0, 0};
     game.setPerformanceOverlay(overlay);
     game.render();
     const auto& overlayPixels = game.framebuffer().displayBuffer();
@@ -74,8 +74,11 @@ int main() {
     assert(overlayPixels[core0Row + 42] != overlayPixels[core0Row + 81]);
     assert(overlayPixels[core0Row + 81] != overlayPixels[core0Row + 121]);
     assert(overlayPixels[core0Row + 121] == pixel_twins::kWhiteColor);
-    assert(overlayPixels[core1Row + 80] != pixel_twins::kDrawableBlackColor);
-    assert(overlayPixels[core1Row + 81] == pixel_twins::kDrawableBlackColor);
+    assert(overlayPixels[core0Row + 159] == pixel_twins::kWhiteColor);
+    assert(overlayPixels[core0Row + 160] == pixel_twins::kDrawableBlackColor);
+    assert(overlayPixels[core1Row + 160] != pixel_twins::kDrawableBlackColor);
+    assert(overlayPixels[core1Row + 238] != pixel_twins::kDrawableBlackColor);
+    assert(overlayPixels[core1Row + 239] == pixel_twins::kDrawableBlackColor);
 
     assert(game.initialize(Scene::Title, 123U, wizward::game::Difficulty::Hard));
     game.render();

@@ -253,13 +253,8 @@ int main() {
         publishedBuffer.store(
             &game.framebuffer().displayBuffer(), std::memory_order_relaxed);
         publishedFrame.store(frame, std::memory_order_release);
-        const auto waitStart = takeProfileStamp();
-        auto waitUsbUs = std::uint32_t{0};
+        const auto workEnd = takeProfileStamp();
         while (consumedFrame.load(std::memory_order_acquire) != frame) {
-            const auto usbStart = takeProfileStamp();
-            usbControllers.task();
-            const auto usbEnd = takeProfileStamp();
-            waitUsbUs += sectionCpuUs(usbStart, usbEnd);
             tight_loop_contents();
         }
         const auto frameEnd = takeProfileStamp();
@@ -268,11 +263,10 @@ int main() {
         const auto renderUs = sectionCpuUs(updateEnd, renderEnd);
         const auto audioUs = frameEnd.audioUs - frameStart.audioUs;
         const auto frameUs = frameEnd.timeUs - frameStart.timeUs;
-        const auto preWaitCpuUs = sectionCpuUs(frameStart, waitStart);
+        const auto preWaitCpuUs = sectionCpuUs(frameStart, workEnd);
         const auto accountedCpuUs = updateUs + renderUs;
         const auto otherUs =
-            (preWaitCpuUs > accountedCpuUs ? preWaitCpuUs - accountedCpuUs : 0)
-            + waitUsbUs;
+            preWaitCpuUs > accountedCpuUs ? preWaitCpuUs - accountedCpuUs : 0;
         performanceOverlay.cores[0] = {
             renderUs, audioUs, updateUs, otherUs,
         };
