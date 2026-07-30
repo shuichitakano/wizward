@@ -19,14 +19,20 @@ namespace {
 extern "C" const std::uint8_t __flash_binary_end;
 
 constexpr std::uint32_t kMagic = 0x4b525a57U; // "WZRK"
-constexpr std::uint16_t kVersion = 1;
+constexpr std::uint16_t kVersion1 = 1;
+constexpr std::uint16_t kVersion2 = 2;
 constexpr std::size_t kSlotCount = 2;
 constexpr std::size_t kHeaderSize = 20;
 constexpr std::size_t kRecordSize = 16;
 constexpr std::size_t kRecordCount = game::kRankingLimit * 2U;
-constexpr std::size_t kCrcOffset = kHeaderSize + kRecordSize * kRecordCount;
+constexpr std::size_t kStatisticsOffset =
+    kHeaderSize + kRecordSize * kRecordCount;
+constexpr std::size_t kStatisticsSize = 6U * sizeof(std::uint32_t);
+constexpr std::size_t kGammaOffset = kStatisticsOffset + kStatisticsSize;
+constexpr std::size_t kVersion1CrcOffset = kStatisticsOffset;
+constexpr std::size_t kVersion2CrcOffset = kGammaOffset + sizeof(std::uint16_t);
 constexpr std::size_t kImageSize = 3U * FLASH_PAGE_SIZE;
-static_assert(kCrcOffset + sizeof(std::uint32_t) <= kImageSize);
+static_assert(kVersion2CrcOffset + sizeof(std::uint32_t) <= kImageSize);
 
 std::uint16_t read16(const std::uint8_t* source) noexcept {
     return static_cast<std::uint16_t>(
@@ -76,11 +82,15 @@ const std::uint8_t* slotData(std::size_t slot) noexcept {
 }
 
 bool validImage(const std::uint8_t* image) noexcept {
-    return read32(image) == kMagic
-        && read16(image + 4U) == kVersion
-        && image[6] <= game::kRankingLimit
-        && image[7] <= game::kRankingLimit
-        && read32(image + kCrcOffset) == crc32(image, kCrcOffset);
+    if (read32(image) != kMagic
+        || image[6] > game::kRankingLimit
+        || image[7] > game::kRankingLimit) return false;
+    const auto version = read16(image + 4U);
+    const auto crcOffset = version == kVersion1
+        ? kVersion1CrcOffset
+        : version == kVersion2 ? kVersion2CrcOffset : 0U;
+    return crcOffset != 0U
+        && read32(image + crcOffset) == crc32(image, crcOffset);
 }
 
 bool sequenceIsNewer(std::uint32_t candidate, std::uint32_t current) noexcept {
@@ -160,8 +170,23 @@ void RankingStore::load(game::Game& game) noexcept {
     }
     game.loadRankings(
         rankings, image[6], endlessRankings, image[7], lastNames);
+    if (read16(image + 4U) == kVersion2) {
+        game::PlayStatistics statistics{};
+        statistics.totalPlays = read32(image + kStatisticsOffset);
+        statistics.normalPlays = read32(image + kStatisticsOffset + 4U);
+        statistics.hardPlays = read32(image + kStatisticsOffset + 8U);
+        statistics.endlessPlays = read32(image + kStatisticsOffset + 12U);
+        statistics.clears = read32(image + kStatisticsOffset + 16U);
+        statistics.totalPlayTicks = read32(image + kStatisticsOffset + 20U);
+        game.loadStatistics(statistics);
+        setGammaTenths(read16(image + kGammaOffset));
+    }
     activeSlot_ = selectedSlot;
     sequence_ = selectedSequence;
+}
+
+void RankingStore::setGammaTenths(std::uint16_t value) noexcept {
+    gammaTenths_ = std::clamp<std::uint16_t>(value, 10U, 35U);
 }
 
 bool RankingStore::save(const game::Game& game) noexcept {
@@ -171,7 +196,7 @@ bool RankingStore::save(const game::Game& game) noexcept {
 
     image_.fill(0xffU);
     write32(image_.data(), kMagic);
-    write16(image_.data() + 4U, kVersion);
+    write16(image_.data() + 4U, kVersion2);
     image_[6] = static_cast<std::uint8_t>(game.rankingCount());
     image_[7] = static_cast<std::uint8_t>(game.endlessRankingCount());
     const auto nextSequence = sequence_ + 1U;
@@ -188,7 +213,16 @@ bool RankingStore::save(const game::Game& game) noexcept {
                 + (game::kRankingLimit + index) * kRecordSize,
             game.endlessRankings()[index]);
     }
-    write32(image_.data() + kCrcOffset, crc32(image_.data(), kCrcOffset));
+    const auto& statistics = game.statistics();
+    write32(image_.data() + kStatisticsOffset, statistics.totalPlays);
+    write32(image_.data() + kStatisticsOffset + 4U, statistics.normalPlays);
+    write32(image_.data() + kStatisticsOffset + 8U, statistics.hardPlays);
+    write32(image_.data() + kStatisticsOffset + 12U, statistics.endlessPlays);
+    write32(image_.data() + kStatisticsOffset + 16U, statistics.clears);
+    write32(image_.data() + kStatisticsOffset + 20U, statistics.totalPlayTicks);
+    write16(image_.data() + kGammaOffset, gammaTenths_);
+    write32(image_.data() + kVersion2CrcOffset,
+            crc32(image_.data(), kVersion2CrcOffset));
 
     const auto targetSlot = activeSlot_ == 0 ? std::size_t{1} : std::size_t{0};
     ProgramContext context{slotOffset(targetSlot), image_.data()};

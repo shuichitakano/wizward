@@ -91,6 +91,15 @@ struct RankingEntry {
     bool submitted = false;
 };
 
+struct PlayStatistics {
+    std::uint32_t totalPlays = 0;
+    std::uint32_t normalPlays = 0;
+    std::uint32_t hardPlays = 0;
+    std::uint32_t endlessPlays = 0;
+    std::uint32_t clears = 0;
+    std::uint32_t totalPlayTicks = 0;
+};
+
 class Game {
 public:
     [[nodiscard]] bool initialize(Scene initialScene = Scene::Title,
@@ -150,6 +159,14 @@ public:
         std::size_t endlessRankingCount,
         const std::array<std::array<char, 3>,
                          pixel_twins::kControllerCount>& lastNames) noexcept;
+    void loadStatistics(const PlayStatistics& statistics) noexcept {
+        statistics_ = statistics;
+        rankingsDirty_ = false;
+    }
+    [[nodiscard]] const PlayStatistics& statistics() const noexcept {
+        return statistics_;
+    }
+    void resetRankings() noexcept;
     [[nodiscard]] bool rankingsDirty() const noexcept { return rankingsDirty_; }
     void markRankingsSaved() noexcept { rankingsDirty_ = false; }
     [[nodiscard]] bool attractMode() const noexcept {
@@ -161,6 +178,7 @@ private:
     void finalizeResult() noexcept;
     void updateRankingInput(const pixel_twins::Controllers& controllers) noexcept;
     void submitRanking(std::size_t player) noexcept;
+    void recordPlayStarted() noexcept;
     [[nodiscard]] bool hasPendingRanking() const noexcept;
     void renderPanelStage(
         std::size_t viewer, GameplayRenderStage stage) noexcept PIXEL_TWINS_SRAM;
@@ -200,6 +218,7 @@ private:
     bool debugMode_ = false;
     bool cheatedRun_ = false;
     bool rankingsDirty_ = false;
+    PlayStatistics statistics_{};
     PerformanceOverlay performanceOverlay_{};
     std::array<std::uint32_t, pixel_twins::kControllerCount> timeBonuses_{};
     std::array<std::uint32_t, pixel_twins::kControllerCount> finalScores_{};

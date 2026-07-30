@@ -13,6 +13,10 @@ class RankingStore {
 public:
     void load(game::Game& game) noexcept;
     [[nodiscard]] bool save(const game::Game& game) noexcept;
+    [[nodiscard]] std::uint16_t gammaTenths() const noexcept {
+        return gammaTenths_;
+    }
+    void setGammaTenths(std::uint16_t value) noexcept;
 
 private:
     static constexpr std::size_t kImageSize = 3U * 256U;
@@ -20,6 +24,7 @@ private:
     std::array<std::uint8_t, kImageSize> image_{};
     std::uint32_t sequence_ = 0;
     std::int8_t activeSlot_ = -1;
+    std::uint16_t gammaTenths_ = 22;
 };
 
 } // namespace wizward::rp2350

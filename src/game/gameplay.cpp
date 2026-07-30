@@ -33,6 +33,45 @@ constexpr float kEnemyContactKnockback = 14.0F;
 constexpr float kMageSeparationRange = 28.0F;
 constexpr float kMageSeparationWeight = 2.0F;
 constexpr float kMageSeparationMaximumSpeed = 1.6F;
+constexpr float kSpatialAudioRolloffDistance = 220.0F;
+constexpr float kSpatialAudioCrossfeed = 0.18F;
+
+float viewportListenerGain(
+        const CameraState& camera, float x, float y) noexcept {
+    const auto left = camera.x;
+    const auto right = camera.x + static_cast<float>(pixel_twins::kPanelWidth);
+    const auto top = camera.y;
+    const auto bottom = camera.y + static_cast<float>(pixel_twins::kScreenHeight);
+    const auto dx = x < left ? left - x : x > right ? x - right : 0.0F;
+    const auto dy = y < top ? top - y : y > bottom ? y - bottom : 0.0F;
+    const auto distance = std::hypot(dx, dy);
+    if (distance >= kSpatialAudioRolloffDistance) return 0.0F;
+    const auto remaining = 1.0F - distance / kSpatialAudioRolloffDistance;
+    return remaining * remaining;
+}
+
+float spatialAudibility(
+        const std::array<CameraState, pixel_twins::kControllerCount>& cameras,
+        float x, float y) noexcept {
+    return std::max(
+        viewportListenerGain(cameras[0], x, y),
+        viewportListenerGain(cameras[1], x, y));
+}
+
+struct SpatialSfxCandidate {
+    float x = 0.0F;
+    float y = 0.0F;
+    float audibility = -1.0F;
+};
+
+void considerSpatialCandidate(
+        SpatialSfxCandidate& candidate,
+        const std::array<CameraState, pixel_twins::kControllerCount>& cameras,
+        float x, float y) noexcept {
+    const auto audibility = spatialAudibility(cameras, x, y);
+    if (audibility <= candidate.audibility) return;
+    candidate = {x, y, audibility};
+}
 
 void invokePair(const ParallelExecutor* parallel,
                 ParallelExecutor::Function first, void* firstContext,
@@ -2710,6 +2749,22 @@ void GameplayState::pushSfx(SfxId id, float pan,
     sfxCues_[sfxCueCount_++] = {id, pan, pitchScale, volumeScale};
 }
 
+void GameplayState::pushSpatialSfx(
+        SfxId id, float x, float y,
+        float pitchScale, float volumeScale) noexcept {
+    auto left = viewportListenerGain(cameras_[0], x, y);
+    auto right = viewportListenerGain(cameras_[1], x, y);
+    const auto peak = std::max(left, right);
+    if (peak <= 0.0F) return;
+    left = std::max(left, peak * kSpatialAudioCrossfeed);
+    right = std::max(right, peak * kSpatialAudioCrossfeed);
+    const auto energy = left * left + right * right;
+    const auto pan = energy > 0.0F
+        ? (right * right - left * left) / energy : 0.0F;
+    const auto gain = std::min(1.25F, std::sqrt(energy));
+    pushSfx(id, pan, pitchScale, volumeScale * gain);
+}
+
 void GameplayState::reset(const world::WorldMap& map, std::size_t startingPlayer,
                           Difficulty difficulty) noexcept {
     players_[0] = {kWorldCenter - 28.0F, kWorldCenter, Facing::East};
@@ -3298,45 +3353,50 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         clearSequenceTicks_ = 1;
     }
 
-    constexpr std::array<float, pixel_twins::kControllerCount> kPlayerPans{{-0.32F, 0.32F}};
     bool playerDamaged = false;
     for (std::size_t player = 0; player < players_.size(); ++player) {
         const auto& before = playersBefore[player];
         const auto& after = players_[player];
-        const auto pan = kPlayerPans[player];
-        if (after.lightCooldownTicks > before.lightCooldownTicks) pushSfx(SfxId::LightCast, pan);
-        if (after.fireCooldownTicks > before.fireCooldownTicks) pushSfx(SfxId::FireCast, pan);
-        if (after.windCooldownTicks > before.windCooldownTicks) pushSfx(SfxId::WindCast, pan);
-        if (after.thunderCooldownTicks > before.thunderCooldownTicks) pushSfx(SfxId::ThunderCast, pan);
-        if (after.iceCooldownTicks > before.iceCooldownTicks) pushSfx(SfxId::IceCast, pan);
-        if (after.familiarCooldownTicks > before.familiarCooldownTicks) pushSfx(SfxId::FamiliarCast, pan);
+        const auto playerSfx = [&](SfxId id, float volumeScale = 1.0F) noexcept {
+            pushSpatialSfx(id, after.x, after.y, 1.0F, volumeScale);
+        };
+        if (after.lightCooldownTicks > before.lightCooldownTicks) playerSfx(SfxId::LightCast);
+        if (after.fireCooldownTicks > before.fireCooldownTicks) playerSfx(SfxId::FireCast);
+        if (after.windCooldownTicks > before.windCooldownTicks) playerSfx(SfxId::WindCast);
+        if (after.thunderCooldownTicks > before.thunderCooldownTicks) playerSfx(SfxId::ThunderCast);
+        if (after.iceCooldownTicks > before.iceCooldownTicks) playerSfx(SfxId::IceCast);
+        if (after.familiarCooldownTicks > before.familiarCooldownTicks) playerSfx(SfxId::FamiliarCast);
         if (before.hp > 0 && after.hp <= 0) {
             playerDamaged = true;
-            pushSfx(SfxId::Down, pan);
+            playerSfx(SfxId::Down);
         } else if (after.hp < before.hp) {
             playerDamaged = true;
-            pushSfx(SfxId::PlayerDamage, pan);
+            playerSfx(SfxId::PlayerDamage);
         }
-        else if (before.hp <= 0 && after.hp > 0) pushSfx(SfxId::Revive, pan);
-        if (after.level > before.level) pushSfx(SfxId::Level, pan);
+        else if (before.hp <= 0 && after.hp > 0) playerSfx(SfxId::Revive);
+        if (after.level > before.level) playerSfx(SfxId::Level);
         if (after.perkFlashTicks > before.perkFlashTicks) {
-            pushSfx(SfxId::UiMove, pan, 1.0F, 0.6F);
-            if (after.perkFlash == Perk::Heal) pushSfx(SfxId::Heal, pan);
-            else if (after.perkFlash == Perk::MaxHp) pushSfx(SfxId::HpUp, pan);
+            playerSfx(SfxId::UiMove, 0.6F);
+            if (after.perkFlash == Perk::Heal) playerSfx(SfxId::Heal);
+            else if (after.perkFlash == Perk::MaxHp) playerSfx(SfxId::HpUp);
         }
-        if (before.bombEffectTicks == 0 && after.bombEffectTicks > 0) pushSfx(SfxId::Bomb, pan);
-        if (!manualBefore[player] && manualPlayers_[player]) pushSfx(SfxId::UiMove, pan);
+        if (before.bombEffectTicks == 0 && after.bombEffectTicks > 0) playerSfx(SfxId::Bomb);
+        if (!manualBefore[player] && manualPlayers_[player]) playerSfx(SfxId::UiMove);
     }
-    bool hitPlayed = false;
-    bool killPlayed = false;
-    bool spawnPlayed = false;
-    bool enemyShoot = false;
+    SpatialSfxCandidate hitCandidate{};
+    SpatialSfxCandidate killCandidate{};
+    SpatialSfxCandidate spawnCandidate{};
+    SpatialSfxCandidate enemyShootCandidate{};
     for (std::size_t index = 0; index < enemies_.size(); ++index) {
         const auto& enemy = enemies_[index];
         if (!enemyActiveBefore[index] && enemy.active && enemy.bornTicks > 0
-            && enemy.spawnDelayTicks == 0) spawnPlayed = true;
+            && enemy.spawnDelayTicks == 0) {
+            considerSpatialCandidate(spawnCandidate, cameras_, enemy.x, enemy.y);
+        }
         if (enemyActiveBefore[index] && enemySpawnDelayBefore[index] > 0
-            && enemy.spawnDelayTicks == 0) spawnPlayed = true;
+            && enemy.spawnDelayTicks == 0) {
+            considerSpatialCandidate(spawnCandidate, cameras_, enemy.x, enemy.y);
+        }
         if (enemyActiveBefore[index] && !enemy.active && enemy.deathTicks > 0) {
             if (enemy.kind == EnemyKind::Boss && enemy.endlessScaled) {
                 pushSfx(SfxId::BossDeathImpact);
@@ -3344,42 +3404,74 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
                 spawnImpact(impactEffects_, ImpactEffectType::BossDeath,
                             enemy.x, enemy.y - 10.0F);
             } else if (enemy.kind != EnemyKind::Boss) {
-                killPlayed = true;
-                hitPlayed = true;
+                considerSpatialCandidate(killCandidate, cameras_, enemy.x, enemy.y);
+                considerSpatialCandidate(hitCandidate, cameras_, enemy.x, enemy.y);
                 spawnImpact(impactEffects_, ImpactEffectType::Generic, enemy.x, enemy.y);
             }
         }
-        if (enemyActiveBefore[index] && enemy.active && enemy.hp < enemyHpBefore[index]) hitPlayed = true;
+        if (enemyActiveBefore[index] && enemy.active && enemy.hp < enemyHpBefore[index]) {
+            considerSpatialCandidate(hitCandidate, cameras_, enemy.x, enemy.y);
+        }
         if (enemy.kind == EnemyKind::Bat && enemyDashBefore[index] == 0 && enemy.dashTicks > 0) {
-            enemyShoot = true;
+            considerSpatialCandidate(
+                enemyShootCandidate, cameras_, enemy.x, enemy.y);
         }
     }
-    if (spawnPlayed) pushSfx(SfxId::EnemySpawn);
-    if (hitPlayed) pushSfx(SfxId::Hit);
-    if (killPlayed) pushSfx(SfxId::Kill);
-    bool bossShoot = false;
-    bool deflected = false;
+    if (spawnCandidate.audibility >= 0.0F) {
+        pushSpatialSfx(
+            SfxId::EnemySpawn, spawnCandidate.x, spawnCandidate.y);
+    }
+    if (hitCandidate.audibility >= 0.0F) {
+        pushSpatialSfx(SfxId::Hit, hitCandidate.x, hitCandidate.y);
+    }
+    if (killCandidate.audibility >= 0.0F) {
+        pushSpatialSfx(SfxId::Kill, killCandidate.x, killCandidate.y);
+    }
+    SpatialSfxCandidate bossShootCandidate{};
+    SpatialSfxCandidate deflectCandidate{};
     for (std::size_t index = 0; index < enemyBullets_.size(); ++index) {
         const auto& bullet = enemyBullets_[index];
         const auto launched = (!enemyBulletBefore[index] && bullet.active && bullet.launchDelayTicks == 0)
             || (enemyBulletBefore[index] && enemyBulletDelayBefore[index] > 0
                 && bullet.active && bullet.launchDelayTicks == 0);
         if (launched) {
-            if (bullet.type == EnemyBulletType::BossFire) bossShoot = true;
-            else enemyShoot = true;
+            if (bullet.type == EnemyBulletType::BossFire) {
+                considerSpatialCandidate(
+                    bossShootCandidate, cameras_, bullet.x, bullet.y);
+            } else {
+                considerSpatialCandidate(
+                    enemyShootCandidate, cameras_, bullet.x, bullet.y);
+            }
         }
         if (enemyBulletBefore[index] && !bullet.active && enemyBulletLifeBefore[index] > 1U) {
-            deflected = true;
+            considerSpatialCandidate(
+                deflectCandidate, cameras_, bullet.x, bullet.y);
         }
     }
-    if (enemyShoot) pushSfx(SfxId::EnemyShoot);
-    if (bossShoot) pushSfx(SfxId::BossShoot);
-    if (deflected && !playerDamaged) pushSfx(SfxId::Deflect);
-    bool xpCollected = false;
-    for (std::size_t index = 0; index < xpGems_.size(); ++index) {
-        xpCollected = xpCollected || (xpGemBefore[index] && !xpGems_[index].active);
+    if (enemyShootCandidate.audibility >= 0.0F) {
+        pushSpatialSfx(
+            SfxId::EnemyShoot, enemyShootCandidate.x, enemyShootCandidate.y);
     }
-    if (xpCollected || xpRecallStarted) pushSfx(SfxId::Xp);
+    if (bossShootCandidate.audibility >= 0.0F) {
+        pushSpatialSfx(
+            SfxId::BossShoot, bossShootCandidate.x, bossShootCandidate.y);
+    }
+    if (deflectCandidate.audibility >= 0.0F && !playerDamaged) {
+        pushSpatialSfx(
+            SfxId::Deflect, deflectCandidate.x, deflectCandidate.y);
+    }
+    SpatialSfxCandidate xpCandidate{};
+    for (std::size_t index = 0; index < xpGems_.size(); ++index) {
+        if (xpGemBefore[index] && !xpGems_[index].active) {
+            considerSpatialCandidate(
+                xpCandidate, cameras_, xpGems_[index].x, xpGems_[index].y);
+        }
+    }
+    if (xpCandidate.audibility >= 0.0F) {
+        pushSpatialSfx(SfxId::Xp, xpCandidate.x, xpCandidate.y);
+    } else if (xpRecallStarted) {
+        pushSfx(SfxId::Xp);
+    }
     if (activeSealCount_ > sealCountBefore) pushSfx(SfxId::SealJingle);
     for (const auto& seal : seals_) {
         if (!seal.active || elapsedTicks_ < seal.activatedAtTicks) continue;

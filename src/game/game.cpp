@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cmath>
+#include <limits>
 #include <string_view>
 
 namespace wizward::game {
@@ -27,6 +28,15 @@ constexpr std::uint16_t kResultContinueDelayTicks = 15;
 constexpr std::uint16_t kResultAutoReturnTicks = 300;
 constexpr std::uint32_t kTimeBonusPerSecond = 50;
 constexpr std::string_view kRankingCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.- ";
+
+void saturatingIncrement(std::uint32_t& value) noexcept {
+    if (value != std::numeric_limits<std::uint32_t>::max()) ++value;
+}
+
+void saturatingAdd(std::uint32_t& value, std::uint32_t amount) noexcept {
+    const auto remaining = std::numeric_limits<std::uint32_t>::max() - value;
+    value += std::min(amount, remaining);
+}
 
 void copySfxCues(const GameplayState& gameplay, UpdateResult& result) noexcept {
     result.sfxCueCount = std::min(gameplay.sfxCueCount(), result.sfxCues.size());
@@ -1358,6 +1368,14 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
                        strike.y - camera.y);
         }
         }
+        // 衝撃波は地面側の表現なので、プレイヤーを合成する前に描く。
+        for (const auto& strike : gameplay.thunderStrikes()) {
+        if (!strike.active) continue;
+        pixel_twins::drawCircle(target,
+            static_cast<std::int16_t>(std::round(strike.x - camera.x)),
+            static_cast<std::int16_t>(std::round(strike.y - camera.y)),
+            thunderShockwaveRadius(strike.ageTicks), assets::palette::kThunder);
+        }
         return;
     }
     if (stage == GameplayRenderStage::Actors) {
@@ -1466,13 +1484,6 @@ PIXEL_TWINS_SRAM void drawGameplayPanel(pixel_twins::RenderTarget target,
             drawPerkSpriteProgress(target, assets, camera, kBombFragment,
                                    progress, x, y, fragment % 3U);
         }
-        }
-        for (const auto& strike : gameplay.thunderStrikes()) {
-        if (!strike.active) continue;
-        pixel_twins::drawCircle(target,
-            static_cast<std::int16_t>(std::round(strike.x - camera.x)),
-            static_cast<std::int16_t>(std::round(strike.y - camera.y)),
-            thunderShockwaveRadius(strike.ageTicks), assets::palette::kThunder);
         }
         return;
     }
@@ -1726,6 +1737,7 @@ bool Game::initialize(Scene initialScene, std::uint32_t mapSeed,
     cheatedRun_ = false;
     rankingsDirty_ = false;
     performanceOverlay_ = {};
+    if (scene_ == Scene::Gameplay) recordPlayStarted();
     if (scene_ == Scene::Title) return titleAssets_.applyPalette(framebuffer_);
     if (scene_ == Scene::AttractRanking) return titleAssets_.applyAttractPalette(framebuffer_);
     return gameAssets_.applyPalette(framebuffer_);
@@ -1749,6 +1761,7 @@ UpdateResult Game::changeScene(Scene scene, bool playStartSfx) noexcept {
         else {
             gameplay_.reset(worldMap_, startingPlayer_, difficulty_);
             cheatedRun_ = false;
+            recordPlayStarted();
         }
         resultOutcome_ = GameplayOutcome::Running;
     }
@@ -1956,6 +1969,11 @@ UpdateResult Game::tick(
 }
 
 void Game::finalizeResult() noexcept {
+    saturatingAdd(statistics_.totalPlayTicks, gameplay_.elapsedTicks());
+    if (resultOutcome_ == GameplayOutcome::Clear) {
+        saturatingIncrement(statistics_.clears);
+    }
+    rankingsDirty_ = true;
     const auto remainingTicks = gameplay_.elapsedTicks() < 300U * 60U
         ? 300U * 60U - gameplay_.elapsedTicks() : 0U;
     const auto remainingSeconds = (remainingTicks + 59U) / 60U;
@@ -1994,6 +2012,26 @@ void Game::finalizeResult() noexcept {
         rankingEntries_[player].rank = static_cast<std::uint8_t>(rank);
         rankingEntries_[player].name = lastNames_[player];
     }
+}
+
+void Game::recordPlayStarted() noexcept {
+    saturatingIncrement(statistics_.totalPlays);
+    switch (difficulty_) {
+    case Difficulty::Easy: saturatingIncrement(statistics_.normalPlays); break;
+    case Difficulty::Hard: saturatingIncrement(statistics_.hardPlays); break;
+    case Difficulty::Endless: saturatingIncrement(statistics_.endlessPlays); break;
+    }
+    rankingsDirty_ = true;
+}
+
+void Game::resetRankings() noexcept {
+    rankings_.fill({});
+    endlessRankings_.fill({});
+    rankingEntries_.fill({});
+    rankingCount_ = 0;
+    endlessRankingCount_ = 0;
+    lastNames_ = {{{{'A', 'A', 'A'}}, {{'A', 'A', 'A'}}}};
+    rankingsDirty_ = true;
 }
 
 bool Game::hasPendingRanking() const noexcept {

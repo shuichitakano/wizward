@@ -17,6 +17,7 @@ add_subdirectory(.. wizward)
 
 add_executable(wizward_rp2350
     main.cpp
+    maintenance_screen.cpp
     ranking_store.cpp
 )
 target_link_libraries(

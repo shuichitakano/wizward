@@ -506,6 +506,9 @@ private:
 
     void pushSfx(SfxId id, float pan = 0.0F,
                  float pitchScale = 1.0F, float volumeScale = 1.0F) noexcept;
+    void pushSpatialSfx(SfxId id, float x, float y,
+                        float pitchScale = 1.0F,
+                        float volumeScale = 1.0F) noexcept;
 };
 
 [[nodiscard]] bool playerPositionIsWalkable(
