@@ -87,6 +87,7 @@ public:
     void setPerformanceOverlay(const PerformanceOverlay& overlay) noexcept {
         performanceOverlay_ = overlay;
     }
+    void setDebugMode(bool enabled) noexcept { debugMode_ = enabled; }
 
     [[nodiscard]] pixel_twins::Framebuffer& framebuffer() noexcept { return framebuffer_; }
     [[nodiscard]] const pixel_twins::Framebuffer& framebuffer() const noexcept { return framebuffer_; }
@@ -144,6 +145,7 @@ private:
     Difficulty difficulty_ = Difficulty::Easy;
     bool paused_ = false;
     bool nameEntryBgmStarted_ = false;
+    bool debugMode_ = false;
     PerformanceOverlay performanceOverlay_{};
     std::array<std::uint32_t, pixel_twins::kControllerCount> timeBonuses_{};
     std::array<std::uint32_t, pixel_twins::kControllerCount> finalScores_{};

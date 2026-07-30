@@ -20,6 +20,20 @@ pixel_twins::Controllers pressedController(
     return controllers;
 }
 
+pixel_twins::Controllers pressedChord(
+    std::size_t player,
+    pixel_twins::ControllerButton first,
+    pixel_twins::ControllerButton second) noexcept {
+    pixel_twins::Controllers controllers;
+    std::array<pixel_twins::ControllerSample, pixel_twins::kControllerCount> samples{};
+    samples[player].connected = true;
+    samples[player].gamepad = true;
+    samples[player].buttons = static_cast<std::uint16_t>(
+        pixel_twins::buttonMask(first) | pixel_twins::buttonMask(second));
+    controllers.update(samples);
+    return controllers;
+}
+
 pixel_twins::Controllers idleControllers() noexcept {
     pixel_twins::Controllers controllers;
     std::array<pixel_twins::ControllerSample, pixel_twins::kControllerCount> samples{};
@@ -194,6 +208,31 @@ int main() {
     assert(!game.paused());
     (void)game.tick(player1Join);
     assert(game.gameplay().playerIsManual(0));
+
+    const auto debugFullPower = pressedChord(
+        0, ControllerButton::system, ControllerButton::dpadUp);
+    (void)game.processInput(debugFullPower);
+    assert(game.gameplay().player(0).fireLevel == 0U);
+    game.setDebugMode(true);
+    const auto fullPowerResult = game.processInput(debugFullPower);
+    assert(fullPowerResult.sfxCueCount == 1U);
+    assert(game.gameplay().player(0).lightLevel == 5U);
+    assert(game.gameplay().player(0).fireLevel == 5U);
+    assert(game.gameplay().player(0).familiarLevel == 5U);
+    assert(game.gameplay().player(0).speedLevel == 4U);
+    assert(game.gameplay().player(0).maxHpLevel == 4U);
+    assert(game.gameplay().player(0).hp == game.gameplay().player(0).maxHp);
+
+    const auto debugCharge = pressedChord(
+        0, ControllerButton::system, ControllerButton::dpadLeft);
+    (void)game.processInput(debugCharge);
+    assert(game.gameplay().player(0).choosingPerk);
+
+    const auto scheduleBefore = game.gameplay().elapsedTicks();
+    const auto debugAdvance = pressedChord(
+        0, ControllerButton::system, ControllerButton::dpadRight);
+    (void)game.processInput(debugAdvance);
+    assert(game.gameplay().elapsedTicks() == scheduleBefore + 60U * 60U);
 
     const auto pause = pressedController(1, ControllerButton::start);
     (void)game.processInput(pause);

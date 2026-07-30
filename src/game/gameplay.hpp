@@ -364,6 +364,9 @@ public:
     void tick(const pixel_twins::Controllers& controllers, const world::WorldMap& map) noexcept;
     [[nodiscard]] bool addEnemy(float x, float y, EnemyKind kind = EnemyKind::Imp) noexcept;
     void grantXp(std::size_t playerIndex, std::uint16_t amount) noexcept;
+    void debugFullyPowerUp(std::size_t playerIndex) noexcept;
+    void debugChargePowerUp(std::size_t playerIndex) noexcept;
+    void debugAdvanceScheduleOneMinute() noexcept;
 
     [[nodiscard]] const PlayerState& player(std::size_t index) const noexcept {
         return players_[index];

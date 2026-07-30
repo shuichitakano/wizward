@@ -1780,6 +1780,31 @@ UpdateResult Game::processInput(const pixel_twins::Controllers& controllers) noe
         }
         return {};
     }
+    if (debugMode_) {
+        const auto chordPressed = [](const pixel_twins::ControllerState& controller,
+                                     pixel_twins::ControllerButton direction) {
+            return (controller.isHeld(pixel_twins::ControllerButton::system)
+                    && controller.isPressed(direction))
+                || (controller.isPressed(pixel_twins::ControllerButton::system)
+                    && controller.isHeld(direction));
+        };
+        for (std::size_t index = 0; index < pixel_twins::kControllerCount; ++index) {
+            const auto& controller = controllers[index];
+            if (chordPressed(controller, pixel_twins::ControllerButton::dpadUp)) {
+                gameplay_.debugFullyPowerUp(index);
+            } else if (chordPressed(controller, pixel_twins::ControllerButton::dpadLeft)) {
+                gameplay_.debugChargePowerUp(index);
+            } else if (chordPressed(controller, pixel_twins::ControllerButton::dpadRight)) {
+                gameplay_.debugAdvanceScheduleOneMinute();
+            } else {
+                continue;
+            }
+            UpdateResult result{};
+            result.sfxCues[0] = {SfxId::UiMove, index == 0 ? -0.32F : 0.32F};
+            result.sfxCueCount = 1;
+            return result;
+        }
+    }
     if (gameplay_.bossIntroTicks() > 0) return {};
     for (std::size_t index = 0; index < pixel_twins::kControllerCount; ++index) {
         if (!gameplay_.playerIsManual(index)

@@ -2996,6 +2996,37 @@ void GameplayState::grantXp(std::size_t playerIndex, std::uint16_t amount) noexc
     }
 }
 
+void GameplayState::debugFullyPowerUp(std::size_t playerIndex) noexcept {
+    if (playerIndex >= players_.size()) return;
+    auto& player = players_[playerIndex];
+    for (std::uint8_t value = static_cast<std::uint8_t>(Perk::Light);
+         value <= static_cast<std::uint8_t>(Perk::MaxHp); ++value) {
+        (void)applyUpgradeTenths(
+            player, static_cast<Perk>(value), UINT8_MAX,
+            difficulty_ == Difficulty::Endless);
+    }
+    player.xp = 0;
+    player.pendingPerkChoices = 0;
+    player.choosingPerk = false;
+    player.hp = player.maxHp;
+}
+
+void GameplayState::debugChargePowerUp(std::size_t playerIndex) noexcept {
+    if (playerIndex >= players_.size()) return;
+    auto& player = players_[playerIndex];
+    const auto needed = xpNeededForPlayer(player, difficulty_);
+    player.xp = needed > 0 ? needed - 1U : 0U;
+    gainXp(player, static_cast<std::uint8_t>(playerIndex), 1,
+           randomState_, perkEffects_, difficulty_);
+}
+
+void GameplayState::debugAdvanceScheduleOneMinute() noexcept {
+    constexpr std::uint32_t kMinuteTicks = 60U * 60U;
+    elapsedTicks_ = std::min(
+        elapsedTicks_, std::numeric_limits<std::uint32_t>::max() - kMinuteTicks);
+    elapsedTicks_ += kMinuteTicks;
+}
+
 bool GameplayState::addEnemy(float x, float y, EnemyKind kind) noexcept {
     const auto slot = std::find_if(enemies_.begin(), enemies_.end(), [](const EnemyState& enemy) {
         return !enemy.active && enemy.deathTicks == 0;

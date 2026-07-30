@@ -161,10 +161,9 @@ void ledCoreMain() noexcept {
     ledCoreReady.store(true, std::memory_order_release);
 
     while (true) {
-        const auto presentStart = time_us_32();
         ledPanel.present(*currentBuffer);
         profiledPresentUs.store(
-            time_us_32() - presentStart, std::memory_order_release);
+            ledPanel.lastPresentActiveUs(), std::memory_order_release);
 
         const auto nextFrame = publishedFrame.load(std::memory_order_acquire);
         if (nextFrame == currentFrame) continue;
@@ -232,6 +231,8 @@ int main() {
         const auto frameStart = takeProfileStamp();
         usbControllers.task();
         usbControllers.update(controllers);
+        const auto debugMode = debugModeEnabled();
+        game.setDebugMode(debugMode);
         const auto updateStart = takeProfileStamp();
         if (!applyUpdate(game.processInput(controllers))
             || !applyUpdate(game.tick(controllers))) {
@@ -243,7 +244,7 @@ int main() {
             paletteRevision.fetch_add(1, std::memory_order_release);
         }
         const auto updateEnd = takeProfileStamp();
-        performanceOverlay.enabled = debugModeEnabled();
+        performanceOverlay.enabled = debugMode;
         game.setPerformanceOverlay(performanceOverlay);
         game.render();
         const auto renderEnd = takeProfileStamp();
@@ -252,8 +253,13 @@ int main() {
         publishedBuffer.store(
             &game.framebuffer().displayBuffer(), std::memory_order_relaxed);
         publishedFrame.store(frame, std::memory_order_release);
+        const auto waitStart = takeProfileStamp();
+        auto waitUsbUs = std::uint32_t{0};
         while (consumedFrame.load(std::memory_order_acquire) != frame) {
+            const auto usbStart = takeProfileStamp();
             usbControllers.task();
+            const auto usbEnd = takeProfileStamp();
+            waitUsbUs += sectionCpuUs(usbStart, usbEnd);
             tight_loop_contents();
         }
         const auto frameEnd = takeProfileStamp();
@@ -262,8 +268,11 @@ int main() {
         const auto renderUs = sectionCpuUs(updateEnd, renderEnd);
         const auto audioUs = frameEnd.audioUs - frameStart.audioUs;
         const auto frameUs = frameEnd.timeUs - frameStart.timeUs;
-        const auto accountedUs = updateUs + renderUs + audioUs;
-        const auto otherUs = frameUs > accountedUs ? frameUs - accountedUs : 0;
+        const auto preWaitCpuUs = sectionCpuUs(frameStart, waitStart);
+        const auto accountedCpuUs = updateUs + renderUs;
+        const auto otherUs =
+            (preWaitCpuUs > accountedCpuUs ? preWaitCpuUs - accountedCpuUs : 0)
+            + waitUsbUs;
         performanceOverlay.cores[0] = {
             renderUs, audioUs, updateUs, otherUs,
         };
