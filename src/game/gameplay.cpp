@@ -252,19 +252,25 @@ float playerSpeedPerTick(const PlayerState& player) noexcept {
 void movePlayer(PlayerState& player,
                 const pixel_twins::ControllerState& controller,
                 const world::WorldMap& map) noexcept {
-    auto inputX = std::abs(controller.x) >= kAxisDeadzone ? static_cast<float>(controller.x) : 0.0F;
-    auto inputY = std::abs(controller.y) >= kAxisDeadzone ? static_cast<float>(controller.y) : 0.0F;
+    constexpr float kAxisMaximum = 32767.0F;
+    auto inputX = std::abs(controller.x) >= kAxisDeadzone
+        ? static_cast<float>(controller.x) / kAxisMaximum : 0.0F;
+    auto inputY = std::abs(controller.y) >= kAxisDeadzone
+        ? static_cast<float>(controller.y) / kAxisMaximum : 0.0F;
     const auto length = std::sqrt(inputX * inputX + inputY * inputY);
     player.moving = length > 0.0F;
     if (!player.moving) return;
 
-    inputX /= length;
-    inputY /= length;
-    player.facing = facingFor(inputX, inputY);
-    const auto speed = playerSpeedPerTick(player);
-    const auto nextX = player.x + inputX * speed;
+    const auto clampedLength = std::min(1.0F, length);
+    const auto directionX = inputX / length;
+    const auto directionY = inputY / length;
+    player.aiDirectionX = directionX;
+    player.aiDirectionY = directionY;
+    player.facing = facingFor(directionX, directionY);
+    const auto speed = playerSpeedPerTick(player) * clampedLength;
+    const auto nextX = player.x + directionX * speed;
     if (playerPositionIsWalkable(map, nextX, player.y)) player.x = nextX;
-    const auto nextY = player.y + inputY * speed;
+    const auto nextY = player.y + directionY * speed;
     if (playerPositionIsWalkable(map, player.x, nextY)) player.y = nextY;
 }
 
@@ -1589,7 +1595,7 @@ bool fireSpread(PlayerState& player,
                 std::array<std::uint8_t, kMaximumPlayerBullets>& freeBulletSlots,
                 std::size_t& freeBulletSlotCount,
                 std::array<ImpactEffectState, kMaximumImpactEffects>& impacts) noexcept {
-    const auto baseAngle = facingAngle(player.facing);
+    const auto baseAngle = std::atan2(player.aiDirectionY, player.aiDirectionX);
     bool fired = false;
     for (std::uint8_t index = 0; index < stats.count; ++index) {
         const auto offset = stats.count == 1 ? 0.0F

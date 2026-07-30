@@ -136,6 +136,27 @@ int main() {
     assert(std::abs((gameplay.camera(0).y + 60.0F) - (gameplay.player(0).y - 16.0F)) < 0.01F);
 
     gameplay.reset(map);
+    const auto analogStart = gameplay.player(0);
+    gameplay.tick(controllersWith(16384, 0), map);
+    const auto halfTiltDistance = gameplay.player(0).x - analogStart.x;
+    gameplay.reset(map);
+    const auto fullTiltStart = gameplay.player(0);
+    gameplay.tick(moveRight, map);
+    const auto fullTiltDistance = gameplay.player(0).x - fullTiltStart.x;
+    assert(halfTiltDistance > 0.0F);
+    assert(std::abs(halfTiltDistance / fullTiltDistance - 0.5F) < 0.01F);
+
+    gameplay.reset(map);
+    gameplay.tick(controllersWith(30000, 10000), map);
+    const auto analogLength = std::sqrt(
+        gameplay.player(0).aiDirectionX * gameplay.player(0).aiDirectionX
+        + gameplay.player(0).aiDirectionY * gameplay.player(0).aiDirectionY);
+    assert(std::abs(analogLength - 1.0F) < 0.001F);
+    assert(std::abs(
+        gameplay.player(0).aiDirectionY / gameplay.player(0).aiDirectionX
+        - 1.0F / 3.0F) < 0.001F);
+
+    gameplay.reset(map);
     const auto partnerBeforeAvoidance = gameplay.player(1);
     assert(gameplay.addEnemy(partnerBeforeAvoidance.x - 10.0F,
                              partnerBeforeAvoidance.y,
