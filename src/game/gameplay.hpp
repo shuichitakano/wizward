@@ -440,6 +440,8 @@ private:
     std::array<CameraState, pixel_twins::kControllerCount> cameras_{};
     std::array<EnemyState, kMaximumEnemies> enemies_{};
     std::array<PlayerBulletState, kMaximumPlayerBullets> bullets_{};
+    std::array<std::uint8_t, kMaximumPlayerBullets> freeBulletSlots_{};
+    std::size_t freeBulletSlotCount_ = 0;
     std::array<XpGemState, kMaximumXpGems> xpGems_{};
     std::array<WindSlashState, kMaximumWindSlashes> windSlashes_{};
     std::array<ThunderStrikeState, kMaximumThunderStrikes> thunderStrikes_{};

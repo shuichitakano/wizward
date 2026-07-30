@@ -909,7 +909,39 @@ bool spawnEnemyBullet(std::array<EnemyBulletState, kMaximumEnemyBullets>& bullet
     return true;
 }
 
+void resetBulletSlots(
+    std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
+    std::array<std::uint8_t, kMaximumPlayerBullets>& freeSlots,
+    std::size_t& freeSlotCount) noexcept {
+    bullets.fill({});
+    for (std::size_t index = 0; index < freeSlots.size(); ++index) {
+        freeSlots[index] = static_cast<std::uint8_t>(freeSlots.size() - 1U - index);
+    }
+    freeSlotCount = freeSlots.size();
+}
+
+PlayerBulletState* acquireBulletSlot(
+    std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
+    std::array<std::uint8_t, kMaximumPlayerBullets>& freeSlots,
+    std::size_t& freeSlotCount) noexcept {
+    if (freeSlotCount == 0) return nullptr;
+    return &bullets[freeSlots[--freeSlotCount]];
+}
+
+void releaseBulletSlot(
+    std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
+    std::array<std::uint8_t, kMaximumPlayerBullets>& freeSlots,
+    std::size_t& freeSlotCount,
+    PlayerBulletState& bullet) noexcept {
+    if (!bullet.active) return;
+    const auto slotIndex = static_cast<std::size_t>(&bullet - bullets.data());
+    bullet.active = false;
+    freeSlots[freeSlotCount++] = static_cast<std::uint8_t>(slotIndex);
+}
+
 bool spawnBullet(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
+                 std::array<std::uint8_t, kMaximumPlayerBullets>& freeSlots,
+                 std::size_t& freeSlotCount,
                  const PlayerState& player,
                  std::uint8_t owner,
                  PlayerAttack type,
@@ -918,9 +950,8 @@ bool spawnBullet(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
                  float speed,
                  std::uint16_t lifetimeTicks,
                  float radius) noexcept {
-    const auto slot = std::find_if(bullets.begin(), bullets.end(),
-        [](const PlayerBulletState& bullet) { return !bullet.active; });
-    if (slot == bullets.end()) return false;
+    auto* slot = acquireBulletSlot(bullets, freeSlots, freeSlotCount);
+    if (slot == nullptr) return false;
     const auto directionX = std::cos(angle);
     const auto directionY = std::sin(angle);
     slot->x = player.x + directionX * 10.0F;
@@ -939,12 +970,13 @@ bool spawnBullet(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
 }
 
 bool spawnBulletAt(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
+                   std::array<std::uint8_t, kMaximumPlayerBullets>& freeSlots,
+                   std::size_t& freeSlotCount,
                    float x, float y, std::uint8_t owner, PlayerAttack type,
                    float directionX, float directionY, std::int16_t damage,
                    float speed, std::uint16_t lifetimeTicks, float radius) noexcept {
-    const auto slot = std::find_if(bullets.begin(), bullets.end(),
-        [](const PlayerBulletState& bullet) { return !bullet.active; });
-    if (slot == bullets.end()) return false;
+    auto* slot = acquireBulletSlot(bullets, freeSlots, freeSlotCount);
+    if (slot == nullptr) return false;
     slot->x = x;
     slot->y = y;
     slot->velocityX = directionX * speed;
@@ -1315,6 +1347,8 @@ bool fireLight(PlayerState& player,
                std::array<EnemyState, kMaximumEnemies>& enemies,
                const EnemySpatialGrid& enemyGrid,
                std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
+               std::array<std::uint8_t, kMaximumPlayerBullets>& freeBulletSlots,
+               std::size_t& freeBulletSlotCount,
                std::array<ImpactEffectState, kMaximumImpactEffects>& impacts) noexcept {
     auto* target = nearestEnemy(enemies, enemyGrid, player.x, player.y, kLightSeekRange);
     if (target == nullptr) return false;
@@ -1327,7 +1361,8 @@ bool fireLight(PlayerState& player,
     const auto baseAngle = std::atan2(dy, dx);
     for (std::uint8_t index = 0; index < stats.count; ++index) {
         const auto angle = baseAngle + static_cast<float>(index) * kTau / stats.count;
-        fired = spawnBullet(bullets, player, owner, PlayerAttack::Light, angle,
+        fired = spawnBullet(bullets, freeBulletSlots, freeBulletSlotCount,
+                            player, owner, PlayerAttack::Light, angle,
                             stats.damage, stats.speed, kLightLifetimeTicks, 2.0F) || fired;
     }
     if (fired) spawnImpact(impacts, ImpactEffectType::CastSpark,
@@ -1343,13 +1378,16 @@ bool fireSpread(PlayerState& player,
                 std::uint16_t lifetimeTicks,
                 float radius,
                 std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
+                std::array<std::uint8_t, kMaximumPlayerBullets>& freeBulletSlots,
+                std::size_t& freeBulletSlotCount,
                 std::array<ImpactEffectState, kMaximumImpactEffects>& impacts) noexcept {
     const auto baseAngle = facingAngle(player.facing);
     bool fired = false;
     for (std::uint8_t index = 0; index < stats.count; ++index) {
         const auto offset = stats.count == 1 ? 0.0F
             : (static_cast<float>(index) - static_cast<float>(stats.count - 1U) * 0.5F) * spread;
-        fired = spawnBullet(bullets, player, owner, type, baseAngle + offset,
+        fired = spawnBullet(bullets, freeBulletSlots, freeBulletSlotCount,
+                            player, owner, type, baseAngle + offset,
                             stats.damage, stats.speed, lifetimeTicks, radius) || fired;
     }
     if (fired) spawnImpact(impacts, ImpactEffectType::CastSpark,
@@ -1450,6 +1488,8 @@ void updateFamiliars(PlayerState& player, std::uint8_t owner,
                      std::array<EnemyState, kMaximumEnemies>& enemies,
                      const EnemySpatialGrid& enemyGrid,
                      std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
+                     std::array<std::uint8_t, kMaximumPlayerBullets>& freeBulletSlots,
+                     std::size_t& freeBulletSlotCount,
                      std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
                      const EnemyBulletSpatialGrid& enemyBulletGrid) noexcept {
     if (player.familiarLevel == 0) {
@@ -1529,7 +1569,8 @@ void updateFamiliars(PlayerState& player, std::uint8_t owner,
         auto dy = target->y - familiar.y;
         normalize(dx, dy);
         familiar.facing = facingFor(dx, dy);
-        fired = spawnBulletAt(bullets, familiar.x, familiar.y, owner, PlayerAttack::Familiar,
+        fired = spawnBulletAt(bullets, freeBulletSlots, freeBulletSlotCount,
+                              familiar.x, familiar.y, owner, PlayerAttack::Familiar,
                               dx, dy, stats.damage, stats.speed, 63, 2.0F) || fired;
     }
     if (fired) {
@@ -1587,6 +1628,8 @@ void processBombs(std::array<PlayerState, pixel_twins::kControllerCount>& player
 }
 
 void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets,
+                   std::array<std::uint8_t, kMaximumPlayerBullets>& freeBulletSlots,
+                   std::size_t& freeBulletSlotCount,
                    std::array<EnemyState, kMaximumEnemies>& enemies,
                    const EnemySpatialGrid& enemyGrid,
                    std::array<EnemyBulletState, kMaximumEnemyBullets>& enemyBullets,
@@ -1627,7 +1670,7 @@ void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets
         if (bullet.remainingTicks > 0) --bullet.remainingTicks;
         if (bullet.remainingTicks == 0 || bullet.x < 0.0F || bullet.y < 0.0F
             || bullet.x >= kMapPixelWidth || bullet.y >= kMapPixelHeight) {
-            bullet.active = false;
+            releaseBulletSlot(bullets, freeBulletSlots, freeBulletSlotCount, bullet);
             continue;
         }
         EnemyState* hitEnemy = nullptr;
@@ -1659,7 +1702,7 @@ void updateBullets(std::array<PlayerBulletState, kMaximumPlayerBullets>& bullets
             if (hitEnemy->hp <= 0) {
                 killEnemy(*hitEnemy, bullet.owner, xpGems, scores, killCounts);
             }
-            bullet.active = false;
+            releaseBulletSlot(bullets, freeBulletSlots, freeBulletSlotCount, bullet);
         }
     }
 }
@@ -2473,7 +2516,7 @@ void GameplayState::reset(const world::WorldMap& map, std::size_t startingPlayer
         player.maxHp = balance.startingHp;
     }
     enemies_.fill({});
-    bullets_.fill({});
+    resetBulletSlots(bullets_, freeBulletSlots_, freeBulletSlotCount_);
     xpGems_.fill({});
     windSlashes_.fill({});
     thunderStrikes_.fill({});
@@ -2800,17 +2843,19 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         auto& player = players_[index];
         if (player.hp > 0) {
             updateFamiliars(player, static_cast<std::uint8_t>(index), enemies_, enemyGrid,
-                            bullets_, enemyBullets_, enemyBulletGrid);
+                            bullets_, freeBulletSlots_, freeBulletSlotCount_,
+                            enemyBullets_, enemyBulletGrid);
         }
         if (player.hp > 0 && player.lightCooldownTicks == 0
             && fireLight(player, static_cast<std::uint8_t>(index), enemies_, enemyGrid,
-                         bullets_, impactEffects_)) {
+                         bullets_, freeBulletSlots_, freeBulletSlotCount_, impactEffects_)) {
             player.lightCooldownTicks = cooldownTicks(0.52F, 0.035F, player.lightLevel, 0.18F);
         }
         if (player.hp > 0 && player.fireLevel > 0 && player.fireCooldownTicks == 0) {
             const auto stats = attackStats(player.fireLevel, 1, 14, kFireSpeedPerTick, 5, 28.0F / 60.0F);
             if (fireSpread(player, static_cast<std::uint8_t>(index), PlayerAttack::Fire,
-                           stats, 0.16F, 54, 3.0F, bullets_, impactEffects_)) {
+                           stats, 0.16F, 54, 3.0F, bullets_,
+                           freeBulletSlots_, freeBulletSlotCount_, impactEffects_)) {
                 player.fireCooldownTicks = cooldownTicks(0.72F, 0.04F, player.fireLevel, 0.24F);
             }
         }
@@ -2829,7 +2874,8 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
             for (std::uint8_t shot = 0; shot < stats.count; ++shot) {
                 randomState_ = randomState_ * 1664525U + 1013904223U;
                 const auto angle = static_cast<float>(randomState_ & 0xffffU) * kTau / 65536.0F;
-                fired = spawnBullet(bullets_, player, static_cast<std::uint8_t>(index),
+                fired = spawnBullet(bullets_, freeBulletSlots_, freeBulletSlotCount_,
+                                    player, static_cast<std::uint8_t>(index),
                                     PlayerAttack::Ice, angle, stats.damage, stats.speed,
                                     63, 3.0F) || fired;
             }
@@ -2844,7 +2890,8 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
     }
     processBombs(players_, enemies_, enemyGrid, enemyBullets_, enemyBulletGrid, xpGems_,
                  scores_, killCounts_, randomState_);
-    updateBullets(bullets_, enemies_, enemyGrid, enemyBullets_, enemyBulletGrid, xpGems_,
+    updateBullets(bullets_, freeBulletSlots_, freeBulletSlotCount_,
+                  enemies_, enemyGrid, enemyBullets_, enemyBulletGrid, xpGems_,
                   scores_, killCounts_, impactEffects_);
     updateWindSlashes(windSlashes_, players_, enemies_, enemyGrid, enemyBullets_,
                       enemyBulletGrid, xpGems_, scores_, killCounts_, impactEffects_);
@@ -2866,7 +2913,7 @@ void GameplayState::tick(const pixel_twins::Controllers& controllers,
         clearY_ = defeated != enemies_.end() ? defeated->y : kWorldCenter;
         clearFacing_ = defeated != enemies_.end() ? defeated->facing : Facing::South;
         enemies_.fill({});
-        bullets_.fill({});
+        resetBulletSlots(bullets_, freeBulletSlots_, freeBulletSlotCount_);
         xpGems_.fill({});
         windSlashes_.fill({});
         thunderStrikes_.fill({});
@@ -3043,8 +3090,7 @@ std::size_t GameplayState::enemyCount() const noexcept {
 }
 
 std::size_t GameplayState::bulletCount() const noexcept {
-    return static_cast<std::size_t>(std::count_if(bullets_.begin(), bullets_.end(),
-        [](const PlayerBulletState& bullet) { return bullet.active; }));
+    return bullets_.size() - freeBulletSlotCount_;
 }
 
 const EnemyState* GameplayState::boss() const noexcept {
