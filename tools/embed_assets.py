@@ -99,7 +99,6 @@ namespace wizward::assets {
     text += _array(
         "kGameplaySpriteMetadata",
         sprites[:sprite_pixel_offset],
-        "PIXEL_TWINS_ASSET_SRAM",
     ) + "\n"
     for index, (start, end, rare) in enumerate(pixel_segments):
         text += _array(
