@@ -59,5 +59,9 @@ git submodule update --init --recursive
 
 ## ライセンス
 
-ソースコードは[MIT License](LICENSE)で公開します。画像、音楽、フォントなどのアセットには、
-それぞれの出典や利用条件が適用される場合があり、MIT Licenseの対象とは限りません。
+プログラムコードは[MIT License](LICENSE)で公開します。
+
+Wizwardの名称、ロゴ、画像、音楽、効果音、フォント、文章、キャラクター、世界観、ゲームデータ、および
+これらを変換・コンパイルしたデータには[Wizward Game Content License](CONTENT-LICENSE)が
+適用されます。個人的・非商用のビルドとプレイは可能ですが、これらを含むゲームや
+ゲームコンテンツを許可なく販売・再配布することはできません。
